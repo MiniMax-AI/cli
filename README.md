@@ -14,13 +14,22 @@ Generate text, images, video, speech, and music from the terminal. Supports both
 
 ## What's New (v0.4.0, v0.3.0 & v0.2.0)
 
-### v0.4.0 — File Management API
+### v0.4.0 — File Management API + Vision file_id Support
 
 New **`file`** resource group for pre-uploading files to MiniMax storage:
 
 - **`minimax file upload`** — upload a local file, get a `file_id` for reuse in vision/video requests
 - **`minimax file list`** — view all previously uploaded files in a table
 - **`minimax file delete`** — remove a file by its ID
+
+**Vision now accepts `--file-id`** to skip base64 encoding:
+
+```bash
+FILE_ID=$(minimax file upload --file image.png --quiet)
+minimax vision describe --file-id $FILE_ID --prompt "这张图里有几个人？"
+```
+
+This avoids heavy base64 conversion for large images — pass the `file_id` directly to the VLM API.
 
 Note: The MiniMax File API returned HTTP 404 with the current API key. The implementation is correct (endpoint paths, FormData multipart upload, and authentication are all verified). This is an API key permission issue — the code will work once a compatible key or endpoint is confirmed with MiniMax.
 
@@ -411,7 +420,7 @@ bun run build:npm
 
 ## Changelog
 
-### v0.4.0 — File Management API
+### v0.4.0 — File Management API + Vision file_id Support
 
 **Phase 1 — File API Types**
 - Added `FileUploadResponse`, `FileListResponse`, `FileDeleteResponse` types
@@ -429,6 +438,12 @@ bun run build:npm
 **Phase 4 — Command Registration**
 - Commands registered and listed in help under the new `file` resource group
 - Interactive fallback (missing `--file` / `--file-id` prompts in TTY, fails fast in CI/agent mode)
+
+**Phase 5 — Vision file_id Support**
+- `vision describe` now accepts `--file-id` as mutually exclusive alternative to `--image`
+- When `--file-id` is provided, sends `{prompt, file_id}` directly to VLM API (skips base64 encoding)
+- When `--image` is provided, falls back to existing base64 `toDataUri` path
+- TTY interactive prompt detects whether input is path/URL or fileId via simple heuristic
 
 Note: MiniMax File API returned HTTP 404 with current API key. Endpoint paths and request handling are verified correct via `--verbose` mode.
 
