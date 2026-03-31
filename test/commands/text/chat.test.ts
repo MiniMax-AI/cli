@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
+import { resetStatusBar } from '../../../src/client/http';
 import { createMockServer, jsonResponse, sseResponse, type MockServer } from '../../helpers/mock-server';
 import textChatResponse from '../../fixtures/text-chat-response.json';
 import type { Config } from '../../../src/config/schema';
@@ -8,6 +9,7 @@ describe('text chat command', () => {
 
   afterEach(() => {
     server?.close();
+    resetStatusBar();
   });
 
   it('sends chat request and gets response', async () => {
@@ -70,7 +72,7 @@ describe('text chat command', () => {
       output: 'json',
       timeout: 10,
       verbose: false,
-      quiet: false,
+      quiet: true,
       noColor: true,
       yes: false,
       dryRun: true,
@@ -85,7 +87,7 @@ describe('text chat command', () => {
     try {
       await chatCommand.execute(config, {
         message: ['Hello'],
-        quiet: false,
+        quiet: true,
         verbose: false,
         noColor: true,
         yes: false,

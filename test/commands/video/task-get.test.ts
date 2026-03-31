@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
+import { resetStatusBar } from '../../../src/client/http';
 import { default as taskGetCommand } from '../../../src/commands/video/task-get';
 import { createMockServer, jsonResponse, type MockServer } from '../../helpers/mock-server';
 import videoTaskSuccess from '../../fixtures/video-task-success.json';
@@ -8,6 +9,7 @@ describe('video task get command', () => {
 
   afterEach(() => {
     server?.close();
+    resetStatusBar();
   });
 
   it('has correct name', () => {

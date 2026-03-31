@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { requestJson } from '../../src/client/http';
+import { requestJson, resetStatusBar } from '../../src/client/http';
 import { createMockServer, jsonResponse, type MockServer } from '../helpers/mock-server';
 import type { Config } from '../../src/config/schema';
 
@@ -11,8 +11,8 @@ function makeConfig(baseUrl: string): Config {
     output: 'text',
     timeout: 10,
     verbose: false,
-    quiet: false,
-    noColor: false,
+    quiet: true,
+    noColor: true,
     yes: false,
     dryRun: false,
     nonInteractive: false,
@@ -25,6 +25,7 @@ describe('HTTP client', () => {
 
   afterEach(() => {
     server?.close();
+    resetStatusBar();
   });
 
   it('makes authenticated GET request', async () => {

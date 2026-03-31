@@ -19,6 +19,14 @@ export interface RequestOpts {
 // Printed once per process invocation to avoid repeating on every request.
 let statusBarPrinted = false;
 
+/**
+ * Reset the status bar flag — for use in test afterEach hooks to prevent
+ * state pollution between test files.
+ */
+export function resetStatusBar(): void {
+  statusBarPrinted = false;
+}
+
 export async function request(
   config: Config,
   opts: RequestOpts,
