@@ -20,7 +20,7 @@ import quotaShow from './commands/quota/show';
 import configShow from './commands/config/show';
 import configSet from './commands/config/set';
 import configExportSchema from './commands/config/export-schema';
-// ❄️ 暂时雪藏 File API (等待接口权限开放)
+// File API temporarily disabled (pending permission grant)
 // import fileUpload from './commands/file/upload';
 // import fileList from './commands/file/list';
 // import fileDelete from './commands/file/delete';
@@ -205,13 +205,18 @@ Getting Help:
   }
 
   private printChildren(node: CommandNode, prefix: string, out: NodeJS.WriteStream): void {
-    for (const [name, child] of node.children) {
-      if (child.command) {
-        out.write(`  ${prefix} ${name.padEnd(12)} ${child.command.description}\n`);
+    // Collect all leaf entries first so we can align the description column.
+    const entries: Array<{ fullName: string; description: string }> = [];
+    const collect = (n: CommandNode, p: string) => {
+      for (const [name, child] of n.children) {
+        if (child.command) entries.push({ fullName: `${p} ${name}`, description: child.command.description });
+        if (child.children.size > 0) collect(child, `${p} ${name}`);
       }
-      if (child.children.size > 0) {
-        this.printChildren(child, `${prefix} ${name}`, out);
-      }
+    };
+    collect(node, prefix);
+    const maxLen = Math.max(...entries.map(e => e.fullName.length));
+    for (const { fullName, description } of entries) {
+      out.write(`  ${fullName.padEnd(maxLen)}  ${description}\n`);
     }
   }
 }
@@ -236,7 +241,7 @@ export const registry = new CommandRegistry({
   'config set':       configSet,
   'config export-schema': configExportSchema,
 
-  // ❄️ 暂时雪藏 File API
+  // File API temporarily disabled (pending permission grant)
   // 'file upload':      fileUpload,
   // 'file list':        fileList,
   // 'file delete':      fileDelete,

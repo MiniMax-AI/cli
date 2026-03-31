@@ -30,7 +30,6 @@ export default defineCommand({
     'minimax auth login --method api-key --api-key sk-xxxxx',
   ],
   async run(config: Config, flags: GlobalFlags) {
-    // --- Phase 4: env key detection ---
     const envKey = process.env.MINIMAX_API_KEY;
     if (envKey) {
       const maskedEnvKey = envKey.length > 8 ? `${envKey.slice(0, 4)}...${envKey.slice(-4)}` : '***';
@@ -48,7 +47,6 @@ export default defineCommand({
         process.stderr.write(`Warning: MINIMAX_API_KEY is already set in environment.\n`);
       }
     }
-    // --- Phase 4 end ---
 
     const method = flags.apiKey ? 'api-key' : (flags.method as string) || 'oauth';
 

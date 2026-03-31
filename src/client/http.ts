@@ -16,6 +16,9 @@ export interface RequestOpts {
   authStyle?: 'bearer' | 'x-api-key';
 }
 
+// Printed once per process invocation to avoid repeating on every request.
+let statusBarPrinted = false;
+
 export async function request(
   config: Config,
   opts: RequestOpts,
@@ -23,8 +26,9 @@ export async function request(
   const isFormData =
     typeof FormData !== 'undefined' && opts.body instanceof FormData;
 
+  const version = process.env.CLI_VERSION ?? '0.3.1';
   const headers: Record<string, string> = {
-    'User-Agent': 'minimax-cli/0.1.0',
+    'User-Agent': `minimax-cli/${version}`,
     ...opts.headers,
   };
 
@@ -47,7 +51,8 @@ export async function request(
     }
 
     // ANSI 真彩色 (24-bit) 与基础排版
-    if (!config.quiet && process.stderr.isTTY) {
+    if (!config.quiet && !statusBarPrinted && process.stderr.isTTY) {
+      statusBarPrinted = true;
       const reset = '\x1b[0m';
       const dim = '\x1b[2m';
       const bold = '\x1b[1m'; // 新增加粗效果

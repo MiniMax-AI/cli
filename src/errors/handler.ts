@@ -1,12 +1,12 @@
 import { CLIError } from './base';
 import { ExitCode } from './codes';
+import { detectOutputFormat } from '../output/formatter';
 
 export function handleError(err: unknown): never {
   if (err instanceof CLIError) {
-    const isJson = process.env.MINIMAX_OUTPUT === 'json' ||
-      (typeof process.stdout?.isTTY !== 'undefined' && !process.stdout.isTTY);
+    const format = detectOutputFormat(process.env.MINIMAX_OUTPUT);
 
-    if (isJson) {
+    if (format === 'json') {
       process.stderr.write(JSON.stringify(err.toJSON(), null, 2) + '\n');
     } else {
       process.stderr.write(`\nError: ${err.message}\n`);

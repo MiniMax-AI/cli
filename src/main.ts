@@ -6,7 +6,7 @@ import { detectRegion, saveDetectedRegion } from './config/detect-region';
 import { REGIONS } from './config/schema';
 import { checkForUpdate, getPendingUpdateNotification } from './update/checker';
 
-const CLI_VERSION = process.env.CLI_VERSION ?? '0.1.0';
+const CLI_VERSION = process.env.CLI_VERSION ?? '0.3.1';
 
 async function main() {
   const args = process.argv.slice(2);

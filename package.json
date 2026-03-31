@@ -1,6 +1,6 @@
 {
   "name": "minimax-cli",
-  "version": "0.1.0",
+  "version": "0.3.1",
   "private": true,
   "description": "CLI for the MiniMax API Platform (Token Plan)",
   "type": "module",

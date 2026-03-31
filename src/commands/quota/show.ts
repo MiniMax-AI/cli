@@ -183,7 +183,9 @@ export default defineCommand({
     const url = quotaEndpoint(config.baseUrl);
     const response = await requestJson<QuotaApiResponse>(config, { url });
     const models = response.model_remains || [];
-    const format = detectOutputFormat(config.output);
+    // Only honour explicit --output flag; ignore config-file output setting so the
+    // rich HUD is shown by default in TTY even when the user has output: json globally.
+    const format = detectOutputFormat(flags.output as string | undefined);
 
     // Step 1: Non-text formats pass through as-is
     if (format !== 'text') {
@@ -208,9 +210,12 @@ export default defineCommand({
     const maxNameLen = models.length > 0
       ? Math.max(...models.map(m => m.model_name.length))
       : 16;
-    // Layout per row: name + 2 + usage(15) + 2 + bar(BAR_WIDTH) + 1 + pct(4) = name + BAR_WIDTH + 24
-    // Box inner W = content + 2 (for "│ " and " │" padding)
-    const W = Math.max(68, maxNameLen + BAR_WIDTH + 26);
+    // color bar:    BAR_WIDTH spaces + ' ' + pct(4)        = BAR_WIDTH + 5 visible cols
+    // no-color bar: '[' + BAR_WIDTH chars + '] ' + pct(4)  = BAR_WIDTH + 7 visible cols
+    const barVisLen = useColor ? BAR_WIDTH + 5 : BAR_WIDTH + 7;
+    // line1 content = name(maxNameLen) + '  '(2) + usage(15) + '  '(2) + bar(barVisLen)
+    // W must be content + 2 so boxRow borders ('| ' + ' |') have room
+    const W = Math.max(68, maxNameLen + 2 + 15 + 2 + barVisLen + 2);
 
     // ── Header row ──
     const weekRange = models.length > 0
@@ -264,8 +269,9 @@ export default defineCommand({
       const usageFrac = `${used.toLocaleString()} / ${limit.toLocaleString()}`;
       const bar = renderBar(usedPct, useColor);
 
-      // Visible columns: name(padded) + gap(2) + usage(15) + gap(2) + bar(BAR_WIDTH) + gap(1) + pct(4)
-      const line1VisLen = maxNameLen + 2 + 15 + 2 + BAR_WIDTH + 1 + 4;
+      // color bar:    BAR_WIDTH spaces + gap(1) + pct(4)       = BAR_WIDTH + 5
+      // no-color bar: '[' + BAR_WIDTH chars + '] ' + pct(4)   = BAR_WIDTH + 7
+      const line1VisLen = maxNameLen + 2 + 15 + 2 + barVisLen;
 
       let line1Styled: string;
       if (useColor) {

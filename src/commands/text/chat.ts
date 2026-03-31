@@ -79,7 +79,7 @@ function extractText(content: ContentBlock[]): string {
 
 export default defineCommand({
   name: 'text chat',
-  description: 'Send a chat completion (Anthropic Messages API)',
+  description: 'Send a chat completion (MiniMax Messages API)',
   usage: 'minimax text chat --message <text> [flags]',
   options: [
     { flag: '--model <model>', description: 'Model ID (default: MiniMax-M2.7)' },
