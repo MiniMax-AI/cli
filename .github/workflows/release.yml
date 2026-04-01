@@ -23,14 +23,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install
 
-      - name: Build all targets
+      - name: Build
         run: VERSION=${GITHUB_REF_NAME} bun run build.ts
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/minimax-*
             dist/minimax.mjs
             dist/manifest.json
           generate_release_notes: true

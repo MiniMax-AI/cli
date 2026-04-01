@@ -2,24 +2,16 @@
   "name": "minimax-cli",
   "version": "0.3.1",
   "private": true,
-  "description": "CLI for the MiniMax API Platform (Token Plan)",
+  "description": "CLI for the MiniMax AI Platform",
   "type": "module",
-  "bin": {
-    "minimax": "./dist/minimax.mjs"
-  },
-  "files": [
-    "dist/minimax.mjs"
-  ],
   "scripts": {
     "dev": "bun run src/main.ts",
     "build": "bun run build.ts",
-    "build:dev": "bun build src/main.ts --compile --minify --outfile dist/minimax --define \"process.env.CLI_VERSION='$(node -p \"require('./package.json').version\")'\"",
+    "build:dev": "bun build src/main.ts --outfile dist/minimax.mjs --target node --minify --define \"process.env.CLI_VERSION='$(node -p \"require('./package.json').version'\")'\" && printf '#!/usr/bin/env node\\n' | cat - dist/minimax.mjs > dist/tmp && mv dist/tmp dist/minimax.mjs && chmod +x dist/minimax.mjs",
     "lint": "eslint src/ test/",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:watch": "bun test --watch",
-    "build:npm": "bun build src/main.ts --outfile dist/minimax.mjs --target node --define \"process.env.CLI_VERSION='$npm_package_version'\" && printf '#!/usr/bin/env node\\n' | cat - dist/minimax.mjs > dist/tmp && mv dist/tmp dist/minimax.mjs && chmod +x dist/minimax.mjs",
-    "prepublishOnly": "bun run build:npm"
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0"
