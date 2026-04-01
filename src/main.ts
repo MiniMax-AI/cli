@@ -6,6 +6,7 @@ import { loadConfig } from './config/loader';
 import { detectRegion, saveDetectedRegion } from './config/detect-region';
 import { REGIONS } from './config/schema';
 import { checkForUpdate, getPendingUpdateNotification } from './update/checker';
+import { loadCredentials } from './auth/credentials';
 
 const CLI_VERSION = process.env.CLI_VERSION ?? '0.3.1';
 
@@ -17,15 +18,31 @@ async function main() {
     process.exit(0);
   }
 
-  // Pass 1: find command path from positional args
   const commandPath = scanCommandPath(argv);
 
-  if (argv.includes('--help') || argv.includes('-h') || commandPath.length === 0) {
+  if (argv.includes('--help') || argv.includes('-h')) {
     registry.printHelp(commandPath, process.stderr);
     process.exit(0);
   }
 
-  // Pass 2: resolve command, then parse flags with the merged schema
+  // No command: show quota if logged in, else guide to login
+  if (commandPath.length === 0) {
+    const { command: quotaCmd } = registry.resolve(['quota', 'show']);
+    const flags = parseFlags(argv, [...GLOBAL_OPTIONS, ...(quotaCmd.options ?? [])]);
+    const config = loadConfig(flags);
+
+    const hasKey = !!(config.apiKey || config.envApiKey || config.fileApiKey);
+    const hasOAuth = !!(await loadCredentials());
+
+    if (hasKey || hasOAuth) {
+      await quotaCmd.execute(config, flags);
+    } else {
+      process.stderr.write('\n  Not logged in.\n\n');
+      process.stderr.write('  minimax auth login --api-key sk-xxxxx\n\n');
+    }
+    process.exit(0);
+  }
+
   const { command, extra } = registry.resolve(commandPath);
   const flags = parseFlags(argv, [...GLOBAL_OPTIONS, ...(command.options ?? [])]);
 
