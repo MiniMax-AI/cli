@@ -23,7 +23,7 @@ export default defineCommand({
 
     if (config.dryRun) {
       if (creds) console.log('Would remove ~/.minimax/credentials.json');
-      if (hasConfigKey) console.log('Would clear api_key from ~/.minimax/config.yaml');
+      if (hasConfigKey) console.log('Would clear api_key from ~/.minimax/config.json');
       if (!creds && !hasConfigKey) console.log('No credentials to clear.');
       console.log('No changes made.');
       return;
@@ -39,7 +39,7 @@ export default defineCommand({
         const updated = fileConfig as Record<string, unknown>;
         delete updated.api_key;
         await writeConfigFile(updated);
-        process.stderr.write('Cleared api_key from ~/.minimax/config.yaml\n');
+        process.stderr.write('Cleared api_key from ~/.minimax/config.json\n');
       } catch { /* ignore */ }
     }
 

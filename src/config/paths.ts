@@ -8,6 +8,10 @@ export function getConfigDir(): string {
 }
 
 export function getConfigPath(): string {
+  return join(getConfigDir(), 'config.json');
+}
+
+export function getLegacyConfigPath(): string {
   return join(getConfigDir(), 'config.yaml');
 }
 

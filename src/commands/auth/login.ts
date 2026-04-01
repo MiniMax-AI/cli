@@ -77,7 +77,7 @@ export default defineCommand({
           );
         }
 
-        // Store key in config.yaml
+        // Store key in config.json
         const existing = readConfigFile() as Record<string, unknown>;
         existing.api_key = key;
         await writeConfigFile(existing);

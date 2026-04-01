@@ -20,7 +20,7 @@ export async function resolveCredential(config: Config): Promise<ResolvedCredent
 
   // 3. API key from config file
   if (config.fileApiKey) {
-    return { token: config.fileApiKey, method: 'api-key', source: 'config.yaml' };
+    return { token: config.fileApiKey, method: 'api-key', source: 'config.json' };
   }
 
   // 4. Environment variable

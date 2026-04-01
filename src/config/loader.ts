@@ -1,15 +1,33 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { parse as parseYaml, stringify as yamlStringify } from 'yaml';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
 import { parseConfigFile, REGIONS, type Config, type ConfigFile, type Region } from './schema';
-import { ensureConfigDir, getConfigPath } from './paths';
+import { ensureConfigDir, getConfigPath, getLegacyConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
 import type { GlobalFlags } from '../types/flags';
 
+function migrateLegacyConfig(): void {
+  const legacy = getLegacyConfigPath();
+  const current = getConfigPath();
+  if (existsSync(legacy) && !existsSync(current)) {
+    try {
+      // Parse YAML by hand — only need simple key: value pairs
+      const raw = readFileSync(legacy, 'utf-8');
+      const obj: Record<string, string> = {};
+      for (const line of raw.split('\n')) {
+        const m = line.match(/^(\w+):\s*(.+)$/);
+        if (m) obj[m[1]!] = m[2]!.trim();
+      }
+      writeFileSync(current, JSON.stringify(obj, null, 2) + '\n', { mode: 0o600 });
+      renameSync(legacy, legacy + '.bak');
+    } catch { /* silent */ }
+  }
+}
+
 export function readConfigFile(): ConfigFile {
+  migrateLegacyConfig();
   const path = getConfigPath();
   if (!existsSync(path)) return {};
   try {
-    return parseConfigFile(parseYaml(readFileSync(path, 'utf-8')));
+    return parseConfigFile(JSON.parse(readFileSync(path, 'utf-8')));
   } catch {
     return {};
   }
@@ -17,7 +35,7 @@ export function readConfigFile(): ConfigFile {
 
 export async function writeConfigFile(data: Record<string, unknown>): Promise<void> {
   await ensureConfigDir();
-  writeFileSync(getConfigPath(), yamlStringify(data), { mode: 0o600 });
+  writeFileSync(getConfigPath(), JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
 }
 
 export function loadConfig(flags: GlobalFlags): Config {
