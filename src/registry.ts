@@ -168,7 +168,7 @@ Global Flags:
   --api-key <key>        API key (overrides all other auth)
   --region <region>      API region: global (default), cn
   --base-url <url>       API base URL (overrides region)
-  --output <format>      Output format: text, json, yaml
+  --output <format>      Output format: text, json
   --quiet                Suppress non-essential output
   --verbose              Print HTTP request/response details
   --timeout <seconds>    Request timeout (default: 300)

@@ -22,8 +22,7 @@
     "prepublishOnly": "bun run build:npm"
   },
   "dependencies": {
-    "@clack/prompts": "^0.7.0",
-    "yaml": "^2.7.1"
+    "@clack/prompts": "^0.7.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3",

@@ -7,11 +7,6 @@ describe('formatOutput', () => {
     expect(JSON.parse(result)).toEqual({ key: 'value' });
   });
 
-  it('formats YAML output', () => {
-    const result = formatOutput({ key: 'value' }, 'yaml');
-    expect(result).toContain('key: value');
-  });
-
   it('formats text output for objects', () => {
     const result = formatOutput({ name: 'test', status: 'ok' }, 'text');
     expect(result).toContain('name: test');

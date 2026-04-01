@@ -48,9 +48,9 @@ export default defineCommand({
       );
     }
 
-    if (key === 'output' && !['text', 'json', 'yaml'].includes(value)) {
+    if (key === 'output' && !['text', 'json'].includes(value)) {
       throw new CLIError(
-        `Invalid output format "${value}". Valid values: text, json, yaml`,
+        `Invalid output format "${value}". Valid values: text, json`,
         ExitCode.USAGE,
       );
     }

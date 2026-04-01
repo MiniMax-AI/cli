@@ -49,7 +49,7 @@ describe('resolveCredential', () => {
     const cred = await resolveCredential(config);
     expect(cred.token).toBe('sk-from-file');
     expect(cred.method).toBe('api-key');
-    expect(cred.source).toBe('config.yaml');
+    expect(cred.source).toBe('config.json');
   });
 
   it('throws when no credentials found', async () => {
@@ -67,7 +67,7 @@ describe('resolveCredential', () => {
     const config = makeConfig({ fileApiKey: 'sk-file', envApiKey: 'sk-env' });
     const cred = await resolveCredential(config);
     expect(cred.token).toBe('sk-file');
-    expect(cred.source).toBe('config.yaml');
+    expect(cred.source).toBe('config.json');
   });
 
   it('env var is lowest priority', async () => {

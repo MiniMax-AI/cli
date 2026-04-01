@@ -10,12 +10,12 @@ export interface ConfigFile {
   region?: Region;
   region_key_fingerprint?: string;
   base_url?: string;
-  output?: 'text' | 'json' | 'yaml';
+  output?: 'text' | 'json';
   timeout?: number;
 }
 
 const VALID_REGIONS = new Set<string>(['global', 'cn']);
-const VALID_OUTPUTS = new Set<string>(['text', 'json', 'yaml']);
+const VALID_OUTPUTS = new Set<string>(['text', 'json']);
 
 export function parseConfigFile(raw: unknown): ConfigFile {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
@@ -38,7 +38,7 @@ export interface Config {
   fileApiKey?: string;
   region: Region;
   baseUrl: string;
-  output: 'text' | 'json' | 'yaml';
+  output: 'text' | 'json';
   timeout: number;
   verbose: boolean;
   quiet: boolean;
