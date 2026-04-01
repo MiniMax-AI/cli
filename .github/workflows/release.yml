@@ -30,7 +30,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/*.tar.gz
-            dist/*.zip
+            dist/minimax-*
+            dist/minimax.mjs
             dist/manifest.json
           generate_release_notes: true
