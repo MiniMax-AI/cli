@@ -10,8 +10,10 @@
 
 ## 安装
 
+需要 [Node.js](https://nodejs.org) 18+。
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MiniMax-AI-Dev/cli/main/install.sh | sh
+npm install -g minimax-cli
 ```
 
 ---

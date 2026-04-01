@@ -70,8 +70,8 @@ async function main() {
   await updateCheckPromise;
   const newVersion = getPendingUpdateNotification();
   if (newVersion && !config.quiet) {
-    process.stderr.write(`\n  Update available: v${CLI_VERSION} → ${newVersion}\n`);
-    process.stderr.write(`  Run 'minimax update' to upgrade.\n\n`);
+    process.stderr.write(`\n  Update available: ${newVersion}\n`);
+    process.stderr.write(`  npm update -g minimax-cli\n\n`);
   }
 }
 
