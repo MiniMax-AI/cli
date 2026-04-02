@@ -23,14 +23,13 @@ export function loadConfig(flags: GlobalFlags): Config {
   const file = readConfigFile();
 
   const apiKey = flags.apiKey || undefined;
-  const envApiKey = process.env.MINIMAX_API_KEY || undefined;
   const fileApiKey = file.api_key;
 
   const explicitRegion = (flags.region as string) || process.env.MINIMAX_REGION || undefined;
   const cachedRegion = file.region;
   const region = (explicitRegion || cachedRegion || 'global') as Region;
 
-  const activeKey = apiKey || fileApiKey || envApiKey;
+  const activeKey = apiKey || fileApiKey;
   const needsRegionDetection = !explicitRegion
     && (!cachedRegion || (activeKey !== undefined && activeKey !== file.api_key));
 
@@ -51,8 +50,9 @@ export function loadConfig(flags: GlobalFlags): Config {
 
   return {
     apiKey,
-    envApiKey,
     fileApiKey,
+    fileRegion: file.region,
+    configPath: getConfigPath(),
     region,
     baseUrl,
     output,

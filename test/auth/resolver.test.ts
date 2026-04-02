@@ -20,14 +20,8 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
 }
 
 describe('resolveCredential', () => {
-  const originalEnv = process.env.MINIMAX_API_KEY;
-
   afterEach(() => {
-    if (originalEnv) {
-      process.env.MINIMAX_API_KEY = originalEnv;
-    } else {
-      delete process.env.MINIMAX_API_KEY;
-    }
+    delete process.env.MINIMAX_API_KEY;
   });
 
   it('resolves from flag (apiKey in config)', async () => {
@@ -35,13 +29,6 @@ describe('resolveCredential', () => {
     const cred = await resolveCredential(config);
     expect(cred.token).toBe('sk-from-flag');
     expect(cred.method).toBe('api-key');
-  });
-
-  it('resolves from env var', async () => {
-    const config = makeConfig({ envApiKey: 'sk-from-env' });
-    const cred = await resolveCredential(config);
-    expect(cred.token).toBe('sk-from-env');
-    expect(cred.source).toBe('env');
   });
 
   it('resolves from config file api key', async () => {
@@ -59,19 +46,6 @@ describe('resolveCredential', () => {
 
   it('prefers flag over file api key', async () => {
     const config = makeConfig({ apiKey: 'sk-flag', fileApiKey: 'sk-file' });
-    const cred = await resolveCredential(config);
-    expect(cred.token).toBe('sk-flag');
-  });
-
-  it('prefers config file over env var', async () => {
-    const config = makeConfig({ fileApiKey: 'sk-file', envApiKey: 'sk-env' });
-    const cred = await resolveCredential(config);
-    expect(cred.token).toBe('sk-file');
-    expect(cred.source).toBe('config.json');
-  });
-
-  it('env var is lowest priority', async () => {
-    const config = makeConfig({ apiKey: 'sk-flag', fileApiKey: 'sk-file', envApiKey: 'sk-env' });
     const cred = await resolveCredential(config);
     expect(cred.token).toBe('sk-flag');
   });

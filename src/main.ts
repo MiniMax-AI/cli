@@ -7,8 +7,19 @@ import { detectRegion, saveDetectedRegion } from './config/detect-region';
 import { REGIONS } from './config/schema';
 import { checkForUpdate, getPendingUpdateNotification } from './update/checker';
 import { loadCredentials } from './auth/credentials';
+import { ensureApiKey } from './auth/setup';
 
 const CLI_VERSION = process.env.CLI_VERSION ?? '0.3.1';
+
+// Commands that manage their own auth or need no key
+const NO_AUTH_SETUP = [
+  ['auth', 'login'],
+  ['auth', 'logout'],
+  ['config', 'show'],
+  ['config', 'set'],
+  ['config', 'export-schema'],
+  ['update'],
+];
 
 async function main() {
   const argv = process.argv.slice(2);
@@ -33,7 +44,7 @@ async function main() {
     const flags = parseFlags(argv, [...GLOBAL_OPTIONS, ...(quotaCmd.options ?? [])]);
     const config = loadConfig(flags);
 
-    const hasKey = !!(config.apiKey || config.envApiKey || config.fileApiKey);
+    const hasKey = !!(config.apiKey || config.fileApiKey);
     const hasOAuth = !!(await loadCredentials());
 
     if (hasKey || hasOAuth) {
@@ -52,8 +63,15 @@ async function main() {
 
   const config = loadConfig(flags);
 
+  const needsAuthSetup = !NO_AUTH_SETUP.some(
+    (cmd) => cmd.every((c, i) => commandPath[i] === c),
+  );
+  if (needsAuthSetup) {
+    await ensureApiKey(config);
+  }
+
   if (config.needsRegionDetection) {
-    const apiKey = config.apiKey || config.fileApiKey || config.envApiKey;
+    const apiKey = config.apiKey || config.fileApiKey;
     if (apiKey) {
       const detected = await detectRegion(apiKey);
       config.region = detected;

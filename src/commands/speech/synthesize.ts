@@ -3,11 +3,12 @@ import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { request, requestJson } from '../../client/http';
 import { speechEndpoint } from '../../client/endpoints';
-import { formatOutput, detectOutputFormat } from '../../output/formatter';
+import { detectOutputFormat, formatOutput } from '../../output/formatter';
+import { saveAudioOutput } from '../../output/audio';
+import { readTextFromPathOrStdin } from '../../utils/fs';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { SpeechRequest, SpeechResponse } from '../../types/api';
-import { readFileSync, writeFileSync } from 'fs';
 
 export default defineCommand({
   name: 'speech synthesize',
@@ -42,10 +43,7 @@ export default defineCommand({
     let text = (flags.text ?? (flags._positional as string[]|undefined)?.[0]) as string | undefined;
 
     if (flags.textFile) {
-      const path = flags.textFile as string;
-      text = path === '-'
-        ? readFileSync('/dev/stdin', 'utf-8')
-        : readFileSync(path, 'utf-8');
+      text = readTextFromPathOrStdin(flags.textFile as string);
     }
 
     if (!text) {
@@ -117,37 +115,7 @@ export default defineCommand({
       body,
     });
 
-    if (!config.quiet) {
-      process.stderr.write(`[Model: ${model}]\n`);
-    }
-
-    if (outPath) {
-      // output_format='hex': data.audio is hex-encoded binary
-      const audioBuffer = Buffer.from(response.data.audio!, 'hex');
-      writeFileSync(outPath, audioBuffer);
-
-      if (config.quiet) {
-        console.log(outPath);
-      } else {
-        console.log(formatOutput({
-          saved: outPath,
-          duration_ms: response.extra_info?.audio_length,
-          size_bytes: response.extra_info?.audio_size,
-          sample_rate: response.extra_info?.audio_sample_rate,
-        }, format));
-      }
-    } else {
-      // output_format='url': API returns URL in data.audio (not data.audio_url)
-      const audioUrl = response.data.audio_url ?? response.data.audio;
-      if (config.quiet) {
-        console.log(audioUrl);
-      } else {
-        console.log(formatOutput({
-          url: audioUrl,
-          duration_ms: response.extra_info?.audio_length,
-          size_bytes: response.extra_info?.audio_size,
-        }, format));
-      }
-    }
+    if (!config.quiet) process.stderr.write(`[Model: ${model}]\n`);
+    saveAudioOutput(response, outPath, format, config.quiet);
   },
 });

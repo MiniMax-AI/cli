@@ -32,8 +32,9 @@ export function parseConfigFile(raw: unknown): ConfigFile {
 
 export interface Config {
   apiKey?: string;
-  envApiKey?: string;
   fileApiKey?: string;
+  fileRegion?: Region;
+  configPath?: string;
   region: Region;
   baseUrl: string;
   output: 'text' | 'json';

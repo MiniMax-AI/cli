@@ -4,6 +4,8 @@ import { loadCredentials } from '../../auth/credentials';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { requestJson } from '../../client/http';
 import { quotaEndpoint } from '../../client/endpoints';
+import { renderQuotaTable } from '../../output/quota-table';
+import { maskToken } from '../../utils/token';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { QuotaResponse } from '../../types/api';
@@ -33,7 +35,7 @@ export default defineCommand({
             if (creds.account) result.account = creds.account;
           }
         } else {
-          result.key = credential.token.slice(0, 6) + '...' + credential.token.slice(-4);
+          result.key = maskToken(credential.token);
         }
         console.log(formatOutput(result, format));
         return;
@@ -45,8 +47,7 @@ export default defineCommand({
       console.log(`  Source: ${credential.source}`);
 
       const token = credential.token;
-      const maskedToken = token.length > 8 ? `${token.slice(0, 4)}...${token.slice(-4)}` : '***';
-      console.log(`  Key:    ${maskedToken}`);
+      console.log(`  Key:    ${maskToken(token)}`);
 
       if (credential.method === 'oauth') {
         const creds = await loadCredentials();
@@ -59,32 +60,14 @@ export default defineCommand({
       }
 
       // Fetch quota snapshot
-      console.log('');
       process.stderr.write('Fetching quota snapshot...\n');
       try {
         const url = quotaEndpoint(config.baseUrl);
         const quota = await requestJson<QuotaResponse>(config, { url, method: 'GET' });
-        const models = quota.model_remains || [];
-        if (models.length > 0) {
-          console.log('Available Quotas:');
-          for (const m of models.slice(0, 5)) {
-            const remaining = m.current_interval_total_count - m.current_interval_usage_count;
-            const pct = m.current_interval_total_count > 0
-              ? Math.round((remaining / m.current_interval_total_count) * 100)
-              : 0;
-            console.log(`  ${m.model_name.padEnd(24)} ${String(remaining).padStart(6)} / ${m.current_interval_total_count}  (${pct}%)`);
-          }
-          if (models.length > 5) {
-            console.log(`  ... and ${models.length - 5} more (run 'minimax quota show' for full details)`);
-          }
-        } else {
-          console.log('  No quota data available.');
-        }
+        renderQuotaTable(quota.model_remains || [], config);
       } catch (e) {
         console.log(`  Quota fetch failed: ${(e as Error).message}`);
       }
-      console.log('');
-      console.log("Run 'minimax quota show' for full details.");
 
     } catch {
       const format = detectOutputFormat(config.output);

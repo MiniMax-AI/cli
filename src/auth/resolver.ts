@@ -23,14 +23,9 @@ export async function resolveCredential(config: Config): Promise<ResolvedCredent
     return { token: config.fileApiKey, method: 'api-key', source: 'config.json' };
   }
 
-  // 4. Environment variable
-  if (config.envApiKey) {
-    return { token: config.envApiKey, method: 'api-key', source: 'env' };
-  }
-
   throw new CLIError(
     'No credentials found.',
     ExitCode.AUTH,
-    'Log in:              minimax auth login\nSet env var:         export MINIMAX_API_KEY=sk-xxxxx\nPass directly:       --api-key sk-xxxxx',
+    'Log in:        minimax auth login\nPass directly:  --api-key sk-xxxxx',
   );
 }

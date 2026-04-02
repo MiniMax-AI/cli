@@ -9,6 +9,7 @@ import { quotaEndpoint } from '../../client/endpoints';
 import { getConfigPath } from '../../config/paths';
 import { readConfigFile, writeConfigFile } from '../../config/loader';
 import { isInteractive } from '../../utils/env';
+import { maskToken } from '../../utils/token';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { CredentialFile } from '../../auth/types';
@@ -32,7 +33,7 @@ export default defineCommand({
   async run(config: Config, flags: GlobalFlags) {
     const envKey = process.env.MINIMAX_API_KEY;
     if (envKey) {
-      const maskedEnvKey = envKey.length > 8 ? `${envKey.slice(0, 4)}...${envKey.slice(-4)}` : '***';
+      const maskedEnvKey = maskToken(envKey);
       if (isInteractive({ nonInteractive: config.nonInteractive })) {
         const { confirm } = await import('@clack/prompts');
         const proceed = await confirm({

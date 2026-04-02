@@ -4,10 +4,11 @@ import { ExitCode } from '../../errors/codes';
 import { request, requestJson } from '../../client/http';
 import { musicEndpoint } from '../../client/endpoints';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
+import { saveAudioOutput } from '../../output/audio';
+import { readTextFromPathOrStdin } from '../../utils/fs';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { MusicRequest, MusicResponse } from '../../types/api';
-import { readFileSync, writeFileSync } from 'fs';
 
 export default defineCommand({
   name: 'music generate',
@@ -33,10 +34,7 @@ export default defineCommand({
     let lyrics = flags.lyrics as string | undefined;
 
     if (flags.lyricsFile) {
-      const path = flags.lyricsFile as string;
-      lyrics = path === '-'
-        ? readFileSync('/dev/stdin', 'utf-8')
-        : readFileSync(path, 'utf-8');
+      lyrics = readTextFromPathOrStdin(flags.lyricsFile as string);
     }
 
     if (!prompt && !lyrics) {
@@ -94,35 +92,7 @@ export default defineCommand({
       body,
     });
 
-    if (!config.quiet) {
-      process.stderr.write('[Model: music-2.5]\n');
-    }
-
-    if (outPath) {
-      const audioBuffer = Buffer.from(response.data.audio!, 'hex');
-      writeFileSync(outPath, audioBuffer);
-
-      if (config.quiet) {
-        console.log(outPath);
-      } else {
-        console.log(formatOutput({
-          saved: outPath,
-          duration_ms: response.extra_info?.audio_length,
-          size_bytes: response.extra_info?.audio_size,
-          sample_rate: response.extra_info?.audio_sample_rate,
-        }, format));
-      }
-    } else {
-      const audioUrl = response.data.audio_url ?? response.data.audio;
-      if (config.quiet) {
-        console.log(audioUrl);
-      } else {
-        console.log(formatOutput({
-          url: audioUrl,
-          duration_ms: response.extra_info?.audio_length,
-          size_bytes: response.extra_info?.audio_size,
-        }, format));
-      }
-    }
+    if (!config.quiet) process.stderr.write('[Model: music-2.5]\n');
+    saveAudioOutput(response, outPath, format, config.quiet);
   },
 });
