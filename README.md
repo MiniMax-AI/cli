@@ -1,41 +1,61 @@
-# minimax-cli
+<p align="center">
+  <img src="assets/logo.png" alt="MiniMax" width="320" />
+</p>
 
-CLI for the [MiniMax AI Platform](https://platform.minimax.io) — generate text, images, video, speech, and music from the terminal.
+<p align="center">
+  <strong>The official CLI for the MiniMax AI Platform</strong><br>
+  Generate text, images, video, speech, and music — all from your terminal.
+</p>
 
-Supports **Global** (`api.minimax.io`) and **CN** (`api.minimaxi.com`) with automatic region detection.
+<p align="center">
+  <a href="https://www.npmjs.com/package/minimax-cli"><img src="https://img.shields.io/npm/v/minimax-cli.svg" alt="npm version" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg" alt="Node.js >= 18" /></a>
+</p>
 
-[中文文档](README_CN.md)
+<p align="center">
+  <a href="README_CN.md">中文文档</a> · <a href="https://platform.minimax.io">Platform</a>
+</p>
 
----
+## Features
+
+- **Text** — Multi-turn chat, streaming, system prompts, JSON output
+- **Image** — Text-to-image with aspect ratio and batch controls
+- **Video** — Async video generation with progress tracking
+- **Speech** — TTS with 30+ voices, speed control, streaming playback
+- **Music** — Text-to-music with optional lyrics
+- **Vision** — Image understanding and description
+- **Search** — Web search powered by MiniMax
+- **Dual Region** — Seamless Global (`api.minimax.io`) and CN (`api.minimaxi.com`) support
 
 ## Install
-
-Requires [Node.js](https://nodejs.org) 18+.
 
 ```bash
 npm install -g minimax-cli
 ```
 
----
+> Requires [Node.js](https://nodejs.org) 18+
 
 ## Quick Start
 
 ```bash
+# Authenticate
 minimax auth login --api-key sk-xxxxx
 
+# Start creating
 minimax text chat --message "What is MiniMax?"
 minimax image "A cat in a spacesuit"
 minimax speech synthesize --text "Hello!" --out hello.mp3
+minimax video generate --prompt "Ocean waves at sunset"
+minimax music "Upbeat pop"
 minimax search "MiniMax AI latest news"
 minimax vision photo.jpg
 minimax quota
 ```
 
----
-
 ## Commands
 
-### Text
+### `minimax text`
 
 ```bash
 minimax text chat --message "Write a poem"
@@ -45,15 +65,15 @@ minimax text chat --message "user:Hi" --message "assistant:Hey!" --message "How 
 cat messages.json | minimax text chat --messages-file - --output json
 ```
 
-### Image
+### `minimax image`
 
 ```bash
-minimax image "A cat in a spacesuit"              # shorthand
+minimax image "A cat in a spacesuit"
 minimax image generate --prompt "A cat" --n 3 --aspect-ratio 16:9
 minimax image generate --prompt "Logo" --out-dir ./out/
 ```
 
-### Video
+### `minimax video`
 
 ```bash
 minimax video generate --prompt "Ocean waves at sunset" --async
@@ -62,7 +82,7 @@ minimax video task get --task-id 123456
 minimax video download --file-id 176844028768320 --out video.mp4
 ```
 
-### Speech
+### `minimax speech`
 
 ```bash
 minimax speech synthesize --text "Hello!" --out hello.mp3
@@ -72,38 +92,29 @@ echo "Breaking news" | minimax speech synthesize --text-file - --out news.mp3
 minimax speech voices
 ```
 
-### Music
+### `minimax music`
 
 ```bash
-minimax music "Upbeat pop"                        # shorthand
+minimax music "Upbeat pop"
 minimax music generate --prompt "Jazz" --lyrics "La la la" --out song.mp3
 ```
 
-### Vision
+### `minimax vision`
 
 ```bash
-minimax vision photo.jpg                          # shorthand
+minimax vision photo.jpg
 minimax vision describe --image https://example.com/img.jpg --prompt "What breed?"
 minimax vision describe --file-id file-123
 ```
 
-### Search
+### `minimax search`
 
 ```bash
-minimax search "MiniMax AI"                       # shorthand
+minimax search "MiniMax AI"
 minimax search query --q "latest news" --output json
 ```
 
-### Quota & Config
-
-```bash
-minimax quota
-minimax config show
-minimax config set --key region --value cn
-minimax config export-schema | jq .
-```
-
-### Auth
+### `minimax auth`
 
 ```bash
 minimax auth login --api-key sk-xxxxx
@@ -113,15 +124,22 @@ minimax auth refresh
 minimax auth logout
 ```
 
-### Update
+### `minimax config` · `minimax quota`
+
+```bash
+minimax quota
+minimax config show
+minimax config set --key region --value cn
+minimax config export-schema | jq .
+```
+
+### `minimax update`
 
 ```bash
 minimax update
 minimax update latest
 ```
 
----
-
 ## License
 
-MIT
+[MIT](LICENSE)
