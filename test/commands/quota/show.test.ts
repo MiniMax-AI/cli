@@ -18,7 +18,7 @@ describe('quota show command', () => {
       noColor: true,
       yes: false,
       dryRun: true,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -34,7 +34,7 @@ describe('quota show command', () => {
         yes: false,
         dryRun: true,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       });
 

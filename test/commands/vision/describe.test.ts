@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'bun:test';
-import { default as setCommand } from '../../../src/commands/config/set';
+import { default as describeCommand } from '../../../src/commands/vision/describe';
 
-describe('config set command', () => {
+describe('vision describe command', () => {
   it('has correct name', () => {
-    expect(setCommand.name).toBe('config set');
+    expect(describeCommand.name).toBe('vision describe');
   });
 
-  it('requires key and value', async () => {
+  it('requires either image or fileId', async () => {
     const config = {
+      apiKey: 'test-key',
       region: 'global' as const,
       baseUrl: 'https://api.minimax.io',
       output: 'text' as const,
@@ -16,27 +17,28 @@ describe('config set command', () => {
       quiet: false,
       noColor: true,
       yes: false,
-      dryRun: false,
+      dryRun: true,
       nonInteractive: true,
       async: false,
     };
 
     await expect(
-      setCommand.execute(config, {
+      describeCommand.execute(config, {
         quiet: false,
         verbose: false,
         noColor: true,
         yes: false,
-        dryRun: false,
+        dryRun: true,
         help: false,
         nonInteractive: true,
         async: false,
       }),
-    ).rejects.toThrow('--key and --value are required');
+    ).rejects.toThrow('Missing required argument');
   });
 
-  it('validates config key', async () => {
+  it('rejects both image and fileId', async () => {
     const config = {
+      apiKey: 'test-key',
       region: 'global' as const,
       baseUrl: 'https://api.minimax.io',
       output: 'text' as const,
@@ -45,24 +47,24 @@ describe('config set command', () => {
       quiet: false,
       noColor: true,
       yes: false,
-      dryRun: false,
+      dryRun: true,
       nonInteractive: true,
       async: false,
     };
 
     await expect(
-      setCommand.execute(config, {
-        key: 'invalid_key',
-        value: 'test',
+      describeCommand.execute(config, {
+        image: 'test.jpg',
+        fileId: 'file-123',
         quiet: false,
         verbose: false,
         noColor: true,
         yes: false,
-        dryRun: false,
+        dryRun: true,
         help: false,
         nonInteractive: true,
         async: false,
       }),
-    ).rejects.toThrow('Invalid config key');
+    ).rejects.toThrow('Conflicting arguments');
   });
 });

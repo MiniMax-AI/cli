@@ -17,7 +17,7 @@ describe('auth status command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -33,7 +33,7 @@ describe('auth status command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       });
 

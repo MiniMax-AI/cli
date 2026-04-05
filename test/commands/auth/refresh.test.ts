@@ -17,7 +17,7 @@ describe('auth refresh command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -29,7 +29,7 @@ describe('auth refresh command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       }),
     ).rejects.toThrow('not authenticated via OAuth');

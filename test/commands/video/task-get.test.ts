@@ -26,7 +26,7 @@ describe('video task get command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -38,7 +38,7 @@ describe('video task get command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       }),
     ).rejects.toThrow('--task-id is required');
@@ -62,7 +62,7 @@ describe('video task get command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -79,7 +79,7 @@ describe('video task get command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       });
 

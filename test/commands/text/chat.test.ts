@@ -31,7 +31,7 @@ describe('text chat command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -50,7 +50,7 @@ describe('text chat command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       });
 
@@ -74,7 +74,7 @@ describe('text chat command', () => {
       noColor: true,
       yes: false,
       dryRun: true,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -91,7 +91,7 @@ describe('text chat command', () => {
         yes: false,
         dryRun: true,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       });
 

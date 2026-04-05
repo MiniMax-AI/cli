@@ -4,6 +4,10 @@ import { maskToken } from '../utils/token';
 
 let printed = false;
 
+export function resetStatusBar(): void {
+  printed = false;
+}
+
 const reset    = '\x1b[0m';
 const dim      = '\x1b[2m';
 const bold     = '\x1b[1m';

@@ -18,7 +18,7 @@ describe('video download command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -30,7 +30,7 @@ describe('video download command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       }),
     ).rejects.toThrow('--file-id is required');
@@ -48,7 +48,7 @@ describe('video download command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -61,7 +61,7 @@ describe('video download command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       }),
     ).rejects.toThrow('--out is required');

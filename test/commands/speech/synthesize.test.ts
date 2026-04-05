@@ -18,7 +18,7 @@ describe('speech synthesize command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -30,7 +30,7 @@ describe('speech synthesize command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       }),
     ).rejects.toThrow('--text or --text-file is required');
@@ -48,7 +48,7 @@ describe('speech synthesize command', () => {
       noColor: true,
       yes: false,
       dryRun: true,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -65,7 +65,7 @@ describe('speech synthesize command', () => {
         yes: false,
         dryRun: true,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       });
 

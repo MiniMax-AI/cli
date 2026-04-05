@@ -18,7 +18,7 @@ describe('music generate command', () => {
       noColor: true,
       yes: false,
       dryRun: false,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -30,7 +30,7 @@ describe('music generate command', () => {
         yes: false,
         dryRun: false,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       }),
     ).rejects.toThrow('At least one of --prompt or --lyrics is required');

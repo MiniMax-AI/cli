@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'bun:test';
-import { default as loginCommand } from '../../../src/commands/auth/login';
+import { default as queryCommand } from '../../../src/commands/search/query';
 
-describe('auth login command', () => {
-  it('has correct name and description', () => {
-    expect(loginCommand.name).toBe('auth login');
-    expect(loginCommand.description).toContain('Authenticate');
+describe('search query command', () => {
+  it('has correct name', () => {
+    expect(queryCommand.name).toBe('search query');
   });
 
-  it('requires api key when method is api-key', async () => {
+  it('requires q argument', async () => {
     const config = {
+      apiKey: 'test-key',
       region: 'global' as const,
       baseUrl: 'https://api.minimax.io',
       output: 'text' as const,
@@ -17,23 +17,22 @@ describe('auth login command', () => {
       quiet: false,
       noColor: true,
       yes: false,
-      dryRun: false,
+      dryRun: true,
       nonInteractive: true,
       async: false,
     };
 
     await expect(
-      loginCommand.execute(config, {
-        method: 'api-key',
+      queryCommand.execute(config, {
         quiet: false,
         verbose: false,
         noColor: true,
         yes: false,
-        dryRun: false,
+        dryRun: true,
         help: false,
         nonInteractive: true,
         async: false,
       }),
-    ).rejects.toThrow('--api-key is required');
+    ).rejects.toThrow('--q is required');
   });
 });

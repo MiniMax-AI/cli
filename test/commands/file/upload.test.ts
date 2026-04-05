@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'bun:test';
-import { default as loginCommand } from '../../../src/commands/auth/login';
+import { default as uploadCommand } from '../../../src/commands/file/upload';
 
-describe('auth login command', () => {
-  it('has correct name and description', () => {
-    expect(loginCommand.name).toBe('auth login');
-    expect(loginCommand.description).toContain('Authenticate');
+describe('file upload command', () => {
+  it('has correct name', () => {
+    expect(uploadCommand.name).toBe('file upload');
   });
 
-  it('requires api key when method is api-key', async () => {
+  it('requires file argument', async () => {
     const config = {
+      apiKey: 'test-key',
       region: 'global' as const,
       baseUrl: 'https://api.minimax.io',
       output: 'text' as const,
@@ -17,23 +17,22 @@ describe('auth login command', () => {
       quiet: false,
       noColor: true,
       yes: false,
-      dryRun: false,
+      dryRun: true,
       nonInteractive: true,
       async: false,
     };
 
     await expect(
-      loginCommand.execute(config, {
-        method: 'api-key',
+      uploadCommand.execute(config, {
         quiet: false,
         verbose: false,
         noColor: true,
         yes: false,
-        dryRun: false,
+        dryRun: true,
         help: false,
         nonInteractive: true,
         async: false,
       }),
-    ).rejects.toThrow('--api-key is required');
+    ).rejects.toThrow('Missing required argument: --file');
   });
 });

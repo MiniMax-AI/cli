@@ -17,7 +17,7 @@ describe('auth logout command', () => {
       noColor: true,
       yes: false,
       dryRun: true,
-      nonInteractive: false,
+      nonInteractive: true,
       async: false,
     };
 
@@ -33,7 +33,7 @@ describe('auth logout command', () => {
         yes: false,
         dryRun: true,
         help: false,
-        nonInteractive: false,
+        nonInteractive: true,
         async: false,
       });
 
