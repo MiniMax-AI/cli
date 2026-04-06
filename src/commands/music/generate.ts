@@ -15,9 +15,15 @@ export default defineCommand({
   description: 'Generate a song (music-2.5)',
   usage: 'minimax music generate --prompt <text> [--lyrics <text>] [--out <path>] [flags]',
   options: [
-    { flag: '--prompt <text>', description: 'Music style description' },
-    { flag: '--lyrics <text>', description: 'Song lyrics' },
+    { flag: '--prompt <text>', description: 'Music style description (can be detailed — see examples)' },
+    { flag: '--lyrics <text>', description: 'Song lyrics with structure tags: [verse], [chorus], [bridge], etc.' },
     { flag: '--lyrics-file <path>', description: 'Read lyrics from file (use - for stdin)' },
+    { flag: '--vocals <text>', description: 'Vocal style, e.g. "warm male and bright female duet"' },
+    { flag: '--genre <text>', description: 'Music genre, e.g. folk, pop, jazz' },
+    { flag: '--mood <text>', description: 'Mood or emotion, e.g. warm, melancholic, uplifting' },
+    { flag: '--instruments <text>', description: 'Instruments to feature, e.g. "acoustic guitar, piano"' },
+    { flag: '--bpm <number>', description: 'Tempo in beats per minute', type: 'number' },
+    { flag: '--avoid <text>', description: 'Elements to avoid in the generated music' },
     { flag: '--format <fmt>', description: 'Audio format (default: mp3)' },
     { flag: '--sample-rate <hz>', description: 'Sample rate (default: 44100)', type: 'number' },
     { flag: '--bitrate <bps>',    description: 'Bitrate (default: 256000)', type: 'number' },
@@ -25,12 +31,15 @@ export default defineCommand({
     { flag: '--out <path>', description: 'Save audio to file (uses hex decoding)' },
   ],
   examples: [
-    'minimax music generate --prompt "Upbeat pop" --lyrics "La la la..."',
-    'minimax music generate --prompt "Indie folk, melancholic" --lyrics-file song.txt --out my_song.mp3',
     'minimax music generate --prompt "Upbeat pop" --lyrics "La la la..." --out summer.mp3',
+    'minimax music generate --prompt "Indie folk, melancholic" --lyrics-file song.txt --out my_song.mp3',
+    '# Detailed prompt with vocal characteristics — music-2.5 responds well to rich descriptions:',
+    'minimax music generate --prompt "Warm morning folk" --vocals "male and female duet, harmonies in chorus" --instruments "acoustic guitar, piano" --bpm 95 --lyrics-file song.txt --out duet.mp3',
+    '# Instrumental (use empty-structure lyrics + pure music prompt):',
+    'minimax music generate --prompt "Cinematic orchestral, building tension" --lyrics "[intro] [outro]" --avoid "vocals, lyrics" --out bgm.mp3',
   ],
   async run(config: Config, flags: GlobalFlags) {
-    const prompt = flags.prompt as string | undefined;
+    let prompt = flags.prompt as string | undefined;
     let lyrics = flags.lyrics as string | undefined;
 
     if (flags.lyricsFile) {
@@ -47,6 +56,23 @@ export default defineCommand({
 
     if (!lyrics) {
       process.stderr.write('Warning: No lyrics provided. Use --lyrics or --lyrics-file to include lyrics.\n');
+    }
+
+    // Build structured prompt from optional music characteristic flags.
+    // music-2.5 interprets rich natural-language prompts — these flags make it
+    // easy to describe vocal style, genre, mood, and instrumentation without
+    // needing to hand-craft a long --prompt string.
+    const structuredParts: string[] = [];
+    if (flags.vocals)      structuredParts.push(`Vocals: ${flags.vocals as string}`);
+    if (flags.genre)       structuredParts.push(`Genre: ${flags.genre as string}`);
+    if (flags.mood)        structuredParts.push(`Mood: ${flags.mood as string}`);
+    if (flags.instruments) structuredParts.push(`Instruments: ${flags.instruments as string}`);
+    if (flags.bpm)         structuredParts.push(`BPM: ${flags.bpm as number}`);
+    if (flags.avoid)       structuredParts.push(`Avoid: ${flags.avoid as string}`);
+
+    if (structuredParts.length > 0) {
+      const structured = structuredParts.join('. ');
+      prompt = prompt ? `${prompt}. ${structured}` : structured;
     }
 
     const outPath = flags.out as string | undefined;
