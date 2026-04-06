@@ -17,7 +17,7 @@ export default defineCommand({
   options: [
     { flag: '--prompt <text>', description: 'Music style description (can be detailed — see examples)' },
     { flag: '--lyrics <text>', description: 'Song lyrics with structure tags. Use "无歌词" for instrumental music. Cannot be used with --instrumental.' },
-    { flag: '--lyrics-file <path>', description: 'Read lyrics from file (use - for stdin)' },
+    { flag: '--lyrics-file <path>', description: 'Read lyrics from file. Use "无歌词" for instrumental. (use - for stdin)' },
     { flag: '--vocals <text>', description: 'Vocal style, e.g. "warm male and bright female duet"' },
     { flag: '--genre <text>', description: 'Music genre, e.g. folk, pop, jazz' },
     { flag: '--mood <text>', description: 'Mood or emotion, e.g. warm, melancholic, uplifting' },
@@ -58,9 +58,9 @@ export default defineCommand({
     // Check for conflicting flags: --instrumental and --lyrics/--lyrics-file
     if (flags.instrumental && (lyrics || flags.lyricsFile)) {
       throw new CLIError(
-        'Cannot use --instrumental with --lyrics or --lyrics-file. For instrumental music, omit --lyrics.',
+        'Cannot use --instrumental with --lyrics or --lyrics-file. For instrumental music, simply use --instrumental without --lyrics.',
         ExitCode.USAGE,
-        'minimax music generate --instrumental --prompt <style>',
+        'minimax music generate --prompt <style> --instrumental',
       );
     }
 
@@ -83,7 +83,7 @@ export default defineCommand({
     if (flags.extra)       structuredParts.push(`Extra: ${flags.extra as string}`);
 
     // Handle "无歌词" as instrumental request
-    if (lyrics === '无歌词' || lyrics === 'no lyrics' || lyrics === 'no lyrics.') {
+    if (lyrics === '无歌词' || lyrics === 'no lyrics') {
       lyrics = '[intro] [outro]';
       structuredParts.push('Style: instrumental, no vocals, pure music');
     }

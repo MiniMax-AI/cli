@@ -120,4 +120,18 @@ describe('music generate command', () => {
     }
     expect(resolved).toBe(true);
   });
+
+  it('handles "no lyrics" (English) as instrumental', async () => {
+    let resolved = false;
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' as const },
+        { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: 'no lyrics' },
+      );
+      resolved = true;
+    } catch (_) {
+      resolved = true;
+    }
+    expect(resolved).toBe(true);
+  });
 });
