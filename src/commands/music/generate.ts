@@ -63,10 +63,6 @@ export default defineCommand({
       );
     }
 
-    if (!lyrics) {
-      process.stderr.write('Warning: No lyrics provided. Use --lyrics or --lyrics-file to include lyrics.\n');
-    }
-
     // Build structured prompt from optional music characteristic flags.
     // music-2.5 interprets rich natural-language prompts — these flags make it
     // easy to describe vocal style, genre, mood, and instrumentation without
@@ -76,20 +72,25 @@ export default defineCommand({
     if (flags.genre)       structuredParts.push(`Genre: ${flags.genre as string}`);
     if (flags.mood)        structuredParts.push(`Mood: ${flags.mood as string}`);
     if (flags.instruments) structuredParts.push(`Instruments: ${flags.instruments as string}`);
+    if (flags.tempo)       structuredParts.push(`Tempo: ${flags.tempo as string}`);
     if (flags.bpm)         structuredParts.push(`BPM: ${flags.bpm as number}`);
+    if (flags.key)         structuredParts.push(`Key: ${flags.key as string}`);
     if (flags.avoid)       structuredParts.push(`Avoid: ${flags.avoid as string}`);
     if (flags.useCase)     structuredParts.push(`Use case: ${flags.useCase as string}`);
     if (flags.structure)   structuredParts.push(`Structure: ${flags.structure as string}`);
     if (flags.references)  structuredParts.push(`References: ${flags.references as string}`);
     if (flags.extra)       structuredParts.push(`Extra: ${flags.extra as string}`);
-    if (flags.tempo)       structuredParts.push(`Tempo: ${flags.tempo as string}`);
-    if (flags.key)         structuredParts.push(`Key: ${flags.key as string}`);
 
     // Handle --instrumental: music-2.5 has no is_instrumental flag,
     // so we use the empty-structure lyrics workaround.
-    if (flags.instrumental) {
+    // Only apply if user didn't provide explicit lyrics.
+    if (flags.instrumental && !lyrics) {
       lyrics = '[intro] [outro]';
       structuredParts.push('Style: instrumental, no vocals, pure music');
+    }
+
+    if (!lyrics) {
+      process.stderr.write('Warning: No lyrics provided. Use --lyrics or --lyrics-file to include lyrics.\n');
     }
 
     if (structuredParts.length > 0) {
