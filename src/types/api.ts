@@ -211,6 +211,7 @@ export interface MusicRequest {
   };
   output_format?: 'url' | 'hex';
   stream?: boolean;
+  aigc_watermark?: boolean;
 }
 
 export interface MusicResponse {
