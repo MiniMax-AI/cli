@@ -31,6 +31,7 @@ export default defineCommand({
     { flag: '--references <text>', description: 'Reference tracks or artists, e.g. "similar to Ed Sheeran, Taylor Swift"' },
     { flag: '--extra <text>', description: 'Additional fine-grained requirements not covered above' },
     { flag: '--instrumental', description: 'Generate instrumental music (no vocals)' },
+    { flag: '--aigc-watermark', description: 'Embed AI-generated content watermark in audio for content provenance' },
     { flag: '--format <fmt>', description: 'Audio format (default: mp3)' },
     { flag: '--sample-rate <hz>', description: 'Sample rate (default: 44100)', type: 'number' },
     { flag: '--bitrate <bps>',    description: 'Bitrate (default: 256000)', type: 'number' },
@@ -128,6 +129,10 @@ export default defineCommand({
       output_format: outFormat,
       stream: flags.stream === true,
     };
+
+    if (flags.aigcWatermark) {
+      body.aigc_watermark = true;
+    }
 
     if (config.dryRun) {
       console.log(formatOutput({ request: body }, format));

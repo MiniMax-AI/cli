@@ -64,7 +64,7 @@ describe('music generate command', () => {
     expect(resolved).toBe(true);
   });
 
-  it('has all structured flags defined: vocals, genre, mood, instruments, tempo, bpm, key, use-case, structure, references, avoid, extra, instrumental', () => {
+  it('has all structured flags defined: vocals, genre, mood, instruments, tempo, bpm, key, use-case, structure, references, avoid, extra, instrumental, aigc-watermark', () => {
     const optionFlags = generateCommand.options?.map((o) => o.flag) ?? [];
     expect(optionFlags.some((f) => f.startsWith('--vocals'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--genre'))).toBe(true);
@@ -79,6 +79,7 @@ describe('music generate command', () => {
     expect(optionFlags.some((f) => f.startsWith('--avoid'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--extra'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--instrumental'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--aigc-watermark'))).toBe(true);
   });
 
   it('examples include vocal and instrumental usage', () => {
