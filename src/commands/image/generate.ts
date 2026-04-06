@@ -56,7 +56,11 @@ export default defineCommand({
     if (flags.subjectRef) {
       const refStr = flags.subjectRef as string;
       const params = Object.fromEntries(
-        refStr.split(',').map(p => p.split('=') as [string, string]),
+        refStr.split(',').map(p => {
+        const eqIdx = p.indexOf('=');
+        if (eqIdx === -1) return [p, ''];
+        return [p.slice(0, eqIdx), p.slice(eqIdx + 1)];
+      }),
       );
 
       const ref: { type: string; image_url?: string; image_file?: string } = {
