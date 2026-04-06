@@ -64,7 +64,7 @@ describe('music generate command', () => {
     expect(resolved).toBe(true);
   });
 
-  it('has all structured flags defined: vocals, genre, mood, instruments, tempo, bpm, key, avoid, extra, instrumental', () => {
+  it('has all structured flags defined: vocals, genre, mood, instruments, tempo, bpm, key, use-case, structure, references, avoid, extra, instrumental', () => {
     const optionFlags = generateCommand.options?.map((o) => o.flag) ?? [];
     expect(optionFlags.some((f) => f.startsWith('--vocals'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--genre'))).toBe(true);
@@ -73,6 +73,9 @@ describe('music generate command', () => {
     expect(optionFlags.some((f) => f.startsWith('--tempo'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--bpm'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--key'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--use-case'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--structure'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--references'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--avoid'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--extra'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--instrumental'))).toBe(true);

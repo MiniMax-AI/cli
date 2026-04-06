@@ -26,7 +26,10 @@ export default defineCommand({
     { flag: '--bpm <number>', description: 'Exact tempo in beats per minute', type: 'number' },
     { flag: '--key <text>', description: 'Musical key, e.g. C major, A minor, G sharp' },
     { flag: '--avoid <text>', description: 'Elements to avoid in the generated music' },
-    { flag: '--extra <text>', description: 'Additional requirements, e.g. "bridge builds tension, chorus has layered harmonies"' },
+    { flag: '--use-case <text>', description: 'Use case context, e.g. "background music for video", "theme song"' },
+    { flag: '--structure <text>', description: 'Song structure, e.g. "verse-chorus-verse-bridge-chorus"' },
+    { flag: '--references <text>', description: 'Reference tracks or artists, e.g. "similar to Ed Sheeran, Taylor Swift"' },
+    { flag: '--extra <text>', description: 'Additional fine-grained requirements not covered above' },
     { flag: '--instrumental', description: 'Generate instrumental music (no vocals)' },
     { flag: '--format <fmt>', description: 'Audio format (default: mp3)' },
     { flag: '--sample-rate <hz>', description: 'Sample rate (default: 44100)', type: 'number' },
@@ -75,6 +78,9 @@ export default defineCommand({
     if (flags.instruments) structuredParts.push(`Instruments: ${flags.instruments as string}`);
     if (flags.bpm)         structuredParts.push(`BPM: ${flags.bpm as number}`);
     if (flags.avoid)       structuredParts.push(`Avoid: ${flags.avoid as string}`);
+    if (flags.useCase)     structuredParts.push(`Use case: ${flags.useCase as string}`);
+    if (flags.structure)   structuredParts.push(`Structure: ${flags.structure as string}`);
+    if (flags.references)  structuredParts.push(`References: ${flags.references as string}`);
     if (flags.extra)       structuredParts.push(`Extra: ${flags.extra as string}`);
     if (flags.tempo)       structuredParts.push(`Tempo: ${flags.tempo as string}`);
     if (flags.key)         structuredParts.push(`Key: ${flags.key as string}`);
