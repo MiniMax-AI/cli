@@ -21,6 +21,8 @@ process.on('SIGINT', () => {
 const NO_AUTH_SETUP = [
   ['auth', 'login'],
   ['auth', 'logout'],
+  ['auth', 'status'],
+  ['auth', 'refresh'],
   ['config', 'show'],
   ['config', 'set'],
   ['config', 'export-schema'],
