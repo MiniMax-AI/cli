@@ -10,7 +10,8 @@ import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { FileUploadResponse } from '../../types/api';
 import { existsSync } from 'fs';
-import { resolve } from 'path';
+import { readFile } from 'fs/promises';
+import { resolve, basename } from 'path';
 
 export default defineCommand({
   name: 'file upload',
@@ -53,9 +54,9 @@ export default defineCommand({
     }
 
     const formData = new FormData();
-    // Read file as a Blob-like File object for fetch compatibility
-    const fileData = await Bun.file(fullPath).arrayBuffer();
-    const fileName = fullPath.split('/').pop() || 'file';
+    // Read file using Node.js fs/promises (compatible with both Node and Bun)
+    const fileData = await readFile(fullPath);
+    const fileName = basename(fullPath);
     const fileBlob = new Blob([fileData]);
     formData.append('file', fileBlob, fileName);
     formData.append('purpose', purpose);
