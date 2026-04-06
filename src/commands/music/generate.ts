@@ -16,7 +16,7 @@ export default defineCommand({
   usage: 'minimax music generate --prompt <text> [--lyrics <text>] [--out <path>] [flags]',
   options: [
     { flag: '--prompt <text>', description: 'Music style description (can be detailed — see examples)' },
-    { flag: '--lyrics <text>', description: 'Song lyrics with structure tags: [verse], [chorus], [bridge], etc.' },
+    { flag: '--lyrics <text>', description: 'Song lyrics with structure tags. Use "无歌词" for instrumental music. Cannot be used with --instrumental.' },
     { flag: '--lyrics-file <path>', description: 'Read lyrics from file (use - for stdin)' },
     { flag: '--vocals <text>', description: 'Vocal style, e.g. "warm male and bright female duet"' },
     { flag: '--genre <text>', description: 'Music genre, e.g. folk, pop, jazz' },
@@ -42,10 +42,10 @@ export default defineCommand({
     'minimax music generate --prompt "Indie folk, melancholic" --lyrics-file song.txt --out my_song.mp3',
     '# Detailed prompt with vocal characteristics — music-2.5 responds well to rich descriptions:',
     'minimax music generate --prompt "Warm morning folk" --vocals "male and female duet, harmonies in chorus" --instruments "acoustic guitar, piano" --bpm 95 --lyrics-file song.txt --out duet.mp3',
-    '# Instrumental (use --instrumental flag for pure music):',
+    '# Instrumental (use --instrumental flag):',
     'minimax music generate --prompt "Cinematic orchestral, building tension" --instrumental --out bgm.mp3',
-    '# Or manually specify empty-structure lyrics:',
-    'minimax music generate --prompt "Cinematic orchestral, building tension" --lyrics "[intro] [outro]" --avoid "vocals" --out bgm.mp3',
+    '# Or specify "无歌词" in lyrics:',
+    'minimax music generate --prompt "Cinematic orchestral" --lyrics "无歌词" --out bgm.mp3',
   ],
   async run(config: Config, flags: GlobalFlags) {
     let prompt = flags.prompt as string | undefined;
@@ -55,11 +55,12 @@ export default defineCommand({
       lyrics = readTextFromPathOrStdin(flags.lyricsFile as string);
     }
 
-    if (!prompt && !lyrics) {
+    // Check for conflicting flags: --instrumental and --lyrics/--lyrics-file
+    if (flags.instrumental && (lyrics || flags.lyricsFile)) {
       throw new CLIError(
-        'At least one of --prompt or --lyrics is required.',
+        'Cannot use --instrumental with --lyrics or --lyrics-file. For instrumental music, omit --lyrics.',
         ExitCode.USAGE,
-        'minimax music generate --prompt <text> [--lyrics <text>]',
+        'minimax music generate --instrumental --prompt <style>',
       );
     }
 
@@ -81,12 +82,25 @@ export default defineCommand({
     if (flags.references)  structuredParts.push(`References: ${flags.references as string}`);
     if (flags.extra)       structuredParts.push(`Extra: ${flags.extra as string}`);
 
-    // Handle --instrumental: music-2.5 has no is_instrumental flag,
-    // so we use the empty-structure lyrics workaround.
-    // Only apply if user didn't provide explicit lyrics.
-    if (flags.instrumental && !lyrics) {
+    // Handle "无歌词" as instrumental request
+    if (lyrics === '无歌词' || lyrics === 'no lyrics' || lyrics === 'no lyrics.') {
       lyrics = '[intro] [outro]';
       structuredParts.push('Style: instrumental, no vocals, pure music');
+    }
+
+    // Handle --instrumental: music-2.5 has no is_instrumental flag,
+    // so we use the empty-structure lyrics workaround.
+    if (flags.instrumental) {
+      lyrics = '[intro] [outro]';
+      structuredParts.push('Style: instrumental, no vocals, pure music');
+    }
+
+    if (!prompt && !lyrics) {
+      throw new CLIError(
+        'At least one of --prompt or --lyrics is required.',
+        ExitCode.USAGE,
+        'minimax music generate --prompt <text> [--lyrics <text>]',
+      );
     }
 
     if (!lyrics) {

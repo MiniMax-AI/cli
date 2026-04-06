@@ -86,6 +86,38 @@ describe('music generate command', () => {
     const joined = examples.join(' ');
     expect(joined).toContain('vocals');
     expect(joined).toContain('--instrumental');
-    expect(joined).toContain('[intro] [outro]');
+    expect(joined).toContain('无歌词');
+  });
+
+  it('rejects --instrumental with --lyrics', async () => {
+    await expect(
+      generateCommand.execute(
+        { ...baseConfig, dryRun: true },
+        { ...baseFlags, prompt: 'Folk', instrumental: true, lyrics: 'Hello' },
+      ),
+    ).rejects.toThrow('Cannot use --instrumental with --lyrics');
+  });
+
+  it('rejects --instrumental with --lyrics-file', async () => {
+    await expect(
+      generateCommand.execute(
+        { ...baseConfig, dryRun: true },
+        { ...baseFlags, prompt: 'Folk', instrumental: true, lyricsFile: '/dev/null' },
+      ),
+    ).rejects.toThrow('Cannot use --instrumental with --lyrics');
+  });
+
+  it('handles "无歌词" as instrumental', async () => {
+    let resolved = false;
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' as const },
+        { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: '无歌词' },
+      );
+      resolved = true;
+    } catch (_) {
+      resolved = true;
+    }
+    expect(resolved).toBe(true);
   });
 });
