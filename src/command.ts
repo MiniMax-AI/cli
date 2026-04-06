@@ -49,6 +49,8 @@ export const GLOBAL_OPTIONS: OptionDef[] = [
   { flag: '--no-color',          description: 'Disable ANSI colors' },
   { flag: '--dry-run',           description: 'Dry run mode' },
   { flag: '--non-interactive',   description: 'Disable interactive prompts' },
+  { flag: '--yes',               description: 'Skip confirmation prompts' },
+  { flag: '--async',             description: 'Return immediately (agent/CI mode)' },
   { flag: '--help',              description: 'Show help' },
   { flag: '--version',           description: 'Print version' },
 ];
