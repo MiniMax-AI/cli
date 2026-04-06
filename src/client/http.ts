@@ -1,5 +1,7 @@
 import type { Config } from '../config/schema';
 import type { ApiErrorBody } from '../errors/api';
+import { CLIError } from '../errors/base';
+import { ExitCode } from '../errors/codes';
 import { resolveCredential } from '../auth/resolver';
 import { mapApiError } from '../errors/api';
 import { maybeShowStatusBar } from '../output/status-bar';
@@ -78,7 +80,16 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
 
 export async function requestJson<T>(config: Config, opts: RequestOpts): Promise<T> {
   const res = await request(config, opts);
-  const data = (await res.json()) as T & { base_resp?: { status_code?: number; status_msg?: string } };
+  let data: T & { base_resp?: { status_code?: number; status_msg?: string } };
+  try {
+    data = (await res.json()) as T & { base_resp?: { status_code?: number; status_msg?: string } };
+  } catch {
+    const contentType = res.headers.get('content-type') || '';
+    throw new CLIError(
+      `API returned non-JSON response (${contentType || 'unknown type'}). Server may be experiencing issues.`,
+      ExitCode.GENERAL,
+    );
+  }
 
   if (data.base_resp?.status_code && data.base_resp.status_code !== 0) {
     throw mapApiError(200, { base_resp: data.base_resp }, opts.url);

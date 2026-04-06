@@ -11,6 +11,12 @@ import { ensureApiKey } from './auth/setup';
 
 const CLI_VERSION = process.env.CLI_VERSION ?? '0.3.1';
 
+// Handle Ctrl+C gracefully
+process.on('SIGINT', () => {
+  process.stderr.write('\nInterrupted. Exiting.\n');
+  process.exit(130);
+});
+
 // Commands that manage their own auth or need no key
 const NO_AUTH_SETUP = [
   ['auth', 'login'],

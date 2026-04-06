@@ -9,7 +9,11 @@ export function readConfigFile(): ConfigFile {
   if (!existsSync(path)) return {};
   try {
     return parseConfigFile(JSON.parse(readFileSync(path, 'utf-8')));
-  } catch {
+  } catch (err) {
+    const e = err as Error;
+    if (e instanceof SyntaxError || e.message.includes('JSON')) {
+      process.stderr.write(`Warning: config file is corrupted. Run 'minimax config set' to reset.\n`);
+    }
     return {};
   }
 }

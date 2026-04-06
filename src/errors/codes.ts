@@ -5,6 +5,7 @@ export const ExitCode = {
   AUTH: 3,
   QUOTA: 4,
   TIMEOUT: 5,
+  NETWORK: 6,
   CONTENT_FILTER: 10,
 } as const;
 

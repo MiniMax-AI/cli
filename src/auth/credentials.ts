@@ -12,7 +12,11 @@ export async function loadCredentials(): Promise<CredentialFile | null> {
     const data = JSON.parse(raw) as CredentialFile;
     if (!data.access_token || !data.refresh_token) return null;
     return data;
-  } catch {
+  } catch (err) {
+    const e = err as Error;
+    if (e instanceof SyntaxError || e.message.includes('JSON')) {
+      process.stderr.write(`Warning: credentials file is corrupted. Run 'minimax auth logout' to reset.\n`);
+    }
     return null;
   }
 }
