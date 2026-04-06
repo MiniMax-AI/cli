@@ -64,7 +64,7 @@ describe('music generate command', () => {
     expect(resolved).toBe(true);
   });
 
-  it('has vocals, genre, mood, instruments, bpm, avoid options defined', () => {
+  it('has vocals, genre, mood, instruments, bpm, avoid, extra options defined', () => {
     const optionFlags = generateCommand.options?.map((o) => o.flag) ?? [];
     expect(optionFlags.some((f) => f.startsWith('--vocals'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--genre'))).toBe(true);
@@ -72,6 +72,7 @@ describe('music generate command', () => {
     expect(optionFlags.some((f) => f.startsWith('--instruments'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--bpm'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--avoid'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--extra'))).toBe(true);
   });
 
   it('examples include vocal and instrumental usage', () => {

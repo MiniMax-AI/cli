@@ -24,6 +24,7 @@ export default defineCommand({
     { flag: '--instruments <text>', description: 'Instruments to feature, e.g. "acoustic guitar, piano"' },
     { flag: '--bpm <number>', description: 'Tempo in beats per minute', type: 'number' },
     { flag: '--avoid <text>', description: 'Elements to avoid in the generated music' },
+    { flag: '--extra <text>', description: 'Additional requirements, e.g. "bridge builds tension, chorus has layered harmonies"' },
     { flag: '--format <fmt>', description: 'Audio format (default: mp3)' },
     { flag: '--sample-rate <hz>', description: 'Sample rate (default: 44100)', type: 'number' },
     { flag: '--bitrate <bps>',    description: 'Bitrate (default: 256000)', type: 'number' },
@@ -69,6 +70,7 @@ export default defineCommand({
     if (flags.instruments) structuredParts.push(`Instruments: ${flags.instruments as string}`);
     if (flags.bpm)         structuredParts.push(`BPM: ${flags.bpm as number}`);
     if (flags.avoid)       structuredParts.push(`Avoid: ${flags.avoid as string}`);
+    if (flags.extra)       structuredParts.push(`Extra: ${flags.extra as string}`);
 
     if (structuredParts.length > 0) {
       const structured = structuredParts.join('. ');
