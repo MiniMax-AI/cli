@@ -64,21 +64,25 @@ describe('music generate command', () => {
     expect(resolved).toBe(true);
   });
 
-  it('has vocals, genre, mood, instruments, bpm, avoid, extra options defined', () => {
+  it('has all structured flags defined: vocals, genre, mood, instruments, tempo, bpm, key, avoid, extra, instrumental', () => {
     const optionFlags = generateCommand.options?.map((o) => o.flag) ?? [];
     expect(optionFlags.some((f) => f.startsWith('--vocals'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--genre'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--mood'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--instruments'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--tempo'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--bpm'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--key'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--avoid'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--extra'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--instrumental'))).toBe(true);
   });
 
   it('examples include vocal and instrumental usage', () => {
     const examples = generateCommand.examples ?? [];
     const joined = examples.join(' ');
     expect(joined).toContain('vocals');
+    expect(joined).toContain('--instrumental');
     expect(joined).toContain('[intro] [outro]');
   });
 });
