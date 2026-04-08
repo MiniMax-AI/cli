@@ -32,8 +32,8 @@ interface Labels {
   now: string;
 }
 
-const LABELS_EN: Labels = { dashboard: 'Quota Dashboard', week: 'Week', weekly: 'Weekly', resetsIn: 'Resets in', noData: 'No quota data available.', now: 'now' };
-const LABELS_CN: Labels = { dashboard: '配额面板', week: '周期', weekly: '每周', resetsIn: '重置于', noData: '暂无配额数据', now: '即将' };
+const LABELS_EN: Labels = { dashboard: 'TokenPlan Quota', week: 'Week', weekly: 'Weekly', resetsIn: 'Resets in', noData: 'No quota data available.', now: 'now' };
+const LABELS_CN: Labels = { dashboard: 'TokenPlan 配额面板', week: '周期', weekly: '每周', resetsIn: '重置于', noData: '暂无配额数据', now: '即将' };
 
 function formatDuration(ms: number, nowLabel: string): string {
   if (ms <= 0) return nowLabel;
