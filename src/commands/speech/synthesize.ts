@@ -6,6 +6,7 @@ import { speechEndpoint } from '../../client/endpoints';
 import { detectOutputFormat, formatOutput } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
 import { readTextFromPathOrStdin } from '../../utils/fs';
+import { pipeAudioSseToStdout } from '../../utils/audio-stream';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { SpeechRequest, SpeechResponse } from '../../types/api';
@@ -98,14 +99,14 @@ export default defineCommand({
 
     if (flags.stream) {
       const res = await request(config, { url, method: 'POST', body, stream: true });
-      const reader = res.body?.getReader();
-      if (!reader) throw new CLIError('No response body', ExitCode.GENERAL);
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        process.stdout.write(value);
+      try {
+        await pipeAudioSseToStdout(res.body);
+      } catch (err) {
+        if (err instanceof Error && err.message === 'No response body') {
+          throw new CLIError('No response body', ExitCode.GENERAL);
+        }
+        throw err;
       }
-      reader.releaseLock();
       return;
     }
 
