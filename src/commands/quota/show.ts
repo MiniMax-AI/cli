@@ -30,19 +30,27 @@ export default defineCommand({
     const models = response.model_remains || [];
     const format = detectOutputFormat(flags.output as string | undefined);
 
+    // API field current_interval_usage_count actually holds the remaining quota (not usage).
+    // Fix values in-place so the JSON output is semantically correct with no schema change.
+    const fixedModels = models.map((m) => ({
+      ...m,
+      current_interval_usage_count: m.current_interval_total_count - m.current_interval_usage_count,
+      current_weekly_usage_count: m.current_weekly_total_count - m.current_weekly_usage_count,
+    }));
+
     if (format !== 'text') {
-      console.log(formatOutput(response, format));
+      console.log(formatOutput({ ...response, model_remains: fixedModels }, format));
       return;
     }
 
     if (config.quiet) {
-      for (const m of models) {
-        const remaining = m.current_interval_total_count - m.current_interval_usage_count;
-        console.log(`${m.model_name}\t${m.current_interval_usage_count}\t${m.current_interval_total_count}\t${remaining}`);
+      for (const m of fixedModels) {
+        const used = m.current_interval_usage_count; // already usage after fix
+        console.log(`${m.model_name}\t${used}\t${m.current_interval_total_count}\t${m.current_interval_total_count - used}`);
       }
       return;
     }
 
-    renderQuotaTable(models, config);
+    renderQuotaTable(fixedModels, config);
   },
 });
