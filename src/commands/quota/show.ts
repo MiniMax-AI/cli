@@ -37,8 +37,9 @@ export default defineCommand({
 
     if (config.quiet) {
       for (const m of models) {
-        const remaining = m.current_interval_total_count - m.current_interval_usage_count;
-        console.log(`${m.model_name}\t${m.current_interval_usage_count}\t${m.current_interval_total_count}\t${remaining}`);
+        const remaining = m.current_interval_usage_count;
+        const used = Math.max(0, m.current_interval_total_count - remaining);
+        console.log(`${m.model_name}\t${used}\t${m.current_interval_total_count}\t${remaining}`);
       }
       return;
     }
