@@ -65,6 +65,18 @@ export async function pipeAudioSseToStdout(
   }
 }
 
+interface SseEnvelope {
+  data?: { audio?: string; status?: number };
+  // `extra_info` is only present on the terminal "summary" event, which
+  // re-sends the full audio plus metadata. We must skip that event in
+  // streaming mode, otherwise the complete file gets appended after the
+  // incremental frames and the resulting MP3 contains duplicated audio
+  // with broken framing. (Note: every event carries `trace_id`, so it
+  // can't be used as the discriminator.)
+  extra_info?: unknown;
+  trace_id?: string;
+}
+
 function writeEvent(event: string): void {
   for (const rawLine of event.split('\n')) {
     if (!rawLine.startsWith('data:')) continue;
@@ -72,11 +84,16 @@ function writeEvent(event: string): void {
     const payload = rawLine.slice(5).replace(/^ /, '');
     if (!payload || payload === '[DONE]') continue;
 
-    let parsed: { data?: { audio?: string } };
+    let parsed: SseEnvelope;
     try {
-      parsed = JSON.parse(payload);
+      parsed = JSON.parse(payload) as SseEnvelope;
     } catch {
       // Non-JSON keepalive or comment — skip.
+      continue;
+    }
+
+    // Skip the terminal summary event (it re-sends the entire audio).
+    if (parsed.extra_info !== undefined) {
       continue;
     }
 
