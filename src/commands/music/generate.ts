@@ -6,6 +6,7 @@ import { musicEndpoint } from '../../client/endpoints';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
 import { readTextFromPathOrStdin } from '../../utils/fs';
+import { pipeAudioSseToStdout, NoResponseBodyError } from '../../utils/audio-stream';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { MusicRequest, MusicResponse } from '../../types/api';
@@ -149,14 +150,14 @@ export default defineCommand({
 
     if (flags.stream) {
       const res = await request(config, { url, method: 'POST', body, stream: true });
-      const reader = res.body?.getReader();
-      if (!reader) throw new CLIError('No response body', ExitCode.GENERAL);
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        process.stdout.write(value);
+      try {
+        await pipeAudioSseToStdout(res);
+      } catch (err) {
+        if (err instanceof NoResponseBodyError) {
+          throw new CLIError('No response body', ExitCode.GENERAL);
+        }
+        throw err;
       }
-      reader.releaseLock();
       return;
     }
 
