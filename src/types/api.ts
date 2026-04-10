@@ -157,6 +157,11 @@ export interface ImageRequest {
   prompt: string;
   aspect_ratio?: string;
   n?: number;
+  seed?: number;
+  width?: number;
+  height?: number;
+  prompt_optimizer?: boolean;
+  aigc_watermark?: boolean;
   subject_reference?: Array<{
     type: string;
     image_url?: string;
