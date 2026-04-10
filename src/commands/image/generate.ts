@@ -1,4 +1,6 @@
 import { defineCommand } from '../../command';
+import { CLIError } from '../../errors/base';
+import { ExitCode } from '../../errors/codes';
 import { requestJson } from '../../client/http';
 import { imageEndpoint } from '../../client/endpoints';
 import { downloadFile } from '../../files/download';
@@ -18,13 +20,19 @@ import { promptText, failIfMissing } from '../../utils/prompt';
 
 export default defineCommand({
   name: 'image generate',
-  description: 'Generate images (image-01)',
+  description: 'Generate images (image-01 / image-01-live)',
+  apiDocs: 'https://platform.minimax.io/docs/api-reference/image-generation-t2i',
   usage: 'mmx image generate --prompt <text> [flags]',
   options: [
     { flag: '--prompt <text>', description: 'Image description', required: true },
-    { flag: '--aspect-ratio <ratio>', description: 'Aspect ratio (e.g. 16:9, 1:1)' },
+    { flag: '--aspect-ratio <ratio>', description: 'Aspect ratio (e.g. 16:9, 1:1). Ignored if --width and --height are both specified.' },
     { flag: '--n <count>', description: 'Number of images to generate (default: 1)', type: 'number' },
-    { flag: '--subject-ref <params>', description: 'Subject reference (type=character,image=path)' },
+    { flag: '--seed <n>', description: 'Random seed for reproducible generation (same seed + prompt = identical output)', type: 'number' },
+    { flag: '--width <px>', description: 'Custom width in pixels. Range [512, 2048], must be multiple of 8. Only effective for image-01 model. Overrides --aspect-ratio if set.', type: 'number' },
+    { flag: '--height <px>', description: 'Custom height in pixels. Range [512, 2048], must be multiple of 8. Only effective for image-01 model. Overrides --aspect-ratio if set.', type: 'number' },
+    { flag: '--prompt-optimizer', description: 'Automatically optimize the prompt before generation for better results.' },
+    { flag: '--aigc-watermark', description: 'Embed AI-generated content watermark in the output image.' },
+    { flag: '--subject-ref <params>', description: 'Subject reference for character consistency. Format: type=character,image=path-or-url' },
     { flag: '--out-dir <dir>', description: 'Download images to directory' },
     { flag: '--out-prefix <prefix>', description: 'Filename prefix (default: image)' },
   ],
@@ -32,6 +40,12 @@ export default defineCommand({
     'mmx image generate --prompt "A cat in a spacesuit on Mars" --aspect-ratio 16:9',
     'mmx image generate --prompt "Logo design" --n 3 --out-dir ./generated/',
     'mmx image generate --prompt "Mountain landscape" --quiet',
+    '# Reproducible output with seed',
+    'mmx image generate --prompt "A castle" --seed 42',
+    '# Custom dimensions (must be 512–2048, multiple of 8)',
+    'mmx image generate --prompt "Wide landscape" --width 1920 --height 1080',
+    '# Optimized prompt with watermark',
+    'mmx image generate --prompt "sunset" --prompt-optimizer --aigc-watermark',
   ],
   async run(config: Config, flags: GlobalFlags) {
     let prompt = (flags.prompt ?? (flags._positional as string[]|undefined)?.[0]) as string | undefined;
@@ -51,11 +65,39 @@ export default defineCommand({
       }
     }
 
+    // Validate width/height
+    const width = flags.width as number | undefined;
+    const height = flags.height as number | undefined;
+
+    if (width !== undefined && height === undefined) {
+      throw new CLIError('--width requires --height. Both must be specified together.', ExitCode.USAGE);
+    }
+    if (height !== undefined && width === undefined) {
+      throw new CLIError('--height requires --width. Both must be specified together.', ExitCode.USAGE);
+    }
+    if (width !== undefined && height !== undefined) {
+      const validateSize = (name: string, val: number) => {
+        if (val < 512 || val > 2048) {
+          throw new CLIError(`--${name} must be between 512 and 2048, got ${val}.`, ExitCode.USAGE);
+        }
+        if (val % 8 !== 0) {
+          throw new CLIError(`--${name} must be a multiple of 8, got ${val}.`, ExitCode.USAGE);
+        }
+      };
+      validateSize('width', width);
+      validateSize('height', height);
+    }
+
     const body: ImageRequest = {
       model: 'image-01',
       prompt,
       aspect_ratio: (flags.aspectRatio as string) || undefined,
       n: (flags.n as number) ?? 1,
+      seed: flags.seed as number | undefined,
+      width: width,
+      height: height,
+      prompt_optimizer: flags.promptOptimizer === true || undefined,
+      aigc_watermark: flags.aigcWatermark === true || undefined,
     };
 
     if (flags.subjectRef) {
