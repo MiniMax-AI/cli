@@ -126,6 +126,13 @@ export default defineCommand({
 
     const model = (flags.model as string) || musicGenerateModel(config);
     const outFormat = (flags.outputFormat as string) || 'hex';
+    if (outFormat !== 'hex' && outFormat !== 'url') {
+      throw new CLIError(
+        '--output-format must be "hex" or "url".',
+        ExitCode.USAGE,
+        'mmx music generate --output-format url',
+      );
+    }
     const body: MusicRequest = {
       model,
       prompt,
@@ -170,11 +177,14 @@ export default defineCommand({
     });
 
     if (!config.quiet) process.stderr.write(`[Model: ${model}]\n`);
-    if (outFormat === 'url' && response.data?.audio_url) {
-      if (config.quiet) {
-        process.stdout.write(response.data.audio_url);
+    if (outFormat === 'url') {
+      if (response.data?.audio_url) {
+        console.log(response.data.audio_url);
       } else {
-        process.stdout.write(formatOutput({ audio_url: response.data.audio_url }, format));
+        throw new CLIError(
+          'Requested URL output but API did not return audio_url.',
+          ExitCode.GENERAL,
+        );
       }
       return;
     }
