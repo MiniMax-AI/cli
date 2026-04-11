@@ -13,10 +13,13 @@ Use `mmx` to generate text, images, video, speech, music, and perform web search
 # Install
 npm install -g mmx-cli
 
-# Auth (persisted to ~/.mmx/credentials.json)
+# Auth — API key (persisted to ~/.mmx/config.json)
 mmx auth login --api-key sk-xxxxx
 
-# Or pass per-call
+# Auth — OAuth (persisted to ~/.mmx/credentials.json)
+mmx auth login
+
+# Or pass per-call (no file needed)
 mmx text chat --api-key sk-xxxxx --message "Hello"
 ```
 

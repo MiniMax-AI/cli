@@ -52,10 +52,14 @@ mmx
 ## Authentication
 
 Credential resolution order:
-1. `--api-key` flag
-2. `$MINIMAX_API_KEY` env var
-3. `~/.mmx/credentials.json` (OAuth)
-4. `api_key` in `~/.mmx/config.yaml`
+1. `--api-key` flag (highest priority)
+2. `~/.mmx/credentials.json` (OAuth token — only created by `mmx auth login` without `--api-key`)
+3. `fileApiKey` in `~/.mmx/config.json` (persisted API key)
+4. `$MINIMAX_API_KEY` env var
+
+If none are found, the CLI returns `No credentials found`. The CLI can be fully authenticated
+using any single method — `~/.mmx/credentials.json` is **not required** if you use an API key
+instead.
 
 ## Configuration
 
