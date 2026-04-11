@@ -4,7 +4,7 @@ import { CLIError } from "../errors/base";
 import { ExitCode } from "../errors/codes";
 
 const DEFAULT_TOKEN_URL = "https://api.minimax.io/oauth/token";
-const DEFAULT_CLIENT_ID = "minimax-cli";
+const DEFAULT_CLIENT_ID = "659cf4c1-615c-45f6-a5f6-4bf15eb476e5";
 
 const MAX_REFRESH_RETRIES = 2;
 const RETRY_DELAY_MS = 500;
@@ -108,7 +108,7 @@ export async function ensureFreshToken(creds: CredentialFile): Promise<string> {
   const updated: CredentialFile = {
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
-    expires_at: new Date(Date.now() + tokens.expired_in).toISOString(),
+    expires_at: new Date(tokens.expired_in).toISOString(), // expired_in is Unix timestamp (ms)
     token_type: 'Bearer',
     resource_url: tokens.resource_url ?? creds.resource_url,
     account: creds.account,

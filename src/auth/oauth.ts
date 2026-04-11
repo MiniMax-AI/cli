@@ -13,7 +13,7 @@ export interface OAuthConfig {
 }
 
 const DEFAULT_OAUTH_CONFIG: OAuthConfig = {
-  clientId: 'mmx-cli',
+  clientId: '659cf4c1-615c-45f6-a5f6-4bf15eb476e5',
   authorizationUrl: 'https://platform.minimax.io/oauth/authorize',
   tokenUrl: 'https://api.minimax.io/oauth/token',
   deviceCodeUrl: 'https://api.minimax.io/oauth/code',
@@ -170,7 +170,7 @@ export async function startDeviceCodeFlow(
   const data = (await codeRes.json()) as {
     user_code: string;
     verification_uri: string;
-    expired_in: number; // milliseconds
+    expired_in: number; // Unix timestamp (ms)
     interval: number;   // milliseconds
     state: string;
   };
@@ -183,8 +183,8 @@ export async function startDeviceCodeFlow(
   process.stderr.write(`Enter code: ${data.user_code}\n`);
   process.stderr.write('Waiting for authorization...\n');
 
-  // Poll for authorization (times are already in milliseconds)
-  const deadline = Date.now() + data.expired_in;
+  // Poll for authorization (expired_in is Unix timestamp in ms)
+  const deadline = data.expired_in;
   const pollInterval = data.interval || 5000;
 
   while (Date.now() < deadline) {
