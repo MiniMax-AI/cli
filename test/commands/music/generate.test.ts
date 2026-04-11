@@ -142,4 +142,42 @@ describe('music generate command', () => {
     }
     expect(resolved).toBe(true);
   });
+
+  it('uses defaultMusicModel when config is set', async () => {
+    let captured = '';
+    const origLog = console.log;
+    console.log = (msg: string) => { captured += msg; };
+
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-2.6' },
+        { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: 'no lyrics' },
+      );
+    } catch {
+      // dry-run may resolve or reject
+    }
+
+    console.log = origLog;
+    const parsed = JSON.parse(captured);
+    expect(parsed.request.model).toBe('music-2.6');
+  });
+
+  it('--model flag overrides defaultMusicModel', async () => {
+    let captured = '';
+    const origLog = console.log;
+    console.log = (msg: string) => { captured += msg; };
+
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-2.6' },
+        { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: 'no lyrics', model: 'music-2.5' },
+      );
+    } catch {
+      // dry-run may resolve or reject
+    }
+
+    console.log = origLog;
+    const parsed = JSON.parse(captured);
+    expect(parsed.request.model).toBe('music-2.5');
+  });
 });

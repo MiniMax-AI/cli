@@ -71,13 +71,17 @@ export default defineCommand({
       );
     }
 
-    // Determine model: explicit --model overrides auto-switch
+    // Determine model: explicit --model > auto-switch > config default > hardcoded
     const explicitModel = flags.model as string | undefined;
-    let model = explicitModel || 'MiniMax-Hailuo-2.3';
-    if (!explicitModel && flags.lastFrame) {
+    let model: string;
+    if (explicitModel) {
+      model = explicitModel;
+    } else if (flags.lastFrame) {
       model = 'MiniMax-Hailuo-02';
-    } else if (!explicitModel && flags.subjectImage) {
+    } else if (flags.subjectImage) {
       model = 'S2V-01';
+    } else {
+      model = config.defaultVideoModel || 'MiniMax-Hailuo-2.3';
     }
     const format = detectOutputFormat(config.output);
 

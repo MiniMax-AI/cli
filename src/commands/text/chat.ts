@@ -117,7 +117,9 @@ export default defineCommand({
       }
     }
 
-    const model = (flags.model as string) || 'MiniMax-M2.7';
+    const model = (flags.model as string)
+      || config.defaultTextModel
+      || 'MiniMax-M2.7';
     const shouldStream = flags.stream === true || (flags.stream === undefined && process.stdout.isTTY);
     const format = detectOutputFormat(config.output);
 

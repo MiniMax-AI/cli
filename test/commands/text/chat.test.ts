@@ -102,4 +102,91 @@ describe('text chat command', () => {
       console.log = originalLog;
     }
   });
+
+  it('uses defaultTextModel when --model flag is not provided', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      defaultTextModel: 'MiniMax-M2.7-highspeed',
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.model).toBe('MiniMax-M2.7-highspeed');
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('--model flag overrides defaultTextModel', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      defaultTextModel: 'MiniMax-M2.7-highspeed',
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        model: 'MiniMax-M2.7',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.model).toBe('MiniMax-M2.7');
+    } finally {
+      console.log = originalLog;
+    }
+  });
 });
