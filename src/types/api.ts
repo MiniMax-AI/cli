@@ -257,8 +257,10 @@ export interface QuotaModelRemain {
   end_time: number;
   remains_time: number;
   current_interval_total_count: number;
+  /** @deprecated Misleading API naming: this represents REMAINING count, not usage. */
   current_interval_usage_count: number;
   current_weekly_total_count: number;
+  /** @deprecated Misleading API naming: this represents REMAINING count, not usage. */
   current_weekly_usage_count: number;
   weekly_start_time: number;
   weekly_end_time: number;

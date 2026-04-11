@@ -114,10 +114,13 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
   for (const m of models) {
     console.log(boxLine(W, '├', '─', '┤', useColor));
 
+    // NOTE: current_interval_usage_count is misleadingly named by the API —
+    // it represents REMAINING count, not used. See issue #70.
     const remaining = m.current_interval_usage_count;
     const limit = m.current_interval_total_count;
     const used = Math.max(0, limit - remaining);
     const usedPct = limit > 0 ? Math.round((used / limit) * 100) : 0;
+    // Same misleading naming for weekly.
     const weekRemaining = m.current_weekly_usage_count;
     const weekLimit = m.current_weekly_total_count;
     const weekUsed = Math.max(0, weekLimit - weekRemaining);
