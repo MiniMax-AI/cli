@@ -13,6 +13,7 @@ export interface CredentialFile {
   expires_at: string; // ISO 8601
   token_type: 'Bearer';
   account?: string;
+  region?: string; // Region at time of login, used for token refresh URL
 }
 
 export interface ResolvedCredential {

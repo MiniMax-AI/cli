@@ -1,4 +1,5 @@
 import type { OAuthTokens } from './types';
+import type { Region } from '../config/schema';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
 
@@ -12,17 +13,33 @@ export interface OAuthConfig {
   callbackPort: number;
 }
 
-const DEFAULT_OAUTH_CONFIG: OAuthConfig = {
-  clientId: 'mmx-cli',
-  authorizationUrl: 'https://platform.minimax.io/oauth/authorize',
-  tokenUrl: 'https://api.minimax.io/v1/oauth/token',
-  deviceCodeUrl: 'https://api.minimax.io/v1/oauth/device/code',
-  scopes: ['api'],
-  callbackPort: 18991,
-};
+const OAUTH_ENDPOINTS = {
+  global: {
+    authorizationUrl: 'https://platform.minimax.io/oauth/authorize',
+    tokenUrl: 'https://api.minimax.io/v1/oauth/token',
+    deviceCodeUrl: 'https://api.minimax.io/v1/oauth/device/code',
+  },
+  cn: {
+    authorizationUrl: 'https://platform.minimaxi.com/oauth/authorize',
+    tokenUrl: 'https://api.minimaxi.com/v1/oauth/token',
+    deviceCodeUrl: 'https://api.minimaxi.com/v1/oauth/device/code',
+  },
+} as const;
+
+export function getOAuthConfig(region: Region, options?: { callbackPort?: number }): OAuthConfig {
+  const endpoints = OAUTH_ENDPOINTS[region];
+  return {
+    clientId: 'mmx-cli',
+    authorizationUrl: endpoints.authorizationUrl,
+    tokenUrl: endpoints.tokenUrl,
+    deviceCodeUrl: endpoints.deviceCodeUrl,
+    scopes: ['api'],
+    callbackPort: options?.callbackPort ?? 18991,
+  };
+}
 
 export async function startBrowserFlow(
-  config: OAuthConfig = DEFAULT_OAUTH_CONFIG,
+  config: OAuthConfig = getOAuthConfig('global'),
 ): Promise<OAuthTokens> {
   const { randomBytes, createHash } = await import('crypto');
   const codeVerifier = randomBytes(32).toString('base64url');
@@ -129,7 +146,7 @@ async function waitForCallback(port: number, expectedState: string): Promise<str
 }
 
 export async function startDeviceCodeFlow(
-  config: OAuthConfig = DEFAULT_OAUTH_CONFIG,
+  config: OAuthConfig = getOAuthConfig('global'),
 ): Promise<OAuthTokens> {
   // Request device code
   const codeRes = await fetch(config.deviceCodeUrl, {

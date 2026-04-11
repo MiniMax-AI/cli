@@ -1,15 +1,20 @@
 import type { OAuthTokens, CredentialFile } from './types';
+import type { Region } from '../config/schema';
 import { saveCredentials } from './credentials';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
 
-// OAuth config — endpoints TBD pending MiniMax OAuth documentation
-const TOKEN_URL = 'https://api.minimax.io/v1/oauth/token';
+const TOKEN_URLS: Record<Region, string> = {
+  global: 'https://api.minimax.io/v1/oauth/token',
+  cn: 'https://api.minimaxi.com/v1/oauth/token',
+} as const;
 
 export async function refreshAccessToken(
   refreshToken: string,
+  region: Region = 'global',
 ): Promise<OAuthTokens> {
-  const res = await fetch(TOKEN_URL, {
+  const tokenUrl = TOKEN_URLS[region];
+  const res = await fetch(tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -39,7 +44,8 @@ export async function ensureFreshToken(creds: CredentialFile): Promise<string> {
   }
 
   // Token expired or about to expire — refresh
-  const tokens = await refreshAccessToken(creds.refresh_token);
+  const region = (creds.region as Region) || 'global';
+  const tokens = await refreshAccessToken(creds.refresh_token, region);
 
   const updated: CredentialFile = {
     access_token: tokens.access_token,

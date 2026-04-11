@@ -2,7 +2,7 @@ import { defineCommand } from '../../command';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { saveCredentials } from '../../auth/credentials';
-import { startBrowserFlow, startDeviceCodeFlow } from '../../auth/oauth';
+import { startBrowserFlow, startDeviceCodeFlow, getOAuthConfig } from '../../auth/oauth';
 import { requestJson } from '../../client/http';
 import { quotaEndpoint } from '../../client/endpoints';
 import { renderQuotaTable } from '../../output/quota-table';
@@ -112,11 +112,13 @@ export default defineCommand({
       return;
     }
 
+    const oauthConfig = getOAuthConfig(config.region);
+
     let tokens;
     if (flags.noBrowser) {
-      tokens = await startDeviceCodeFlow();
+      tokens = await startDeviceCodeFlow(oauthConfig);
     } else {
-      tokens = await startBrowserFlow();
+      tokens = await startBrowserFlow(oauthConfig);
     }
 
     const creds: CredentialFile = {
@@ -124,6 +126,7 @@ export default defineCommand({
       refresh_token: tokens.refresh_token,
       expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
       token_type: 'Bearer',
+      region: config.region,
     };
 
     await saveCredentials(creds);
