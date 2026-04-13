@@ -2,7 +2,7 @@ import { defineCommand } from '../../command';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { saveCredentials } from '../../auth/credentials';
-import { startBrowserFlow, startDeviceCodeFlow } from '../../auth/oauth';
+import { startDeviceCodeFlow, type OAuthConfig } from '../../auth/oauth';
 import { requestJson } from '../../client/http';
 import { quotaEndpoint } from '../../client/endpoints';
 import { renderQuotaTable } from '../../output/quota-table';
@@ -37,11 +37,9 @@ export default defineCommand({
   options: [
     { flag: '--method <method>', description: 'Auth method: oauth (default), api-key' },
     { flag: '--api-key <key>', description: 'API key to store' },
-    { flag: '--no-browser', description: 'Use device-code flow instead of browser' },
   ],
   examples: [
     'mmx auth login',
-    'mmx auth login --no-browser',
     'mmx auth login --api-key sk-xxxxx',
     'mmx auth login --method api-key --api-key sk-xxxxx',
   ],
@@ -112,12 +110,17 @@ export default defineCommand({
       return;
     }
 
-    let tokens;
-    if (flags.noBrowser) {
-      tokens = await startDeviceCodeFlow();
-    } else {
-      tokens = await startBrowserFlow();
-    }
+    const oauthConfig: OAuthConfig = {
+      clientId: '659cf4c1-615c-45f6-a5f6-4bf15eb476e5',
+      clientName: 'MiniMax CLI',
+      authorizationUrl: `${config.platformHost}/oauth-authorize`,
+      tokenUrl: `${config.oauthApiHost}/oauth2/token`,
+      deviceCodeUrl: `${config.oauthApiHost}/oauth2/device/code`,
+      scopes: ['openid', 'profile', 'coding_plan'],
+      callbackPort: 18991,
+    };
+
+    const tokens = await startDeviceCodeFlow(oauthConfig);
 
     const creds: CredentialFile = {
       access_token: tokens.access_token,

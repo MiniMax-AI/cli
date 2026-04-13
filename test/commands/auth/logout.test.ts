@@ -9,6 +9,9 @@ describe('auth logout command', () => {
   it('handles dry run', async () => {
     const config = {
       region: 'global' as const,
+      env: 'prod' as const,
+      platformHost: 'https://platform.minimax.io',
+      oauthApiHost: 'https://account.minimax.io',
       baseUrl: 'https://api.mmx.io',
       output: 'text' as const,
       timeout: 10,

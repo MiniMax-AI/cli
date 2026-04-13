@@ -14,7 +14,7 @@ export async function resolveCredential(config: Config): Promise<ResolvedCredent
   // 2. OAuth credentials file
   const oauth = await loadCredentials();
   if (oauth) {
-    const token = await ensureFreshToken(oauth);
+    const token = await ensureFreshToken(oauth, `${config.oauthApiHost}/oauth2/token`);
     return { token, method: 'oauth', source: 'credentials.json' };
   }
 

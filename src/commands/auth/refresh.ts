@@ -31,7 +31,10 @@ export default defineCommand({
       return;
     }
 
-    const tokens = await refreshAccessToken(creds.refresh_token);
+    const tokens = await refreshAccessToken(
+      creds.refresh_token,
+      `${config.oauthApiHost}/oauth2/token`,
+    );
 
     const updated: CredentialFile = {
       access_token: tokens.access_token,

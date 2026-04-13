@@ -3,8 +3,8 @@ import { saveCredentials } from "./credentials";
 import { CLIError } from "../errors/base";
 import { ExitCode } from "../errors/codes";
 
-const DEFAULT_TOKEN_URL = "https://api.minimax.io/oauth/token";
-const DEFAULT_CLIENT_ID = "659cf4c1-615c-45f6-a5f6-4bf15eb476e5";
+const DEFAULT_TOKEN_URL = 'https://account.minimax.io/oauth2/token';
+const DEFAULT_CLIENT_ID = '659cf4c1-615c-45f6-a5f6-4bf15eb476e5';
 
 const MAX_REFRESH_RETRIES = 2;
 const RETRY_DELAY_MS = 500;
@@ -95,7 +95,11 @@ export async function refreshAccessToken(
   );
 }
 
-export async function ensureFreshToken(creds: CredentialFile): Promise<string> {
+export async function ensureFreshToken(
+  creds: CredentialFile,
+  tokenUrl?: string,
+  clientId?: string,
+): Promise<string> {
   const expiresAt = new Date(creds.expires_at).getTime();
   const bufferMs = 5 * 60 * 1000;
 
@@ -103,7 +107,7 @@ export async function ensureFreshToken(creds: CredentialFile): Promise<string> {
     return creds.access_token;
   }
 
-  const tokens = await refreshAccessToken(creds.refresh_token);
+  const tokens = await refreshAccessToken(creds.refresh_token, tokenUrl, clientId);
 
   const updated: CredentialFile = {
     access_token: tokens.access_token,

@@ -21,6 +21,9 @@ describe('config show command', () => {
     const config = {
       apiKey: 'test-key',
       region: 'global' as const,
+      env: 'prod' as const,
+      platformHost: 'https://platform.minimax.io',
+      oauthApiHost: 'https://account.minimax.io',
       baseUrl: 'https://api.mmx.io',
       output: 'json' as const,
       timeout: 300,

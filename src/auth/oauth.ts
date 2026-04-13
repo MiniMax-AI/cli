@@ -5,6 +5,7 @@ import { ExitCode } from '../errors/codes';
 // OAuth configuration
 export interface OAuthConfig {
   clientId: string;
+  clientName: string;
   authorizationUrl: string;
   tokenUrl: string;
   deviceCodeUrl: string;
@@ -12,17 +13,8 @@ export interface OAuthConfig {
   callbackPort: number;
 }
 
-const DEFAULT_OAUTH_CONFIG: OAuthConfig = {
-  clientId: '659cf4c1-615c-45f6-a5f6-4bf15eb476e5',
-  authorizationUrl: 'https://platform.minimax.io/oauth/authorize',
-  tokenUrl: 'https://api.minimax.io/oauth/token',
-  deviceCodeUrl: 'https://api.minimax.io/oauth/code',
-  scopes: ['openid', 'profile', 'coding_plan'],
-  callbackPort: 18991,
-};
-
 export async function startBrowserFlow(
-  config: OAuthConfig = DEFAULT_OAUTH_CONFIG,
+  config: OAuthConfig,
 ): Promise<OAuthTokens> {
   const { randomBytes, createHash } = await import('crypto');
   const codeVerifier = randomBytes(32).toString('base64url');
@@ -137,7 +129,7 @@ async function waitForCallback(port: number, expectedState: string): Promise<str
 }
 
 export async function startDeviceCodeFlow(
-  config: OAuthConfig = DEFAULT_OAUTH_CONFIG,
+  config: OAuthConfig,
 ): Promise<OAuthTokens> {
   const { randomBytes, createHash } = await import('crypto');
   const codeVerifier = randomBytes(32).toString('base64url');
@@ -147,10 +139,13 @@ export async function startDeviceCodeFlow(
 
   const state = randomBytes(16).toString('base64url');
 
+  const lane = process.env.BEDROCK_LANE;
+  const extraHeaders: Record<string, string> = lane ? { bedrock_lane: lane } : {};
+
   // Request device code with PKCE
   const codeRes = await fetch(config.deviceCodeUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...extraHeaders },
     body: new URLSearchParams({
       client_id: config.clientId,
       scope: config.scopes.join(' '),
@@ -161,9 +156,11 @@ export async function startDeviceCodeFlow(
   });
 
   if (!codeRes.ok) {
+    const body = await codeRes.text().catch(() => '');
     throw new CLIError(
-      'Failed to start device code flow.',
+      `Failed to start device code flow: HTTP ${codeRes.status} ${body}`,
       ExitCode.AUTH,
+      `URL: ${config.deviceCodeUrl}`,
     );
   }
 
@@ -179,7 +176,17 @@ export async function startDeviceCodeFlow(
     throw new CLIError('OAuth state mismatch: possible CSRF attack.', ExitCode.AUTH);
   }
 
-  process.stderr.write(`\nVisit: ${data.verification_uri}\n`);
+  const verificationUrl = new URL(data.verification_uri);
+  verificationUrl.searchParams.set('user_code', data.user_code);
+  verificationUrl.searchParams.set('client', config.clientName);
+  const url = verificationUrl.toString();
+
+  const { exec } = await import('child_process');
+  const openCmd = process.platform === 'darwin' ? 'open' :
+    process.platform === 'win32' ? 'start' : 'xdg-open';
+  exec(`${openCmd} "${url}"`);
+
+  process.stderr.write(`\nOpened: ${url}\n`);
   process.stderr.write(`Enter code: ${data.user_code}\n`);
   process.stderr.write('Waiting for authorization...\n');
 
@@ -192,7 +199,7 @@ export async function startDeviceCodeFlow(
 
     const tokenRes = await fetch(config.tokenUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...extraHeaders },
       body: new URLSearchParams({
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
         client_id: config.clientId,

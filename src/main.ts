@@ -7,7 +7,7 @@ import { detectRegion, saveDetectedRegion } from './config/detect-region';
 import { REGIONS, type Region } from './config/schema';
 import { checkForUpdate, getPendingUpdateNotification } from './update/checker';
 import { loadCredentials } from './auth/credentials';
-import { ensureApiKey } from './auth/setup';
+import { ensureAuth } from './auth/setup';
 import { CLI_VERSION } from './version';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
@@ -75,7 +75,8 @@ async function main() {
       await quotaCmd.execute(config, flags);
     } else {
       process.stderr.write('  Not logged in.\n');
-      process.stderr.write('  mmx auth login --api-key sk-xxxxx\n\n');
+      process.stderr.write('  mmx auth login              Log in with MiniMax account\n');
+      process.stderr.write('  mmx auth login --api-key    Log in with API key\n\n');
     }
     process.exit(0);
   }
@@ -91,7 +92,7 @@ async function main() {
     (cmd) => cmd.every((c, i) => commandPath[i] === c),
   );
   if (needsAuthSetup) {
-    await ensureApiKey(config);
+    await ensureAuth(config);
   }
 
   if (config.needsRegionDetection) {

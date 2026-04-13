@@ -15,6 +15,9 @@ describe('config set command', () => {
   it('requires key and value', async () => {
     const config = {
       region: 'global' as const,
+      env: 'prod' as const,
+      platformHost: 'https://platform.minimax.io',
+      oauthApiHost: 'https://account.minimax.io',
       baseUrl: 'https://api.mmx.io',
       output: 'text' as const,
       timeout: 10,
@@ -44,6 +47,9 @@ describe('config set command', () => {
   it('validates config key', async () => {
     const config = {
       region: 'global' as const,
+      env: 'prod' as const,
+      platformHost: 'https://platform.minimax.io',
+      oauthApiHost: 'https://account.minimax.io',
       baseUrl: 'https://api.mmx.io',
       output: 'text' as const,
       timeout: 10,

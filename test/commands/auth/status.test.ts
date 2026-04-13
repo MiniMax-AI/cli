@@ -9,6 +9,9 @@ describe('auth status command', () => {
   it('shows not authenticated when no credentials', async () => {
     const config = {
       region: 'global' as const,
+      env: 'prod' as const,
+      platformHost: 'https://platform.minimax.io',
+      oauthApiHost: 'https://account.minimax.io',
       baseUrl: 'https://api.mmx.io',
       output: 'json' as const,
       timeout: 10,

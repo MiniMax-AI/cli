@@ -8,6 +8,9 @@ function makeConfig(baseUrl: string): Config {
   return {
     apiKey: 'test-api-key',
     region: 'global',
+      env: 'prod' as const,
+      platformHost: 'https://platform.minimax.io',
+      oauthApiHost: 'https://account.minimax.io',
     baseUrl,
     output: 'text',
     timeout: 10,

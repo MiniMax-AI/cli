@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
-import { parseConfigFile, REGIONS, type Config, type ConfigFile, type Region } from './schema';
+import { parseConfigFile, REGIONS, PLATFORM_HOSTS, OAUTH_API_HOSTS, type Config, type ConfigFile, type Region, type Env } from './schema';
 import { ensureConfigDir, getConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
 import { CLIError } from '../errors/base';
@@ -45,6 +45,8 @@ export function loadConfig(flags: GlobalFlags): Config {
   const cachedRegion = file.region;
   const region = (explicitRegion || cachedRegion || 'global') as Region;
 
+  const env = ((flags.env as string) || process.env.MINIMAX_ENV || 'prod') as Env;
+
   const activeKey = apiKey || fileApiKey;
   const needsRegionDetection = !explicitRegion
     && (!cachedRegion || (activeKey !== undefined && activeKey !== file.api_key));
@@ -70,7 +72,10 @@ export function loadConfig(flags: GlobalFlags): Config {
     fileRegion: file.region,
     configPath: getConfigPath(),
     region,
+    env,
     baseUrl,
+    platformHost: PLATFORM_HOSTS[region][env],
+    oauthApiHost: OAUTH_API_HOSTS[region][env],
     output,
     timeout,
     defaultTextModel: file.default_text_model,

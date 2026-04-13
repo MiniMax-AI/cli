@@ -44,6 +44,7 @@ export function defineCommand(spec: CommandSpec): Command {
 export const GLOBAL_OPTIONS: OptionDef[] = [
   { flag: '--api-key <key>',     description: 'API key' },
   { flag: '--region <region>',   description: 'API region: global, cn' },
+  { flag: '--env <env>',         description: 'Environment: test, pre, prod (default)' },
   { flag: '--base-url <url>',    description: 'API base URL' },
   { flag: '--output <format>',   description: 'Output format: text, json' },
   { flag: '--timeout <seconds>', description: 'Request timeout', type: 'number' },
