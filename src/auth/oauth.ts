@@ -176,10 +176,7 @@ export async function startDeviceCodeFlow(
     throw new CLIError('OAuth state mismatch: possible CSRF attack.', ExitCode.AUTH);
   }
 
-  const verificationUrl = new URL(data.verification_uri);
-  verificationUrl.searchParams.set('user_code', data.user_code);
-  verificationUrl.searchParams.set('client', config.clientName);
-  const url = verificationUrl.toString();
+  const url = data.verification_uri;
 
   const { exec } = await import('child_process');
   const openCmd = process.platform === 'darwin' ? 'open' :
