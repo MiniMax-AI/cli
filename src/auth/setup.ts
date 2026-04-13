@@ -5,6 +5,7 @@ import { isInteractive } from '../utils/env';
 import { maskToken } from '../utils/token';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { discoverExternalCredential } from './discover';
 
 export async function ensureApiKey(config: Config): Promise<void> {
   if (config.apiKey || config.fileApiKey) return;
@@ -20,6 +21,38 @@ export async function ensureApiKey(config: Config): Promise<void> {
         message: `Found MINIMAX_API_KEY in environment (${maskToken(envKey)}). Save it to config file?`,
       });
       if (use) key = envKey;
+    }
+  }
+
+  // Try to discover credentials from external tools (e.g. OpenClaw)
+  if (!key) {
+    const discovered = discoverExternalCredential();
+    if (discovered) {
+      const interactive = isInteractive({ nonInteractive: config.nonInteractive });
+      let accepted = !interactive;
+
+      if (interactive) {
+        accepted = !!(await promptConfirm({
+          message: `Found MiniMax API key (${maskToken(discovered.key)}) in ${discovered.source}. Import it?`,
+        }));
+      }
+
+      if (accepted) {
+        const data: Record<string, unknown> = {
+          ...(readConfigFile() as Record<string, unknown>),
+          api_key: discovered.key,
+        };
+        if (discovered.region) data.region = discovered.region;
+        await writeConfigFile(data);
+        config.fileApiKey = discovered.key;
+        if (discovered.region) {
+          config.region = discovered.region;
+          config.needsRegionDetection = false;
+        }
+        const path = config.configPath ?? '~/.mmx/config.json';
+        process.stderr.write(`Imported API key from ${discovered.source} → ${path}\n`);
+        return;
+      }
     }
   }
 
