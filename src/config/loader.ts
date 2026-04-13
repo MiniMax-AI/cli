@@ -75,7 +75,7 @@ export function loadConfig(flags: GlobalFlags): Config {
     env,
     baseUrl,
     platformHost: PLATFORM_HOSTS[region][env],
-    oauthApiHost: OAUTH_API_HOSTS[region][env],
+    oauthApiHost: process.env.MINIMAX_AUTH_URL || OAUTH_API_HOSTS[region][env],
     output,
     timeout,
     defaultTextModel: file.default_text_model,
