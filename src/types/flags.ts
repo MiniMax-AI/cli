@@ -1,7 +1,6 @@
 export interface GlobalFlags {
   apiKey?: string;
   baseUrl?: string;
-  env?: string;
   output?: string;
   quiet: boolean;
   verbose: boolean;

@@ -10,7 +10,6 @@ describe('auth login command', () => {
   it('requires api key when method is api-key', async () => {
     const config = {
       region: 'global' as const,
-      env: 'prod' as const,
       platformHost: 'https://platform.minimax.io',
       oauthApiHost: 'https://account.minimax.io',
       baseUrl: 'https://api.mmx.io',

@@ -9,34 +9,15 @@ export const DOCS_HOSTS = {
 } as const;
 
 export type Region = keyof typeof REGIONS;
-export type Env = 'test' | 'pre' | 'prod';
-
-export const PLATFORM_HOSTS: Record<Region, Record<Env, string>> = {
-  cn: {
-    test: 'https://platform-test.xaminim.com',
-    pre:  'https://platform-pre.xaminim.com',
-    prod: 'https://platform.minimaxi.com',
-  },
-  global: {
-    test: 'https://platform-us-test.xaminim.com',
-    pre:  'https://platform-us-pre.xaminim.com',
-    prod: 'https://platform.minimax.io',
-  },
+export const PLATFORM_HOSTS: Record<Region, string> = {
+  cn: 'https://platform.minimaxi.com',
+  global: 'https://platform.minimax.io',
 };
 
-export const OAUTH_API_HOSTS: Record<Region, Record<Env, string>> = {
-  cn: {
-    test: 'https://account-test.xaminim.com',
-    pre:  'https://account-pre.xaminim.com',
-    prod: 'https://account.minimaxi.com',
-  },
-  global: {
-    test: 'https://account-overseas-test.xaminim.com',
-    pre:  'https://account-overseas-pre.xaminim.com',
-    prod: 'https://account.minimax.io',
-  },
+export const OAUTH_API_HOSTS: Record<Region, string> = {
+  cn: 'https://account.minimaxi.com',
+  global: 'https://account.minimax.io',
 };
-
 export interface ConfigFile {
   api_key?: string;
   region?: Region;
@@ -51,7 +32,6 @@ export interface ConfigFile {
 }
 
 const VALID_REGIONS = new Set<string>(['global', 'cn']);
-const VALID_ENVS = new Set<string>(['test', 'pre', 'prod']);
 const VALID_OUTPUTS = new Set<string>(['text', 'json']);
 
 export function parseConfigFile(raw: unknown): ConfigFile {
@@ -79,7 +59,6 @@ export interface Config {
   fileRegion?: Region;
   configPath?: string;
   region: Region;
-  env: Env;
   baseUrl: string;
   platformHost: string;
   oauthApiHost: string;
