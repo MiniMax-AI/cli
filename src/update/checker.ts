@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { readFileSync, writeFileSync } from 'fs';
 import { getConfigDir } from '../config/paths';
+import { proxyFetch } from '../client/proxy';
 
 const STATE_FILE = () => join(getConfigDir(), 'update-state.json');
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -29,7 +30,7 @@ function writeState(state: UpdateState): void {
 
 async function fetchLatestVersion(): Promise<string | null> {
   try {
-    const res = await fetch(
+    const res = await proxyFetch(
       `https://api.github.com/repos/${REPO}/releases/latest`,
       {
         headers: { 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },

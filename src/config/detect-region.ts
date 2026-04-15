@@ -1,5 +1,6 @@
 import { REGIONS, type Region } from "./schema";
 import { readConfigFile, writeConfigFile } from "./loader";
+import { proxyFetch } from "../client/proxy";
 
 const QUOTA_PATH = "/v1/api/openplatform/coding_plan/remains";
 
@@ -23,7 +24,7 @@ async function probeRegion(
 
   for (const authHeader of authHeaders) {
     try {
-      const res = await fetch(quotaUrl(region), {
+      const res = await proxyFetch(quotaUrl(region), {
         headers: { ...authHeader, "Content-Type": "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
       });

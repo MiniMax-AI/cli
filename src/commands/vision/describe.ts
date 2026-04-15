@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from 'fs';
 import { extname } from 'path';
 import { isInteractive } from '../../utils/env';
 import { promptText } from '../../utils/prompt';
+import { proxyFetch } from '../../client/proxy';
 
 interface VlmResponse {
   content: string;
@@ -26,7 +27,7 @@ async function toDataUri(image: string): Promise<string> {
   if (image.startsWith('data:')) return image;
 
   if (image.startsWith('http://') || image.startsWith('https://')) {
-    const res = await fetch(image);
+    const res = await proxyFetch(image);
     if (!res.ok) throw new CLIError(`Failed to download image: HTTP ${res.status}`, ExitCode.GENERAL);
     const contentType = res.headers.get('content-type') || 'image/jpeg';
     const mime = contentType.split(';')[0]!.trim();

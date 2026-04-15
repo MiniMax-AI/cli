@@ -3,6 +3,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { proxyFetch } from '../client/proxy';
 
 const REPO = 'MiniMax-AI-Dev/minimax-cli';
 const GH_API = 'https://api.github.com';
@@ -57,7 +58,7 @@ async function ghFetch(path: string): Promise<Response> {
     'X-GitHub-Api-Version': '2022-11-28',
   };
   if (process.env.GITHUB_TOKEN) headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
-  return fetch(`${GH_API}${path}`, { headers, signal: AbortSignal.timeout(10_000) });
+  return proxyFetch(`${GH_API}${path}`, { headers, signal: AbortSignal.timeout(10_000) });
 }
 
 async function resolveVersion(channel: Channel): Promise<string> {
@@ -84,7 +85,7 @@ async function resolveVersion(channel: Channel): Promise<string> {
 
 async function fetchManifest(version: string): Promise<Manifest> {
   const url = `https://github.com/${REPO}/releases/download/${version}/manifest.json`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+  const res = await proxyFetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new CLIError(`manifest.json not found for ${version}.`, ExitCode.GENERAL);
   return res.json() as Promise<Manifest>;
 }
@@ -102,7 +103,7 @@ async function verifySha256(filePath: string, expected: string): Promise<void> {
 }
 
 async function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void): Promise<void> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+  const res = await proxyFetch(url, { signal: AbortSignal.timeout(120_000) });
   if (!res.ok) throw new CLIError(`Download failed: ${res.status} ${res.statusText}`, ExitCode.GENERAL);
 
   const total = Number(res.headers.get('content-length') ?? 0);
