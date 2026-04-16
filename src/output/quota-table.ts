@@ -114,13 +114,11 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
   for (const m of models) {
     console.log(boxLine(W, '├', '─', '┤', useColor));
 
-    const remaining = m.current_interval_usage_count;
+    const used = m.current_interval_usage_count;
     const limit = m.current_interval_total_count;
-    const used = Math.max(0, limit - remaining);
     const usedPct = limit > 0 ? Math.round((used / limit) * 100) : 0;
-    const weekRemaining = m.current_weekly_usage_count;
+    const weekUsed = m.current_weekly_usage_count;
     const weekLimit = m.current_weekly_total_count;
-    const weekUsed = Math.max(0, weekLimit - weekRemaining);
     const resets = formatDuration(m.remains_time, L.now);
 
     const nameStr = m.model_name.padEnd(maxNameLen);

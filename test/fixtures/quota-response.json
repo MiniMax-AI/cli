@@ -3,53 +3,45 @@
     "status_code": 0,
     "status_msg": "success"
   },
-  "data": {
-    "plan": "Max-Highspeed",
-    "period_start": "2025-08-01",
-    "period_end": "2025-09-01",
-    "models": [
-      {
-        "model": "MiniMax-M2.7-highspeed",
-        "used": 8241,
-        "limit": 15000,
-        "reset": "rolling 5h",
-        "unit": "requests"
-      },
-      {
-        "model": "speech-2.8-hd",
-        "used": 4300,
-        "limit": 19000,
-        "reset": "daily",
-        "unit": "characters"
-      },
-      {
-        "model": "image-01",
-        "used": 42,
-        "limit": 200,
-        "reset": "daily",
-        "unit": "images"
-      },
-      {
-        "model": "Hailuo-2.3",
-        "used": 1,
-        "limit": 3,
-        "reset": "daily",
-        "unit": "videos"
-      },
-      {
-        "model": "Hailuo-2.3-Fast",
-        "used": 0,
-        "limit": 3,
-        "reset": "daily",
-        "unit": "videos"
-      },
-      {
-        "model": "music-2.5",
-        "used": 2,
-        "limit": 7,
-        "reset": "daily",
-        "unit": "songs"
-      }
-    ]
-  }
+  "model_remains": [
+    {
+      "model_name": "MiniMax-M*",
+      "start_time": 1776355200000,
+      "end_time": 1776373200000,
+      "remains_time": 7151954,
+      "current_interval_total_count": 1500,
+      "current_interval_usage_count": 228,
+      "current_weekly_total_count": 0,
+      "current_weekly_usage_count": 0,
+      "weekly_start_time": 1776009600000,
+      "weekly_end_time": 1776614400000,
+      "weekly_remains_time": 248351954
+    },
+    {
+      "model_name": "speech-hd",
+      "start_time": 1776355200000,
+      "end_time": 1776441600000,
+      "remains_time": 75551954,
+      "current_interval_total_count": 9000,
+      "current_interval_usage_count": 0,
+      "current_weekly_total_count": 63000,
+      "current_weekly_usage_count": 0,
+      "weekly_start_time": 1776009600000,
+      "weekly_end_time": 1776614400000,
+      "weekly_remains_time": 248351954
+    },
+    {
+      "model_name": "image-01",
+      "start_time": 1776355200000,
+      "end_time": 1776441600000,
+      "remains_time": 75551954,
+      "current_interval_total_count": 100,
+      "current_interval_usage_count": 0,
+      "current_weekly_total_count": 700,
+      "current_weekly_usage_count": 0,
+      "weekly_start_time": 1776009600000,
+      "weekly_end_time": 1776614400000,
+      "weekly_remains_time": 248351954
+    }
+  ]
 }

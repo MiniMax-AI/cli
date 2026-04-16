@@ -1,6 +1,6 @@
 {
   "name": "mmx-cli",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "CLI for the MiniMax AI Platform",
   "type": "module",
   "engines": {
