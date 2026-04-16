@@ -277,6 +277,7 @@ export const registry = new CommandRegistry({
   'music generate':    musicGenerate,
   'music cover':       musicCover,
   'search query':      searchQuery,
+  'search web':        searchQuery,
   'vision describe':   visionDescribe,
   'quota show':       quotaShow,
   'config show':          configShow,

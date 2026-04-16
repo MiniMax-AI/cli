@@ -44,6 +44,11 @@ function parseMessages(flags: GlobalFlags): ParsedMessages {
     }
   }
 
+  // --prompt is an alias for --message
+  if (!flags.message && flags.prompt) {
+    flags.message = Array.isArray(flags.prompt) ? flags.prompt : [flags.prompt as string];
+  }
+
   if (flags.message) {
     const validRoles = new Set(['system', 'user', 'assistant']);
     const msgs = flags.message as string[];
