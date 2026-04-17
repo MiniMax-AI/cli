@@ -1,6 +1,7 @@
 import type { OAuthTokens } from './types';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { proxyFetch } from '../client/proxy';
 
 // OAuth configuration — exact endpoints TBD pending MiniMax OAuth docs
 export interface OAuthConfig {
@@ -57,7 +58,7 @@ export async function startBrowserFlow(
   const code = await waitForCallback(config.callbackPort, state);
 
   // Exchange code for tokens
-  const tokenRes = await fetch(config.tokenUrl, {
+  const tokenRes = await proxyFetch(config.tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -132,7 +133,7 @@ export async function startDeviceCodeFlow(
   config: OAuthConfig = DEFAULT_OAUTH_CONFIG,
 ): Promise<OAuthTokens> {
   // Request device code
-  const codeRes = await fetch(config.deviceCodeUrl, {
+  const codeRes = await proxyFetch(config.deviceCodeUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -168,7 +169,7 @@ export async function startDeviceCodeFlow(
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, pollInterval));
 
-    const tokenRes = await fetch(config.tokenUrl, {
+    const tokenRes = await proxyFetch(config.tokenUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({

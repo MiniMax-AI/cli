@@ -5,6 +5,7 @@ import { ExitCode } from '../errors/codes';
 import { resolveCredential } from '../auth/resolver';
 import { mapApiError } from '../errors/api';
 import { maybeShowStatusBar } from '../output/status-bar';
+import { proxyFetch } from './proxy';
 
 export interface RequestOpts {
   url: string;
@@ -54,7 +55,7 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
 
   const timeoutMs = (opts.timeout ?? config.timeout) * 1000;
 
-  const res = await fetch(opts.url, {
+  const res = await proxyFetch(opts.url, {
     method: opts.method ?? 'GET',
     headers,
     body: opts.body

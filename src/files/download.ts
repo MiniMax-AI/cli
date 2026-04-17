@@ -2,13 +2,14 @@ import { createWriteStream, unlinkSync } from 'fs';
 import { createProgressBar } from '../output/progress';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { proxyFetch } from '../client/proxy';
 
 export async function downloadFile(
   url: string,
   destPath: string,
   opts?: { quiet?: boolean },
 ): Promise<{ size: number }> {
-  const res = await fetch(url);
+  const res = await proxyFetch(url);
 
   if (!res.ok) {
     throw new CLIError(`Download failed: HTTP ${res.status}`, ExitCode.GENERAL);

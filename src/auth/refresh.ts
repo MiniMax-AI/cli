@@ -2,6 +2,7 @@ import type { OAuthTokens, CredentialFile } from "./types";
 import { saveCredentials } from "./credentials";
 import { CLIError } from "../errors/base";
 import { ExitCode } from "../errors/codes";
+import { proxyFetch } from "../client/proxy";
 
 // OAuth config — endpoints TBD pending MiniMax OAuth documentation
 const TOKEN_URL = "https://api.minimax.io/v1/oauth/token";
@@ -11,7 +12,7 @@ export async function refreshAccessToken(
 ): Promise<OAuthTokens> {
   let res: Response;
   try {
-    res = await fetch(TOKEN_URL, {
+    res = await proxyFetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({

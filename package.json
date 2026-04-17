@@ -23,7 +23,8 @@
     "test:watch": "bun test --watch"
   },
   "dependencies": {
-    "@clack/prompts": "^0.7.0"
+    "@clack/prompts": "^0.7.0",
+    "undici": "^7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
