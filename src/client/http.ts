@@ -26,6 +26,11 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
     ...opts.headers,
   };
 
+  const bedrockLane = process.env.BEDROCK_LANE;
+  if (bedrockLane) {
+    headers['bedrock_lane'] = bedrockLane;
+  }
+
   if (!isFormData && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
