@@ -1,5 +1,6 @@
 export function chatEndpoint(baseUrl: string): string {
-  return `${baseUrl}/anthropic/v1/messages`;
+  const base = baseUrl.replace(/\/anthropic\/?$/, '');
+  return `${base}/anthropic/v1/messages`;
 }
 
 export function speechEndpoint(baseUrl: string): string {
