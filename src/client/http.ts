@@ -30,6 +30,9 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
   if (bedrockLane) {
     headers['bedrock_lane'] = bedrockLane;
   }
+  if (process.env.X_USER_PRE) {
+    headers['X-User-Pre'] = 'true';
+  }
 
   if (!isFormData && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';

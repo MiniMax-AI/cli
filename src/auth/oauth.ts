@@ -141,6 +141,7 @@ export async function startDeviceCodeFlow(
 
   const lane = process.env.BEDROCK_LANE;
   const extraHeaders: Record<string, string> = lane ? { bedrock_lane: lane } : {};
+  if (process.env.X_USER_PRE) extraHeaders['X-User-Pre'] = 'true';
 
   // Request device code with PKCE
   const codeRes = await fetch(config.deviceCodeUrl, {
