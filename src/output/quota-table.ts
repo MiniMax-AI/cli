@@ -8,7 +8,6 @@ const B = '\x1b[1m';
 const D = '\x1b[2m';
 const MM_BLUE = '\x1b[38;2;43;82;255m';
 const MM_CYAN = '\x1b[38;2;6;184;212m';
-const WHITE = '\x1b[38;2;255;255;255m';
 const FG_GREEN = '\x1b[38;2;74;222;128m';
 const FG_YELLOW = '\x1b[38;2;250;204;21m';
 const FG_RED = '\x1b[38;2;248;113;113m';
@@ -114,13 +113,11 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
   for (const m of models) {
     console.log(boxLine(W, '├', '─', '┤', useColor));
 
-    const remaining = m.current_interval_usage_count;
+    const used = m.current_interval_usage_count;
     const limit = m.current_interval_total_count;
-    const used = Math.max(0, limit - remaining);
     const usedPct = limit > 0 ? Math.round((used / limit) * 100) : 0;
-    const weekRemaining = m.current_weekly_usage_count;
+    const weekUsed = m.current_weekly_usage_count;
     const weekLimit = m.current_weekly_total_count;
-    const weekUsed = Math.max(0, weekLimit - weekRemaining);
     const resets = formatDuration(m.remains_time, L.now);
 
     const nameStr = m.model_name.padEnd(maxNameLen);
@@ -129,7 +126,7 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
     const line1VisLen = maxNameLen + 2 + 15 + 2 + barVisLen;
 
     const line1 = useColor
-      ? `${B}${WHITE}${nameStr}${R}  ${usageColors(usedPct)[0]}${usageFrac.padStart(15)}${R}  ${bar}`
+      ? `${B}${nameStr}${R}  ${usageColors(usedPct)[0]}${usageFrac.padStart(15)}${R}  ${bar}`
       : `${nameStr}  ${usageFrac.padStart(15)}  ${renderBar(usedPct, false)}`;
     console.log(boxRow(line1, W, line1VisLen, useColor));
 

@@ -6,6 +6,7 @@ import { speechEndpoint } from '../../client/endpoints';
 import { parseSSE } from '../../client/stream';
 import { detectOutputFormat, formatOutput } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
+import { writeFileSync } from 'fs';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
@@ -37,6 +38,7 @@ export default defineCommand({
   examples: [
     'mmx speech synthesize --text "Hello, world!"',
     'mmx speech synthesize --text "Hello, world!" --out hello.mp3',
+    'mmx speech synthesize --text "Hello" --subtitles --out hello.mp3',
     'echo "Breaking news." | mmx speech synthesize --text-file - --out news.mp3',
     'mmx speech synthesize --text "Stream" --stream | mpv --no-terminal -',
   ],
@@ -85,7 +87,7 @@ export default defineCommand({
     };
 
     if (flags.language) body.language_boost = flags.language as string;
-    if (flags.subtitles) body.subtitle = true;
+    if (flags.subtitles) body.subtitle_enable = true;  // Correct API parameter name
 
     if (flags.pronunciation) {
       body.pronunciation_dict = (flags.pronunciation as string[]).map(p => {
@@ -122,5 +124,52 @@ export default defineCommand({
 
     if (!config.quiet) process.stderr.write(`[Model: ${model}]\n`);
     saveAudioOutput(response, outPath, format, config.quiet);
+
+    // Download and save subtitle file when --subtitles is requested
+    if (flags.subtitles && response.data.subtitle_file) {
+      try {
+        // Download the subtitle JSON file from the URL
+        const subtitleRes = await fetch(response.data.subtitle_file);
+        if (!subtitleRes.ok) {
+          throw new CLIError(`Failed to download subtitle file: ${subtitleRes.status}`, ExitCode.GENERAL);
+        }
+        // API returns a flat array, not { subtitles: [...] }
+        const subtitleArray = await subtitleRes.json() as Array<{ text: string; time_begin: number; time_end: number }>;
+        
+        if (subtitleArray?.length) {
+          // Convert to SRT format (API returns time in milliseconds)
+          const subtitlePath = outPath.replace(/\.[^.]+$/, '') + '.srt';
+          const srtContent = subtitleArray
+            .map((s, i) => {
+              // API already returns milliseconds, use directly
+              const fmt = (ms: number) => {
+                const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
+                const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
+                const sec = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+                const mil = String(Math.round(ms % 1000)).padStart(3, '0');
+                return `${h}:${m}:${sec},${mil}`;
+              };
+              return `${i + 1}\n${fmt(s.time_begin)} --> ${fmt(s.time_end)}\n${s.text}`;
+            })
+            .join('\n\n');
+          writeFileSync(subtitlePath, srtContent, 'utf-8');
+          if (!config.quiet) {
+            console.log(formatOutput({ subtitles: subtitlePath }, format));
+          } else {
+            console.log(subtitlePath);
+          }
+        }
+      } catch (err) {
+        // Non-fatal: log warning but don't fail the whole synthesis
+        if (!config.quiet) {
+          process.stderr.write(`Warning: failed to download subtitles: ${(err as Error).message}\n`);
+        }
+      }
+    } else if (flags.subtitles && !response.data.subtitle_file) {
+      // Warn if --subtitles was requested but API didn't return subtitle_file
+      if (!config.quiet) {
+        process.stderr.write(`Warning: subtitles requested but not returned by API\n`);
+      }
+    }
   },
 });

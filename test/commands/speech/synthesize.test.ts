@@ -159,4 +159,47 @@ describe('speech synthesize command', () => {
       console.log = originalLog;
     }
   });
+
+  it('--subtitles sets subtitle_enable in dry-run output', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await synthesizeCommand.execute(config, {
+        text: 'Hello',
+        subtitles: true,
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.subtitle_enable).toBe(true);
+      // Verify the old incorrect parameter name is NOT used
+      expect(parsed.request.subtitle).toBeUndefined();
+    } finally {
+      console.log = originalLog;
+    }
+  });
 });

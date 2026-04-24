@@ -29,7 +29,7 @@ describe('detect-region: probeRegion auth style fallback', () => {
   it('succeeds when endpoint only accepts Bearer token', async () => {
     server = createMockServer({
       routes: {
-        '/v1/api/openplatform/coding_plan/remains': (req) => {
+        '/v1/token_plan/remains': (req) => {
           if (req.headers.get('Authorization') === 'Bearer bearer-only-key') {
             return jsonResponse({ base_resp: { status_code: 0 } });
           }
@@ -55,7 +55,7 @@ describe('detect-region: probeRegion auth style fallback', () => {
   it('succeeds when endpoint only accepts x-api-key header', async () => {
     server = createMockServer({
       routes: {
-        '/v1/api/openplatform/coding_plan/remains': (req) => {
+        '/v1/token_plan/remains': (req) => {
           if (req.headers.get('x-api-key') === 'xapikey-only-key') {
             return jsonResponse({ base_resp: { status_code: 0 } });
           }
@@ -80,7 +80,7 @@ describe('detect-region: probeRegion auth style fallback', () => {
   it('falls back to global when key is invalid for all auth styles and regions', async () => {
     server = createMockServer({
       routes: {
-        '/v1/api/openplatform/coding_plan/remains': () =>
+        '/v1/token_plan/remains': () =>
           jsonResponse({ error: 'unauthorized' }, 401),
       },
     });
@@ -124,7 +124,8 @@ describe('refreshAccessToken: timeout and error handling', () => {
     // We test the real function against a mock server via a wrapper
     // that overrides the fetch to hit our local server instead.
     const origFetch = globalThis.fetch;
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('oauth/token')) {
         return origFetch(`${server.url}/v1/oauth/token`, init);
@@ -156,7 +157,8 @@ describe('refreshAccessToken: timeout and error handling', () => {
 
     const mod = await import('../../src/auth/refresh');
     const origFetch = globalThis.fetch;
-    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
       if (url.includes('oauth/token')) {
         return origFetch(`${server.url}/v1/oauth/token`, init);
@@ -197,17 +199,20 @@ describe('handleError: timeout message includes region/auth hint', () => {
 
     let captured = '';
     const origWrite = process.stderr.write.bind(process.stderr);
+    const origExit = process.exit;
     (process.stderr as NodeJS.WriteStream).write = (chunk: unknown) => {
       captured += String(chunk);
       return true;
     };
+    (process as unknown as Record<string, unknown>).exit = () => { throw new Error('exit'); };
 
     try {
       handleError(abortErr);
     } catch {
-      // process.exit throws in test env — that's expected
+      // mocked process.exit throws — expected
     } finally {
       (process.stderr as NodeJS.WriteStream).write = origWrite;
+      (process as unknown as Record<string, unknown>).exit = origExit;
     }
 
     expect(captured).toContain('mmx auth status');

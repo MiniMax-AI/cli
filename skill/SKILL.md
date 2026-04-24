@@ -178,7 +178,7 @@ mmx speech synthesize --text <text> [flags]
 | `--bitrate <bps>` | number | Bitrate (default: 128000) |
 | `--channels <n>` | number | Audio channels (default: 1) |
 | `--language <code>` | string | Language boost |
-| `--subtitles` | boolean | Include subtitle timing data |
+| `--subtitles` | boolean | Download and save subtitles as `.srt` file (alongside `--out` audio file). API must support subtitles for the selected model.
 | `--pronunciation <from/to>` | string, repeatable | Custom pronunciation |
 | `--sound-effect <effect>` | string | Add sound effect |
 | `--out <path>` | string | Save audio to file |
@@ -187,6 +187,9 @@ mmx speech synthesize --text <text> [flags]
 ```bash
 mmx speech synthesize --text "Hello world" --out hello.mp3 --quiet
 # stdout: hello.mp3
+
+mmx speech synthesize --text "Hello" --subtitles --out hello.mp3
+# saves hello.mp3 + hello.srt (SRT subtitle file)
 
 echo "Breaking news." | mmx speech synthesize --text-file - --out news.mp3
 ```

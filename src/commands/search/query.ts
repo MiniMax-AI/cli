@@ -30,7 +30,7 @@ export default defineCommand({
     'mmx search query --q "latest news" --output json',
   ],
   async run(config: Config, flags: GlobalFlags) {
-    const query = (flags.q ?? (flags._positional as string[]|undefined)?.[0]) as string | undefined;
+    const query = (flags.q ?? flags.query ?? (flags._positional as string[]|undefined)?.[0]) as string | undefined;
 
     if (!query) {
       throw new CLIError(

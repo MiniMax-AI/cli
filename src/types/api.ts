@@ -108,7 +108,7 @@ export interface SpeechRequest {
   pronunciation_dict?: Array<{ tone: string; text: string }>;
   output_format?: 'url' | 'hex';
   stream?: boolean;
-  subtitle?: boolean;
+  subtitle_enable?: boolean;  // Correct API parameter name (not 'subtitle')
 }
 
 export interface SpeechResponse {
@@ -116,7 +116,7 @@ export interface SpeechResponse {
   data: {
     audio?: string; // hex-encoded audio data
     audio_url?: string;
-    subtitle_info?: SubtitleInfo;
+    subtitle_file?: string; // URL to download subtitle JSON file (when subtitle_enable=true)
     status: number;
   };
   extra_info?: {
@@ -127,14 +127,6 @@ export interface SpeechResponse {
     word_count?: number;
     invisible_character_ratio?: number;
   };
-}
-
-export interface SubtitleInfo {
-  subtitles: Array<{
-    text: string;
-    start_time: number;
-    end_time: number;
-  }>;
 }
 
 // ---- Voice List ----

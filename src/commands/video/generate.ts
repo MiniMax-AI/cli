@@ -21,11 +21,11 @@ import { promptText, failIfMissing } from '../../utils/prompt';
 
 export default defineCommand({
   name: 'video generate',
-  description: 'Generate a video (T2V: Hailuo-2.3 / 2.3-Fast / Hailuo-02 | I2V: I2V-01 / I2V-01-Director / I2V-01-live | S2V: S2V-01)',
+  description: 'Generate a video\n  T2V:  Hailuo-2.3\n  I2V:  Hailuo-2.3 (default) / Hailuo-2.3-Fast (fast mode, requires --first-frame)\n  SEF:  Hailuo-02 (requires --first-frame and --last-frame)\n  S2V:  S2V-01 (requires --subject-image)',
   apiDocs: '/docs/api-reference/video-generation',
   usage: 'mmx video generate --prompt <text> [flags]',
   options: [
-    { flag: '--model <model>', description: 'Model ID (default: MiniMax-Hailuo-2.3). Auto-switched to Hailuo-02 with --last-frame, or S2V-01 with --subject-image.' },
+    { flag: '--model <model>', description: 'Model ID. T2V: MiniMax-Hailuo-2.3; I2V: MiniMax-Hailuo-2.3 (default) or MiniMax-Hailuo-2.3-Fast (fast, requires --first-frame). Auto-switched to Hailuo-02 with --last-frame, or S2V-01 with --subject-image.' },
     { flag: '--prompt <text>', description: 'Video description', required: true },
     { flag: '--first-frame <path-or-url>', description: 'First frame image (local path or URL). Auto base64-encoded for local files.' },
     { flag: '--last-frame <path-or-url>', description: 'Last frame image (local path or URL). Enables SEF (start-end frame) interpolation mode with Hailuo-02 model. Requires --first-frame.' },
@@ -71,8 +71,17 @@ export default defineCommand({
       );
     }
 
-    // Determine model: explicit --model > auto-switch > config default > hardcoded
+    // MiniMax-Hailuo-2.3-Fast only supports I2V, not T2V
     const explicitModel = flags.model as string | undefined;
+    if (explicitModel === 'MiniMax-Hailuo-2.3-Fast' && !flags.firstFrame) {
+      throw new CLIError(
+        'MiniMax-Hailuo-2.3-Fast only supports I2V (image-to-video). Use --first-frame to provide an input image.',
+        ExitCode.USAGE,
+        'mmx video generate --prompt <text> --model MiniMax-Hailuo-2.3-Fast --first-frame <image>',
+      );
+    }
+
+    // Determine model: explicit --model > auto-switch > config default > hardcoded
     let model: string;
     if (explicitModel) {
       model = explicitModel;

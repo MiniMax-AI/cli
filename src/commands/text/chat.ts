@@ -3,6 +3,8 @@ import { request, requestJson } from '../../client/http';
 import { chatEndpoint } from '../../client/endpoints';
 import { parseSSE } from '../../client/stream';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
+import { CLIError } from '../../errors/base';
+import { ExitCode } from '../../errors/codes';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type {
@@ -42,6 +44,11 @@ function parseMessages(flags: GlobalFlags): ParsedMessages {
         messages.push(m as ChatMessage);
       }
     }
+  }
+
+  // --prompt is an alias for --message
+  if (!flags.message && flags.prompt) {
+    flags.message = Array.isArray(flags.prompt) ? flags.prompt : [flags.prompt as string];
   }
 
   if (flags.message) {
@@ -139,8 +146,16 @@ export default defineCommand({
         try {
           return JSON.parse(t);
         } catch {
-          const raw = readFileSync(t, 'utf-8');
-          return JSON.parse(raw);
+          // Not JSON — treat as file path
+          try {
+            const raw = readFileSync(t, 'utf-8');
+            return JSON.parse(raw);
+          } catch {
+            throw new CLIError(
+              `Invalid tool definition: "${t}" is neither valid JSON nor a readable file.`,
+              ExitCode.USAGE,
+            );
+          }
         }
       });
       body.tools = tools;
@@ -161,6 +176,15 @@ export default defineCommand({
         stream: true,
         authStyle: 'x-api-key',
       });
+
+      // Validate response is actually SSE before attempting to parse
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('text/event-stream') && !contentType.includes('stream')) {
+        throw new CLIError(
+          `Expected SSE stream but got content-type "${contentType}". Server may be experiencing issues.`,
+          ExitCode.GENERAL,
+        );
+      }
 
       let textContent = '';
       let inThinking = false;
@@ -193,8 +217,9 @@ export default defineCommand({
               statusOut.write(parsed.delta.thinking);
             }
           }
-        } catch {
-          // Skip unparseable chunks
+        } catch (err) {
+          // Warn but don't crash — partial output is better than nothing
+          process.stderr.write(`\n${dim}[warning] Failed to parse stream chunk: ${err instanceof Error ? err.message : String(err)}${reset}\n`);
         }
       }
       if (inThinking) statusOut.write(reset);

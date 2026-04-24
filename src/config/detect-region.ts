@@ -1,7 +1,7 @@
 import { REGIONS, type Region } from "./schema";
 import { readConfigFile, writeConfigFile } from "./loader";
 
-const QUOTA_PATH = "/v1/api/openplatform/coding_plan/remains";
+const QUOTA_PATH = "/v1/token_plan/remains";
 
 function quotaUrl(region: Region): string {
   return REGIONS[region] + QUOTA_PATH;
@@ -52,7 +52,10 @@ export async function detectRegion(apiKey: string): Promise<Region> {
   if (!match) {
     process.stderr.write(" failed\n");
     process.stderr.write(
-      "Warning: API key failed validation against all regions. Falling back to global.\n",
+      `Warning: API key failed validation against all regions (global, cn).\n` +
+      `  This usually means the API key is invalid or the network is blocking requests.\n` +
+      `  Falling back to 'global'. Subsequent requests may fail.\n` +
+      `  Run 'mmx auth status' to verify your credentials.\n`,
     );
     return "global";
   }

@@ -1,6 +1,8 @@
 import { writeFileSync } from 'fs';
 import type { OutputFormat } from './formatter';
 import { formatOutput } from './formatter';
+import { CLIError } from '../errors/base';
+import { ExitCode } from '../errors/codes';
 
 interface AudioExtraInfo {
   audio_length?: number;
@@ -20,7 +22,39 @@ export function saveAudioOutput(
   quiet: boolean,
 ): void {
   if (outPath) {
-    writeFileSync(outPath, Buffer.from(response.data.audio!, 'hex'));
+    const audioHex = response.data.audio;
+    if (!audioHex) {
+      throw new CLIError(
+        'API response missing audio data (audio field is empty).',
+        ExitCode.GENERAL,
+      );
+    }
+    // Validate hex string before attempting conversion
+    if (!/^[0-9a-fA-F]*$/.test(audioHex)) {
+      throw new CLIError(
+        'API returned invalid audio data (not valid hex).',
+        ExitCode.GENERAL,
+      );
+    }
+    if (audioHex.length % 2 !== 0) {
+      throw new CLIError(
+        'API returned truncated audio data (odd-length hex string).',
+        ExitCode.GENERAL,
+      );
+    }
+    try {
+      writeFileSync(outPath, Buffer.from(audioHex, 'hex'));
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'ENOSPC') {
+        throw new CLIError(
+          'Disk full — cannot write audio file.',
+          ExitCode.GENERAL,
+          'Free up disk space and try again.',
+        );
+      }
+      throw err;
+    }
     if (quiet) {
       console.log(outPath);
     } else {

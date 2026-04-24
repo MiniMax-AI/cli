@@ -34,9 +34,15 @@ export async function poll<T>(config: Config, opts: PollOptions): Promise<T> {
 
       if (opts.isFailed(data)) {
         spinner.stop('Failed.');
+        // Include API status context to help users diagnose failures
+        const status = opts.getStatus ? opts.getStatus(data) : 'failed';
+        const extra = (data as Record<string, unknown>)?.base_resp
+          ? ` (${(data as { base_resp: { status_code?: number; status_msg?: string } }).base_resp.status_msg})`
+          : '';
         throw new CLIError(
-          'Task failed.',
+          `Task ${status}.${extra}`,
           ExitCode.GENERAL,
+          'Check the MiniMax dashboard or --verbose output for details.',
         );
       }
 

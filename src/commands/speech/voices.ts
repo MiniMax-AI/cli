@@ -15,7 +15,11 @@ function extractLanguage(voiceId: string): string {
 
 function filterByLanguage(voices: SystemVoiceInfo[], language: string): SystemVoiceInfo[] {
   const lang = language.toLowerCase();
-  return voices.filter(v => extractLanguage(v.voice_id).toLowerCase().includes(lang));
+  return voices.filter(v => {
+    const voiceLang = extractLanguage(v.voice_id).toLowerCase();
+    // Exact prefix match: "english" matches "English_*" but not "Korean_*"
+    return voiceLang === lang || voiceLang.startsWith(lang + '_') || voiceLang.startsWith(lang + ' (');
+  });
 }
 
 export default defineCommand({

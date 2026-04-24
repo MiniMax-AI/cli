@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="README_CN.md">中文文档</a> · <a href="https://platform.minimax.io">Global Platform</a> · <a href="https://platform.minimaxi.com">CN Platform</a>
+  <a href="README_CN.md">中文文档</a> · <a href="https://platform.minimax.io">Global Platform</a> · <a href="https://platform.minimaxi.com">CN Platform</a> · <a href="https://platform.minimax.io/docs/token-plan/minimax-cli">Example</a>
 </p>
 
 ## Features

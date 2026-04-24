@@ -164,6 +164,9 @@ export default defineCommand({
       for (let i = 0; i < images.length; i++) {
         const filename = `${prefix}_${String(i + 1).padStart(3, '0')}.jpg`;
         const destPath = join(outDir, filename);
+        if (existsSync(destPath)) {
+          process.stderr.write(`Warning: overwriting existing file: ${destPath}\n`);
+        }
         writeFileSync(destPath, images[i]!, 'base64');
         saved.push(destPath);
       }
@@ -172,12 +175,24 @@ export default defineCommand({
       for (let i = 0; i < imageUrls.length; i++) {
         const filename = `${prefix}_${String(i + 1).padStart(3, '0')}.jpg`;
         const destPath = join(outDir, filename);
+        if (existsSync(destPath)) {
+          process.stderr.write(`Warning: overwriting existing file: ${destPath}\n`);
+        }
         await downloadFile(imageUrls[i]!, destPath, { quiet: config.quiet });
         saved.push(destPath);
       }
     }
 
-    if (config.quiet) {
+    // --output json is respected even in --quiet mode (JSON is the actual output, not progress)
+    if (format === 'json') {
+      console.log(formatOutput({
+        id: response.data.task_id,
+        saved,
+        success_count: response.data.success_count,
+        failed_count: response.data.failed_count,
+      }, format));
+    } else if (config.quiet) {
+      // Non-JSON quiet mode: just print file paths
       console.log(saved.join('\n'));
     } else {
       console.log(formatOutput({

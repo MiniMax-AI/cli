@@ -162,4 +162,36 @@ describe('video generate command', () => {
       console.log = originalLog;
     }
   });
+
+  it('rejects explicit MiniMax-Hailuo-2.3-Fast without --first-frame', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    await expect(
+      generateCommand.execute(config, {
+        prompt: 'A cat',
+        model: 'MiniMax-Hailuo-2.3-Fast',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      }),
+    ).rejects.toThrow('MiniMax-Hailuo-2.3-Fast only supports I2V');
+  });
 });

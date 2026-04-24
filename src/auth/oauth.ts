@@ -44,13 +44,21 @@ export async function startBrowserFlow(
 
   const authUrl = `${config.authorizationUrl}?${params}`;
 
-  // Open browser
-  const { exec } = await import('child_process');
+  // Open browser using execFile/spawn instead of exec to prevent shell injection.
+  // exec() passes the string to a shell, so a crafted authUrl containing shell
+  // metacharacters (e.g. from a malicious authorization server redirect) could
+  // execute arbitrary commands. execFile/spawn bypass the shell entirely. (#79)
+  const { execFile, spawn } = await import('child_process');
   const platform = process.platform;
-  const openCmd = platform === 'darwin' ? 'open' :
-    platform === 'win32' ? 'start' : 'xdg-open';
 
-  exec(`${openCmd} "${authUrl}"`);
+  if (platform === 'darwin') {
+    execFile('open', [authUrl]);
+  } else if (platform === 'win32') {
+    // On Windows, 'start' is a shell built-in — use cmd.exe /c start explicitly.
+    spawn('cmd.exe', ['/c', 'start', '', authUrl], { shell: false, detached: true });
+  } else {
+    execFile('xdg-open', [authUrl]);
+  }
   process.stderr.write('Opening browser to authenticate with MiniMax...\n');
 
   // Start local server to receive callback

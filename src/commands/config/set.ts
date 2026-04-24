@@ -30,8 +30,9 @@ export default defineCommand({
     'mmx config set --key base_url --value https://api-uw.minimax.io',
   ],
   async run(config: Config, flags: GlobalFlags) {
-    const key = flags.key as string | undefined;
-    const value = flags.value as string | undefined;
+    const positional = flags._positional as string[] | undefined;
+    const key = (flags.key as string | undefined) ?? positional?.[0];
+    const value = (flags.value as string | undefined) ?? positional?.[1];
 
     if (!key || value === undefined) {
       throw new CLIError(
@@ -85,6 +86,12 @@ export default defineCommand({
 
     const existing = readConfigFile() as Record<string, unknown>;
     existing[resolvedKey] = resolvedKey === 'timeout' ? Number(value) : value;
+
+    // When API key changes, clear cached region so it gets re-detected
+    if (resolvedKey === 'api_key') {
+      delete existing.region;
+    }
+
     await writeConfigFile(existing);
 
     if (!config.quiet) {
