@@ -93,9 +93,15 @@ mmx image generate --prompt <text> [flags]
 | Flag | Type | Description |
 |---|---|---|
 | `--prompt <text>` | string, **required** | Image description |
-| `--aspect-ratio <ratio>` | string | e.g. `16:9`, `1:1` |
+| `--aspect-ratio <ratio>` | string | e.g. `16:9`, `1:1`. Ignored if `--width` and `--height` are both set |
 | `--n <count>` | number | Number of images (default: 1) |
+| `--seed <n>` | number | Random seed for reproducible generation |
+| `--width <px>` | number | Width in pixels (512–2048, multiple of 8). Requires `--height` |
+| `--height <px>` | number | Height in pixels (512–2048, multiple of 8). Requires `--width` |
+| `--prompt-optimizer` | boolean | Optimize prompt before generation |
+| `--aigc-watermark` | boolean | Embed AI-generated content watermark |
 | `--subject-ref <params>` | string | Subject reference: `type=character,image=path-or-url` |
+| `--response-format <format>` | string | `url` (default) or `base64`. Base64 bypasses CDN download |
 | `--out-dir <dir>` | string | Download images to directory |
 | `--out-prefix <prefix>` | string | Filename prefix (default: `image`) |
 

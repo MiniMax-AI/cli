@@ -8,15 +8,15 @@ import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { ImageRequest, ImageResponse } from '../../types/api';
-import { mkdirSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join, resolve, extname } from 'path';
+import { isInteractive } from '../../utils/env';
+import { promptText, failIfMissing } from '../../utils/prompt';
 
 const MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.png': 'image/png', '.webp': 'image/webp',
 };
-import { isInteractive } from '../../utils/env';
-import { promptText, failIfMissing } from '../../utils/prompt';
 
 export default defineCommand({
   name: 'image generate',
@@ -33,6 +33,7 @@ export default defineCommand({
     { flag: '--prompt-optimizer', description: 'Automatically optimize the prompt before generation for better results.' },
     { flag: '--aigc-watermark', description: 'Embed AI-generated content watermark in the output image.' },
     { flag: '--subject-ref <params>', description: 'Subject reference for character consistency. Format: type=character,image=path-or-url' },
+    { flag: '--response-format <format>', description: 'Response format: url (download), base64 (embed). Default: url' },
     { flag: '--out-dir <dir>', description: 'Download images to directory' },
     { flag: '--out-prefix <prefix>', description: 'Filename prefix (default: image)' },
   ],
@@ -46,6 +47,8 @@ export default defineCommand({
     'mmx image generate --prompt "Wide landscape" --width 1920 --height 1080',
     '# Optimized prompt with watermark',
     'mmx image generate --prompt "sunset" --prompt-optimizer --aigc-watermark',
+    '# Base64 response (bypasses CDN, useful when image URLs are unreachable)',
+    'mmx image generate --prompt "A cat" --response-format base64',
   ],
   async run(config: Config, flags: GlobalFlags) {
     let prompt = (flags.prompt ?? (flags._positional as string[]|undefined)?.[0]) as string | undefined;
@@ -88,6 +91,8 @@ export default defineCommand({
       validateSize('height', height);
     }
 
+    const responseFormat = (flags.responseFormat as 'url' | 'base64' | undefined) || 'url';
+
     const body: ImageRequest = {
       model: 'image-01',
       prompt,
@@ -98,6 +103,7 @@ export default defineCommand({
       height: height,
       prompt_optimizer: flags.promptOptimizer === true || undefined,
       aigc_watermark: flags.aigcWatermark === true || undefined,
+      response_format: responseFormat,
     };
 
     if (flags.subjectRef) {
@@ -143,8 +149,6 @@ export default defineCommand({
       body,
     });
 
-    const imageUrls = response.data.image_urls || [];
-
     if (!config.quiet) {
       process.stderr.write('[Model: image-01]\n');
     }
@@ -155,17 +159,28 @@ export default defineCommand({
     const prefix = (flags.outPrefix as string) || 'image';
     const saved: string[] = [];
 
-    for (let i = 0; i < imageUrls.length; i++) {
-      const filename = `${prefix}_${String(i + 1).padStart(3, '0')}.jpg`;
-      const destPath = join(outDir, filename);
-
-      // Warn if overwriting existing file (but don't block)
-      if (existsSync(destPath)) {
-        process.stderr.write(`Warning: overwriting existing file: ${destPath}\n`);
+    if (responseFormat === 'base64') {
+      const images = response.data.image_base64 || [];
+      for (let i = 0; i < images.length; i++) {
+        const filename = `${prefix}_${String(i + 1).padStart(3, '0')}.jpg`;
+        const destPath = join(outDir, filename);
+        if (existsSync(destPath)) {
+          process.stderr.write(`Warning: overwriting existing file: ${destPath}\n`);
+        }
+        writeFileSync(destPath, images[i]!, 'base64');
+        saved.push(destPath);
       }
-
-      await downloadFile(imageUrls[i]!, destPath, { quiet: config.quiet });
-      saved.push(destPath);
+    } else {
+      const imageUrls = response.data.image_urls || [];
+      for (let i = 0; i < imageUrls.length; i++) {
+        const filename = `${prefix}_${String(i + 1).padStart(3, '0')}.jpg`;
+        const destPath = join(outDir, filename);
+        if (existsSync(destPath)) {
+          process.stderr.write(`Warning: overwriting existing file: ${destPath}\n`);
+        }
+        await downloadFile(imageUrls[i]!, destPath, { quiet: config.quiet });
+        saved.push(destPath);
+      }
     }
 
     // --output json is respected even in --quiet mode (JSON is the actual output, not progress)
