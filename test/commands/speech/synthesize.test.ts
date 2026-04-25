@@ -202,4 +202,77 @@ describe('speech synthesize command', () => {
       console.log = originalLog;
     }
   });
+
+  it('rejects invalid audio format', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    await expect(
+      synthesizeCommand.execute(config, {
+        text: 'Hello',
+        format: 'aac',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      }),
+    ).rejects.toThrow('Invalid audio format "aac"');
+  });
+
+  it('accepts opus audio format', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await synthesizeCommand.execute(config, {
+        text: 'Hello',
+        format: 'opus',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.audio_setting.format).toBe('opus');
+    } finally {
+      console.log = originalLog;
+    }
+  });
 });
