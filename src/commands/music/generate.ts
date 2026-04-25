@@ -6,6 +6,7 @@ import { musicEndpoint } from '../../client/endpoints';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
 import { readTextFromPathOrStdin } from '../../utils/fs';
+import { AUDIO_FORMATS_DISPLAY, validateAudioFormat } from '../../utils/audio-formats';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { MusicRequest, MusicResponse } from '../../types/api';
@@ -37,7 +38,7 @@ export default defineCommand({
     { flag: '--model <model>', description: 'Model: music-2.6 (recommended), music-2.6-free (default, unlimited), music-2.5+, or music-2.5.' },
     { flag: '--output-format <fmt>', description: 'Return format: hex (default, saved to file) or url (24h expiry, download promptly). When --stream, only hex.' },
     { flag: '--aigc-watermark', description: 'Embed AI-generated content watermark in audio for content provenance' },
-    { flag: '--format <fmt>', description: 'Audio format (default: mp3)' },
+    { flag: '--format <fmt>', description: `Audio format: ${AUDIO_FORMATS_DISPLAY} (default: mp3)` },
     { flag: '--sample-rate <hz>', description: 'Sample rate (default: 44100)', type: 'number' },
     { flag: '--bitrate <bps>',    description: 'Bitrate (default: 256000)', type: 'number' },
     { flag: '--stream', description: 'Stream raw audio to stdout' },
@@ -121,6 +122,7 @@ export default defineCommand({
 
     const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
     const ext = (flags.format as string) || 'mp3';
+    validateAudioFormat(ext);
     const outPath = (flags.out as string | undefined) ?? `music_${ts}.${ext}`;
     const format = detectOutputFormat(config.output);
 
