@@ -6,6 +6,7 @@ import { request, requestJson } from '../../client/http';
 import { musicEndpoint } from '../../client/endpoints';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
+import { AUDIO_FORMATS_DISPLAY, validateAudioFormat } from '../../utils/audio-formats';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { MusicRequest, MusicResponse } from '../../types/api';
@@ -24,7 +25,7 @@ export default defineCommand({
     { flag: '--lyrics <text>', description: 'Cover lyrics. If omitted, extracted from reference audio via ASR.' },
     { flag: '--lyrics-file <path>', description: 'Read lyrics from file (use - for stdin)' },
     { flag: '--seed <number>', description: 'Random seed 0–1000000 for reproducible results', type: 'number' },
-    { flag: '--format <fmt>', description: 'Audio format: mp3, wav, pcm (default: mp3)' },
+    { flag: '--format <fmt>', description: `Audio format: ${AUDIO_FORMATS_DISPLAY} (default: mp3)` },
     { flag: '--sample-rate <hz>', description: 'Sample rate: 16000, 24000, 32000, 44100 (default: 44100)', type: 'number' },
     { flag: '--bitrate <bps>', description: 'Bitrate: 32000, 64000, 128000, 256000 (default: 256000)', type: 'number' },
     { flag: '--channel <n>', description: 'Channels: 1 (mono) or 2 (stereo, default)', type: 'number' },
@@ -65,6 +66,7 @@ export default defineCommand({
 
     const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
     const ext = (flags.format as string) || 'mp3';
+    validateAudioFormat(ext);
     const outPath = (flags.out as string | undefined) ?? `cover_${ts}.${ext}`;
     const format = detectOutputFormat(config.output);
 

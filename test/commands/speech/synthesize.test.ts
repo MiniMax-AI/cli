@@ -202,4 +202,36 @@ describe('speech synthesize command', () => {
       console.log = originalLog;
     }
   });
+
+  it('rejects invalid audio format', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    await expect(
+      synthesizeCommand.execute(config, {
+        text: 'Hello',
+        format: 'aac',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      }),
+    ).rejects.toThrow('Invalid audio format "aac"');
+  });
 });
