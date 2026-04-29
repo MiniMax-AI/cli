@@ -131,7 +131,11 @@ export function parseFlags(argv: string[], options: OptionDef[]): GlobalFlags {
         if (arr) arr.push(value);
         else (flags as Record<string, unknown>)[camelKey] = [value];
       } else if (schema.numbers.has(camelKey)) {
-        (flags as Record<string, unknown>)[camelKey] = Number(value);
+        const numericValue = Number(value);
+        if (value.trim() === '' || !Number.isFinite(numericValue)) {
+          throw new Error(`Flag --${key} requires a numeric value, got "${value}".`);
+        }
+        (flags as Record<string, unknown>)[camelKey] = numericValue;
       } else {
         (flags as Record<string, unknown>)[camelKey] = value;
       }
