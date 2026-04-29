@@ -26,6 +26,8 @@ process.stdout.on('error', (e: NodeJS.ErrnoException) => {
 // Commands that manage their own auth or need no key
 const NO_AUTH_SETUP = [
   ['auth', 'login'],
+  ['auth', 'refresh'],
+  ['auth', 'status'],
   ['auth', 'logout'],
   ['config', 'show'],
   ['config', 'set'],
@@ -80,7 +82,7 @@ async function main() {
   const needsAuthSetup = !NO_AUTH_SETUP.some(
     (cmd) => cmd.every((c, i) => commandPath[i] === c),
   );
-  if (needsAuthSetup) {
+  if (needsAuthSetup && !config.dryRun) {
     await ensureApiKey(config);
   }
 

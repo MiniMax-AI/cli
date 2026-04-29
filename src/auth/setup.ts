@@ -1,5 +1,6 @@
 import type { Config } from '../config/schema';
 import { readConfigFile, writeConfigFile } from '../config/loader';
+import { loadCredentials } from './credentials';
 import { promptText, promptConfirm } from '../utils/prompt';
 import { isInteractive } from '../utils/env';
 import { maskToken } from '../utils/token';
@@ -8,6 +9,7 @@ import { ExitCode } from '../errors/codes';
 
 export async function ensureApiKey(config: Config): Promise<void> {
   if (config.apiKey || config.fileApiKey) return;
+  if (await loadCredentials()) return;
 
   const envKey = process.env.MINIMAX_API_KEY;
   let key: string | undefined;
