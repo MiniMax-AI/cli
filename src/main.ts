@@ -8,8 +8,7 @@ import { REGIONS, type Region } from './config/schema';
 import { checkForUpdate, getPendingUpdateNotification } from './update/checker';
 import { loadCredentials } from './auth/credentials';
 import { ensureApiKey } from './auth/setup';
-
-const CLI_VERSION = process.env.CLI_VERSION ?? '1.0.4';
+import { CLI_VERSION } from './version';
 
 // Handle Ctrl+C gracefully
 process.on('SIGINT', () => {

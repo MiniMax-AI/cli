@@ -5,6 +5,7 @@ import { ExitCode } from '../errors/codes';
 import { resolveCredential } from '../auth/resolver';
 import { mapApiError } from '../errors/api';
 import { maybeShowStatusBar } from '../output/status-bar';
+import { CLI_VERSION } from '../version';
 
 export interface RequestOpts {
   url: string;
@@ -20,9 +21,8 @@ export interface RequestOpts {
 export async function request(config: Config, opts: RequestOpts): Promise<Response> {
   const isFormData = typeof FormData !== 'undefined' && opts.body instanceof FormData;
 
-  const version = process.env.CLI_VERSION ?? '1.0.4';
   const headers: Record<string, string> = {
-    'User-Agent': `mmx-cli/${version}`,
+    'User-Agent': `mmx-cli/${CLI_VERSION}`,
     ...opts.headers,
   };
 

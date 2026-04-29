@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "bun run src/main.ts",
     "build": "bun run build.ts",
-    "build:dev": "bun build src/main.ts --outfile dist/mmx.mjs --target node --minify --define \"process.env.CLI_VERSION='1.0.4'\" && printf '#!/usr/bin/env node\\n' | cat - dist/mmx.mjs > dist/tmp && mv dist/tmp dist/mmx.mjs && chmod +x dist/mmx.mjs",
+    "build:dev": "bun run build.ts --dev",
     "prepublishOnly": "bun run build",
     "lint": "eslint src/ test/",
     "typecheck": "tsc --noEmit",

@@ -1,6 +1,5 @@
 import { defineCommand } from '../command';
-
-const CLI_VERSION = process.env.CLI_VERSION ?? '0.0.0';
+import { CLI_VERSION } from '../version';
 
 export default defineCommand({
   name: 'update',
