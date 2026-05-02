@@ -24,7 +24,7 @@ const MIME_TYPES: Record<string, string> = {
 
 const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB limit
 
-async function toDataUri(image: string): Promise<string> {
+export async function toDataUri(image: string): Promise<string> {
   if (image.startsWith('data:')) return image;
 
   if (image.startsWith('http://') || image.startsWith('https://')) {

@@ -10,8 +10,17 @@
     "mmx": "dist/mmx.mjs"
   },
   "files": [
-    "dist/mmx.mjs"
+    "dist/mmx.mjs",
+    "dist/sdk.mjs",
+    "dist/index.d.ts"
   ],
+  "exports": {
+    "./sdk": {
+      "import": "./dist/sdk.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "dev": "bun run src/main.ts",
     "build": "bun run build.ts",
@@ -23,7 +32,9 @@
     "test:watch": "bun test --watch"
   },
   "dependencies": {
-    "@clack/prompts": "^0.7.0"
+    "@clack/prompts": "^0.7.0",
+    "bun-plugin-dts": "^0.4.0",
+    "es-toolkit": "^1.46.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

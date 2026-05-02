@@ -13,7 +13,7 @@ function extractLanguage(voiceId: string): string {
   return match ? match[1] : voiceId;
 }
 
-function filterByLanguage(voices: SystemVoiceInfo[], language: string): SystemVoiceInfo[] {
+export function filterByLanguage(voices: SystemVoiceInfo[], language: string): SystemVoiceInfo[] {
   const lang = language.toLowerCase();
   return voices.filter(v => {
     const voiceLang = extractLanguage(v.voice_id).toLowerCase();

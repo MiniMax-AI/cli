@@ -21,3 +21,15 @@ export class CLIError extends Error {
     };
   }
 }
+
+export class SDKError extends CLIError {
+  readonly exitCode: ExitCode;
+  readonly hint?: string;
+
+  constructor(message: string, exitCode: ExitCode = ExitCode.GENERAL, hint?: string) {
+    super(message);
+    this.name = 'SDKError';
+    this.exitCode = exitCode;
+    this.hint = hint;
+  }
+}

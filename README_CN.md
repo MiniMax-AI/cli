@@ -158,6 +158,195 @@ mmx update
 mmx update latest
 ```
 
+## SDK 使用
+
+你也可以通过 TypeScript SDK 以编程方式使用 MiniMax。
+
+### 安装
+
+```bash
+npm install mmx-cli
+```
+
+### 基础用法
+
+```typescript
+import { MiniMaxSDK } from 'mmx-cli/sdk';
+
+const sdk = new MiniMaxSDK({
+  apiKey: 'sk-xxxxx',
+  region: 'global', // 或 'cn'
+});
+```
+
+### 文本对话
+
+```typescript
+// 非流式
+const response = await sdk.text.chat({
+  model: 'MiniMax-M2.7',
+  messages: [{ role: 'user', content: '你好！' }],
+  max_tokens: 4096,
+});
+
+// 流式
+const stream = await sdk.text.chat({
+  model: 'MiniMax-M2.7',
+  messages: [{ role: 'user', content: '写一首诗' }],
+  stream: true,
+});
+
+for await (const event of stream) {
+  console.log(event.choices[0]?.delta?.content);
+}
+```
+
+### 图像生成
+
+```typescript
+const result = await sdk.image.generate({
+  model: 'image-01',
+  prompt: '一只穿宇航服的猫',
+  width: 1024,
+  height: 1024,
+  n: 1,
+});
+```
+
+### 视频生成
+
+```typescript
+// 同步（等待完成）
+const video = await sdk.video.generate({
+  model: 'MiniMax-Hailuo-2.3',
+  prompt: '海浪拍打礁石',
+});
+
+// 异步（立即返回任务 ID）
+const { taskId } = await sdk.video.generate({
+  prompt: '机器人作画',
+  async: true,
+});
+
+// 查询任务状态
+const task = await sdk.video.getTask({ taskId });
+
+// 下载视频
+const { size, save, downloadUrl } = await sdk.video.download({
+  fileId: '176844028768320',
+  outPath: './video.mp4',
+});
+```
+
+### 语音合成
+
+```typescript
+// 非流式
+const speech = await sdk.speech.synthesize({
+  model: 'speech-2.8-hd',
+  text: '你好，世界！',
+  voice_setting: { voice_id: 'English_expressive_narrator' },
+  audio_setting: { format: 'mp3', sample_rate: 32000, bitrate: 128000, channel: 1 },
+});
+
+// 流式
+const stream = await sdk.speech.synthesize({
+  text: '流式输出',
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  // 处理音频块
+}
+
+// 获取可用音色列表
+const voices = await sdk.speech.voices();
+const chineseVoices = await sdk.speech.voices('zh');
+```
+
+### 音乐生成
+
+```typescript
+// 带歌词
+const music = await sdk.music.generate({
+  model: 'music-2.6',
+  prompt: '欢快的流行乐',
+  lyrics: '[主歌] 啦啦啦，阳光照',
+  output_format: 'hex',
+});
+
+// 纯音乐
+const instrumental = await sdk.music.generate({
+  prompt: '史诗管弦乐',
+  instrumental: true,
+});
+
+// 自动生词
+const autoLyrics = await sdk.music.generate({
+  prompt: '忧郁的独立民谣，雨夜',
+  lyrics_optimizer: true,
+});
+
+// 流式
+const stream = await sdk.music.generate({
+  prompt: '欢快的流行乐',
+  lyrics: '[主歌] 你好世界',
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  // 处理音频块
+}
+
+// 结构化提示词
+const structured = await sdk.music.generate({
+  prompt: '一首优美的歌曲',
+  vocals: '温暖的男中音',
+  genre: '爵士',
+  mood: '放松',
+  instruments: '钢琴，萨克斯',
+  bpm: 120,
+  key: 'C 大调',
+});
+```
+
+### 图像理解
+
+```typescript
+const result = await sdk.vision.describe({
+  image: 'https://example.com/photo.jpg',
+  prompt: '这是什么品种的狗？',
+});
+
+console.log(result.content);
+```
+
+### 网络搜索
+
+```typescript
+const results = await sdk.search.query('MiniMax AI 最新动态');
+
+for (const item of results.organic) {
+  console.log(item.title, item.link, item.snippet);
+}
+```
+
+### 配额信息
+
+```typescript
+const quota = await sdk.quota.info();
+console.log(quota);
+```
+
+### 自定义基础 URL
+
+```typescript
+const sdk = new MiniMaxSDK({
+  apiKey: 'sk-xxxxx',
+  baseUrl: 'https://api.minimax.io', // 自定义端点
+});
+```
+
 ## 贡献者
 
 <a href="https://github.com/MiniMax-AI/cli/graphs/contributors">
