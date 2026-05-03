@@ -6,11 +6,12 @@ import { filterByLanguage } from "../../commands/speech/voices";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
+import { ModelPartial } from "../types";
 
 export class SpeechSDK extends Client {
-  async synthesize(request: Partial<SpeechRequest> & { stream: true }): Promise<AsyncGenerator<SpeechResponse>>;
-  async synthesize(request: Partial<SpeechRequest>): Promise<SpeechResponse>;
-  async synthesize(request: Partial<SpeechRequest>): Promise<SpeechResponse | AsyncGenerator<SpeechResponse>> {
+  async synthesize(request: ModelPartial<SpeechRequest> & { stream: true }): Promise<AsyncGenerator<SpeechResponse>>;
+  async synthesize(request: ModelPartial<SpeechRequest>): Promise<SpeechResponse>;
+  async synthesize(request: ModelPartial<SpeechRequest>): Promise<SpeechResponse | AsyncGenerator<SpeechResponse>> {
     const body = this.validateParams(request);
 
     const url = speechEndpoint(this.config.baseUrl);

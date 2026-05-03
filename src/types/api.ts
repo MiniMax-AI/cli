@@ -98,7 +98,7 @@ export interface SpeechRequest {
     vol?: number;
     pitch?: number;
   };
-  audio_setting: {
+  audio_setting?: {
     format?: string;
     sample_rate?: number;
     bitrate?: number;
