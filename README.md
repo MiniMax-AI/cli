@@ -158,6 +158,195 @@ mmx update
 mmx update latest
 ```
 
+## SDK Usage
+
+You can also use MiniMax programmatically via the TypeScript SDK.
+
+### Installation
+
+```bash
+npm install mmx-cli
+```
+
+### Basic Usage
+
+```typescript
+import { MiniMaxSDK } from 'mmx-cli/sdk';
+
+const sdk = new MiniMaxSDK({
+  apiKey: 'sk-xxxxx',
+  region: 'global', // or 'cn'
+});
+```
+
+### Text Chat
+
+```typescript
+// Non-streaming
+const response = await sdk.text.chat({
+  model: 'MiniMax-M2.7',
+  messages: [{ role: 'user', content: 'Hello!' }],
+  max_tokens: 4096,
+});
+
+// Streaming
+const stream = await sdk.text.chat({
+  model: 'MiniMax-M2.7',
+  messages: [{ role: 'user', content: 'Write a poem' }],
+  stream: true,
+});
+
+for await (const event of stream) {
+  console.log(event.choices[0]?.delta?.content);
+}
+```
+
+### Image Generation
+
+```typescript
+const result = await sdk.image.generate({
+  model: 'image-01',
+  prompt: 'A cat in a spacesuit',
+  width: 1024,
+  height: 1024,
+  n: 1,
+});
+```
+
+### Video Generation
+
+```typescript
+// Synchronous (waits for completion)
+const video = await sdk.video.generate({
+  model: 'MiniMax-Hailuo-2.3',
+  prompt: 'Ocean waves at sunset',
+});
+
+// Asynchronous (returns task ID immediately)
+const { taskId } = await sdk.video.generate({
+  prompt: 'A robot painting',
+  async: true,
+});
+
+// Check task status
+const task = await sdk.video.getTask({ taskId });
+
+// Download video
+const { size, save, downloadUrl } = await sdk.video.download({
+  fileId: '176844028768320',
+  outPath: './video.mp4',
+});
+```
+
+### Speech Synthesis
+
+```typescript
+// Non-streaming
+const speech = await sdk.speech.synthesize({
+  model: 'speech-2.8-hd',
+  text: 'Hello, world!',
+  voice_setting: { voice_id: 'English_expressive_narrator' },
+  audio_setting: { format: 'mp3', sample_rate: 32000, bitrate: 128000, channel: 1 },
+});
+
+// Streaming
+const stream = await sdk.speech.synthesize({
+  text: 'Stream me',
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  // Process audio chunks
+}
+
+// List available voices
+const voices = await sdk.speech.voices();
+const englishVoices = await sdk.speech.voices('en');
+```
+
+### Music Generation
+
+```typescript
+// With lyrics
+const music = await sdk.music.generate({
+  model: 'music-2.6',
+  prompt: 'Upbeat pop song',
+  lyrics: '[verse] La da dee, sunny day',
+  output_format: 'hex',
+});
+
+// Instrumental
+const instrumental = await sdk.music.generate({
+  prompt: 'Cinematic orchestral',
+  instrumental: true,
+});
+
+// Auto-generate lyrics
+const autoLyrics = await sdk.music.generate({
+  prompt: 'Indie folk, melancholic, rainy night',
+  lyrics_optimizer: true,
+});
+
+// Streaming
+const stream = await sdk.music.generate({
+  prompt: 'Upbeat pop',
+  lyrics: '[verse] Hello world',
+  stream: true,
+});
+
+for await (const chunk of stream) {
+  // Process audio chunks
+}
+
+// Structured prompt
+const structured = await sdk.music.generate({
+  prompt: 'A beautiful song',
+  vocals: 'warm male baritone',
+  genre: 'jazz',
+  mood: 'relaxing',
+  instruments: 'piano, saxophone',
+  bpm: 120,
+  key: 'C major',
+});
+```
+
+### Vision (Image Description)
+
+```typescript
+const result = await sdk.vision.describe({
+  image: 'https://example.com/photo.jpg',
+  prompt: 'What breed is this dog?',
+});
+
+console.log(result.content);
+```
+
+### Web Search
+
+```typescript
+const results = await sdk.search.query('MiniMax AI latest news');
+
+for (const item of results.organic) {
+  console.log(item.title, item.link, item.snippet);
+}
+```
+
+### Quota Information
+
+```typescript
+const quota = await sdk.quota.info();
+console.log(quota);
+```
+
+### Custom Base URL
+
+```typescript
+const sdk = new MiniMaxSDK({
+  apiKey: 'sk-xxxxx',
+  baseUrl: 'https://api.minimax.io', // custom endpoint
+});
+```
+
 ## Thanks to
 
 <a href="https://github.com/MiniMax-AI/cli/graphs/contributors">
