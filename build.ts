@@ -26,7 +26,7 @@ await Bun.build({
   outdir: 'dist',
   naming: 'sdk.mjs',
   target: 'node',
-  minify: true,
+  minify: false,
   plugins: [dts()],
 });
 
