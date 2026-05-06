@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'bun:test';
 import { requestJson } from '../../src/client/http';
+import { CLI_VERSION } from '../../src/version';
 import { createMockServer, jsonResponse, type MockServer } from '../helpers/mock-server';
 import type { Config } from '../../src/config/schema';
 
@@ -28,9 +29,13 @@ describe('HTTP client', () => {
   });
 
   it('makes authenticated GET request', async () => {
+    let userAgent: string | null = null;
     server = createMockServer({
       routes: {
-        '/v1/test': () => jsonResponse({ result: 'ok' }),
+        '/v1/test': (req) => {
+          userAgent = req.headers.get('user-agent');
+          return jsonResponse({ result: 'ok' });
+        },
       },
     });
 
@@ -40,6 +45,7 @@ describe('HTTP client', () => {
     });
 
     expect(result.result).toBe('ok');
+    expect(userAgent ?? '').toBe(`mmx-cli/${CLI_VERSION}`);
   });
 
   it('makes POST request with body', async () => {

@@ -3,13 +3,14 @@ import { readFileSync, writeFileSync } from 'fs';
 const pkg = JSON.parse(readFileSync('package.json', 'utf-8'));
 const VERSION = process.env.VERSION ?? pkg.version;
 const OUT = 'dist/mmx.mjs';
+const DEV_BUILD = process.argv.includes('--dev');
 
 await Bun.build({
   entrypoints: ['src/main.ts'],
   outdir: 'dist',
   naming: 'mmx.mjs',
   target: 'node',
-  minify: true,
+  minify: !DEV_BUILD,
   define: { 'process.env.CLI_VERSION': JSON.stringify(VERSION) },
 });
 
