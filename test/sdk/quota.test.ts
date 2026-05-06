@@ -1,5 +1,4 @@
-import { describe, it, expect, afterEach, mock } from 'bun:test';
-import { jsonResponse } from '../helpers/mock-server';
+import { describe, it, expect, mock } from 'bun:test';
 import { MiniMaxSDK } from '../../src/sdk';
 
 describe('MiniMaxSDK.quota', () => {

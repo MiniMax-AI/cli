@@ -1,5 +1,5 @@
 import { loadConfig } from "../config/loader";
-import { Config, Region } from "../config/schema";
+import { Config } from "../config/schema";
 import { request as requestClient, requestJson as requestJsonClient, RequestOpts } from "../client/http";
 import { MiniMaxSDKOptions } from "./types";
 
