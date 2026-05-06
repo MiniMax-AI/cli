@@ -59,7 +59,7 @@ export class VideoSDK extends Client {
     const fileInfo = await this.requestJson<FileRetrieveResponse>({ url });
     const downloadUrl = fileInfo.file?.download_url;
     if (!downloadUrl) {
-      throw new Error('No download URL available for this file.');
+      throw new SDKError('No download URL available for this file.', ExitCode.GENERAL);
     }
     const { size } = await downloadFile(downloadUrl, request.outPath, { quiet: true });
     return {
@@ -75,8 +75,16 @@ export class VideoSDK extends Client {
     if (!prompt) {
       throw new SDKError('prompt is required', ExitCode.USAGE);
     }
-
-    const resolvedModel = model ?? 'MiniMax-Hailuo-2.3';
+    let resolvedModel: string
+    if (model) {
+      resolvedModel = model;
+    } else if (last_frame_image) {
+      resolvedModel = 'MiniMax-Hailuo-02';
+    } else if (subject_reference) {
+      resolvedModel = 'S2V-01';
+    } else {
+      resolvedModel = 'MiniMax-Hailuo-2.3';
+    }
 
     if (resolvedModel === 'MiniMax-Hailuo-2.3-Fast' && !first_frame_image) {
       throw new SDKError(
