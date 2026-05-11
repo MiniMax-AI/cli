@@ -22,6 +22,9 @@ import quotaShow from './commands/quota/show';
 import configShow from './commands/config/show';
 import configSet from './commands/config/set';
 import configExportSchema from './commands/config/export-schema';
+import fileUpload from './commands/file/upload';
+import fileList from './commands/file/list';
+import fileDelete from './commands/file/delete';
 import update from './commands/update';
 import help from './commands/help';
 
@@ -197,6 +200,7 @@ ${b('Resources:')}
   ${a('vision')}     ${d('Image understanding (describe)')}
   ${a('quota')}      ${d('Usage quotas (show)')}
   ${a('config')}     ${d('CLI configuration (show, set, export-schema)')}
+  ${a('file')}       ${d('File storage (upload, list, delete)')}
   ${a('update')}     ${d('Update mmx to a newer version')}
 
 ${b('Global Flags:')}
@@ -284,6 +288,9 @@ export const registry = new CommandRegistry({
   'config show':          configShow,
   'config set':           configSet,
   'config export-schema': configExportSchema,
+  'file upload':          fileUpload,
+  'file list':            fileList,
+  'file delete':          fileDelete,
   'update':               update,
   'help':                 help,
 });

@@ -13,6 +13,12 @@ describe('command aliases', () => {
     const synthesize = registry.resolve(['speech', 'synthesize']);
     expect(generate.command).toBe(synthesize.command);
   });
+
+  it('resolves file storage commands', () => {
+    expect(registry.resolve(['file', 'upload']).command.name).toBe('file upload');
+    expect(registry.resolve(['file', 'list']).command.name).toBe('file list');
+    expect(registry.resolve(['file', 'delete']).command.name).toBe('file delete');
+  });
 });
 
 describe('text chat --prompt alias', () => {
