@@ -241,6 +241,45 @@ describe('parseSSE', () => {
     expect(events2[1].data).toBe('[DONE]');
   });
 
+  it('preserves event fields split across network chunks', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode('id: 7\nevent: mes'));
+        controller.enqueue(encoder.encode('sage\ndata: hel'));
+        controller.enqueue(encoder.encode('lo\n\n'));
+        controller.close();
+      },
+    });
+
+    const events = await collectEvents(new Response(body));
+
+    expect(events).toEqual([{ id: '7', event: 'message', data: 'hello' }]);
+  });
+
+  it('preserves multi-line data split across network chunks', async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const encoder = new TextEncoder();
+        controller.enqueue(encoder.encode('data: first\n'));
+        controller.enqueue(encoder.encode('data: sec'));
+        controller.enqueue(encoder.encode('ond\n\n'));
+        controller.close();
+      },
+    });
+
+    const events = await collectEvents(new Response(body));
+
+    expect(events).toEqual([{ data: 'first\nsecond' }]);
+  });
+
+  it('handles CRLF line endings', async () => {
+    const body = 'event: message\r\ndata: hello\r\n\r\n';
+    const events = await collectEvents(new Response(body));
+
+    expect(events).toEqual([{ event: 'message', data: 'hello' }]);
+  });
+
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------

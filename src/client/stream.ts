@@ -10,6 +10,41 @@ export async function* parseSSE(response: Response): AsyncGenerator<ServerSentEv
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let event: Partial<ServerSentEvent> = {};
+
+  const processLine = (rawLine: string): ServerSentEvent | undefined => {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+
+    if (line === '') {
+      const completed = event.data !== undefined
+        ? { data: event.data, event: event.event, id: event.id }
+        : undefined;
+      event = {};
+      return completed;
+    }
+
+    if (line.startsWith(':')) return undefined;
+
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) return undefined;
+
+    const field = line.slice(0, colonIndex);
+    const value = line.slice(colonIndex + 1).trimStart();
+
+    switch (field) {
+      case 'data':
+        event.data = event.data !== undefined ? `${event.data}\n${value}` : value;
+        break;
+      case 'event':
+        event.event = value;
+        break;
+      case 'id':
+        event.id = value;
+        break;
+    }
+
+    return undefined;
+  };
 
   try {
     while (true) {
@@ -21,45 +56,25 @@ export async function* parseSSE(response: Response): AsyncGenerator<ServerSentEv
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
-      let event: Partial<ServerSentEvent> = {};
-
       for (const line of lines) {
-        if (line === '') {
-          if (event.data !== undefined) {
-            yield { data: event.data, event: event.event, id: event.id };
-          }
-          event = {};
-          continue;
-        }
-
-        if (line.startsWith(':')) continue; // comment
-
-        const colonIndex = line.indexOf(':');
-        if (colonIndex === -1) continue;
-
-        const field = line.slice(0, colonIndex);
-        const value = line.slice(colonIndex + 1).trimStart();
-
-        switch (field) {
-          case 'data':
-            event.data = event.data !== undefined ? `${event.data}\n${value}` : value;
-            break;
-          case 'event':
-            event.event = value;
-            break;
-          case 'id':
-            event.id = value;
-            break;
+        const completed = processLine(line);
+        if (completed) {
+          yield completed;
         }
       }
     }
 
-    // Flush remaining
-    if (buffer.trim() && buffer.includes('data:')) {
-      const colonIndex = buffer.indexOf(':');
-      if (colonIndex !== -1) {
-        yield { data: buffer.slice(colonIndex + 1).trimStart() };
+    buffer += decoder.decode();
+
+    if (buffer.length > 0) {
+      const completed = processLine(buffer);
+      if (completed) {
+        yield completed;
       }
+    }
+
+    if (event.data !== undefined) {
+      yield { data: event.data, event: event.event, id: event.id };
     }
   } finally {
     reader.releaseLock();
