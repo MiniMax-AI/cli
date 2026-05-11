@@ -3,7 +3,7 @@ import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { request, requestJson } from '../../client/http';
 import { musicEndpoint } from '../../client/endpoints';
-import { formatOutput, detectOutputFormat, dryRun } from '../../output/formatter';
+import { detectOutputFormat, dryRun } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import { MUSIC_FORMATS, formatList, validateAudioFormat } from '../../utils/audio-formats';
