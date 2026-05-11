@@ -2,6 +2,8 @@ import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
 import { parseConfigFile, REGIONS, type Config, type ConfigFile, type Region } from './schema';
 import { ensureConfigDir, getConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
+import { CLIError } from '../errors/base';
+import { ExitCode } from '../errors/codes';
 import type { GlobalFlags } from '../types/flags';
 
 export function readConfigFile(): ConfigFile {
@@ -33,6 +35,13 @@ export function loadConfig(flags: GlobalFlags): Config {
   const fileApiKey = file.api_key;
 
   const explicitRegion = (flags.region as string) || process.env.MINIMAX_REGION || undefined;
+  if (explicitRegion && !(explicitRegion in REGIONS)) {
+    throw new CLIError(
+      `Invalid region "${explicitRegion}". Valid values: ${Object.keys(REGIONS).join(', ')}`,
+      ExitCode.USAGE,
+    );
+  }
+
   const cachedRegion = file.region;
   const region = (explicitRegion || cachedRegion || 'global') as Region;
 
