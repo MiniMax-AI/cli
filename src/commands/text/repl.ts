@@ -1,9 +1,14 @@
 import { defineCommand } from '../../command';
+import { request } from '../../client/http';
+import { chatEndpoint } from '../../client/endpoints';
+import { parseSSE } from '../../client/stream';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { isInteractive } from '../../utils/env';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
+import type { ChatMessage, ChatRequest, StreamEvent } from '../../types/api';
+import { writeFileSync } from 'node:fs';
 
 // ---------------------------------------------------------------------------
 // ANSI helpers
@@ -40,6 +45,19 @@ function showHelp(): void {
     process.stdout.write(`  ${cmd.padEnd(CMD_MAX_LEN + 2)} ${desc}\n`);
   }
   process.stdout.write('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Conversation state
+// ---------------------------------------------------------------------------
+
+interface ReplState {
+  messages: ChatMessage[];
+  system: string | undefined;
+  model: string;
+  maxTokens: number;
+  temperature: number | undefined;
+  topP: number | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -303,9 +321,23 @@ export default defineCommand({
     const dim  = config.noColor ? '' : '\x1b[2m';
     const reset = config.noColor ? '' : '\x1b[0m';
 
+    // ---- Initialize state ----
+    const state: ReplState = {
+      messages: [],
+      system: flags.system as string | undefined,
+      model: (flags.model as string) || config.defaultTextModel || 'MiniMax-M2.7',
+      maxTokens: (flags.maxTokens as number) ?? 4096,
+      temperature: flags.temperature !== undefined ? flags.temperature as number : undefined,
+      topP: flags.topP !== undefined ? flags.topP as number : undefined,
+    };
+
     const bold = config.noColor ? '' : '\x1b[1m';
 
     process.stdout.write(`\n${bold}MiniMax Chat REPL${reset}\n`);
+    process.stdout.write(`${dim}Model: ${state.model}${reset}\n`);
+    if (state.system) {
+      process.stdout.write(`${dim}System: ${state.system.slice(0, 80)}${state.system.length > 80 ? '...' : ''}${reset}\n`);
+    }
     process.stdout.write(`${dim}Type / to see commands, /exit to quit.${reset}\n`);
 
     const stdin = process.stdin;
@@ -316,6 +348,91 @@ export default defineCommand({
     }
     stdin.resume();
     stdin.setEncoding('utf8');
+
+    let waitingForResponse = false;
+    let sigintCount = 0;
+
+    // ---- Helper: send messages and stream response ----
+    async function sendMessages(): Promise<void> {
+      if (state.messages.length === 0) {
+        stdout.write(`${dim}No messages to send. Type something first.${reset}\n`);
+        return;
+      }
+
+      const body: ChatRequest = {
+        model: state.model,
+        messages: state.messages,
+        max_tokens: state.maxTokens,
+        stream: true,
+      };
+      if (state.system) body.system = state.system;
+      if (state.temperature !== undefined) body.temperature = state.temperature;
+      if (state.topP !== undefined) body.top_p = state.topP;
+
+      waitingForResponse = true;
+      const url = chatEndpoint(config.baseUrl);
+
+      try {
+        const res = await request(config, {
+          url,
+          method: 'POST',
+          body,
+          stream: true,
+          authStyle: 'x-api-key',
+        });
+
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('text/event-stream') && !contentType.includes('stream')) {
+          throw new CLIError(
+            `Expected SSE stream but got content-type "${contentType}".`,
+            ExitCode.GENERAL,
+          );
+        }
+
+        let textContent = '';
+        let inThinking = false;
+
+        for await (const event of parseSSE(res)) {
+          if (event.data === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(event.data) as StreamEvent;
+
+            if (parsed.type === 'content_block_start') {
+              if (parsed.content_block.type === 'thinking') {
+                inThinking = true;
+                stdout.write(`${dim}Thinking:\n`);
+              } else if (parsed.content_block.type === 'text' && inThinking) {
+                stdout.write(`${reset}\nResponse:\n`);
+                inThinking = false;
+              }
+            } else if (parsed.type === 'content_block_delta') {
+              if (parsed.delta.type === 'text_delta') {
+                textContent += parsed.delta.text;
+                stdout.write(parsed.delta.text);
+              } else if (parsed.delta.type === 'thinking_delta') {
+                stdout.write(parsed.delta.thinking);
+              }
+            }
+          } catch {
+            // Skip malformed chunks
+          }
+        }
+
+        if (inThinking) stdout.write(reset);
+
+        if (textContent) {
+          state.messages.push({ role: 'assistant', content: textContent });
+          stdout.write('\n');
+        } else {
+          stdout.write(`${dim}[empty response]${reset}\n`);
+        }
+      } catch (err) {
+        stdout.write(`${dim}[error] ${err instanceof Error ? err.message : String(err)}${reset}\n`);
+      } finally {
+        waitingForResponse = false;
+        sigintCount = 0;
+      }
+    }
 
     // ---- Helper: handle slash commands ----
     function handleSlash(input: string): 'exit' | 'ok' {
@@ -333,23 +450,30 @@ export default defineCommand({
           return 'ok';
 
         case '/clear':
+          state.messages = [];
           stdout.write(`${dim}Conversation cleared.${reset}\n`);
           return 'ok';
 
         case '/system': {
           if (arg) {
+            state.system = arg;
             stdout.write(`${dim}System prompt set.${reset}\n`);
           } else {
-            stdout.write(`${dim}No system prompt set.${reset}\n`);
+            if (state.system) {
+              stdout.write(`${dim}System prompt:${reset}\n${state.system}\n`);
+            } else {
+              stdout.write(`${dim}No system prompt set.${reset}\n`);
+            }
           }
           return 'ok';
         }
 
         case '/model': {
           if (arg) {
-            stdout.write(`${dim}Model set to: ${arg}${reset}\n`);
+            state.model = arg;
+            stdout.write(`${dim}Model set to: ${state.model}${reset}\n`);
           } else {
-            stdout.write(`${dim}Current model will be displayed here.${reset}\n`);
+            stdout.write(`${dim}Current model: ${state.model}${reset}\n`);
           }
           return 'ok';
         }
@@ -357,14 +481,44 @@ export default defineCommand({
         case '/save': {
           if (!arg) {
             stdout.write(`${dim}Usage: /save <file-path>${reset}\n`);
-          } else {
-            stdout.write(`${dim}Conversation saving will be available once chat is integrated.${reset}\n`);
+            return 'ok';
+          }
+          try {
+            const toSave: Array<{ role: string; content: string }> = [];
+            if (state.system) toSave.push({ role: 'system', content: state.system });
+            for (const m of state.messages) {
+              toSave.push({
+                role: m.role,
+                content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+              });
+            }
+            writeFileSync(arg, JSON.stringify(toSave, null, 2), 'utf-8');
+            stdout.write(`${dim}Conversation saved to ${arg} (${toSave.length} messages)${reset}\n`);
+          } catch (err) {
+            stdout.write(`${dim}[error] Failed to save: ${err instanceof Error ? err.message : String(err)}${reset}\n`);
           }
           return 'ok';
         }
 
         case '/history': {
-          stdout.write(`${dim}History will be available once chat is integrated.${reset}\n`);
+          if (state.messages.length === 0) {
+            stdout.write(`${dim}No messages in conversation.${reset}\n`);
+            return 'ok';
+          }
+          if (state.system) {
+            stdout.write(`${dim}[system] ${state.system.slice(0, 100)}${state.system.length > 100 ? '...' : ''}${reset}\n`);
+          }
+          let index = 1;
+          for (const m of state.messages) {
+            const roleLabel = m.role === 'user' ? 'user' : 'assistant';
+            const raw = typeof m.content === 'string' ? m.content : '[structured content]';
+            const preview = raw.length > 120 ? raw.slice(0, 120) + '...' : raw;
+            const oneline = preview.replace(/\n/g, '\u21B5');
+            const prefix = `  ${String(index).padStart(2)} ${roleLabel.padEnd(11)}`;
+            stdout.write(`${dim}${prefix}${reset}${oneline}\n`);
+            index++;
+          }
+          stdout.write(`${dim}\u2500\u2500 ${index - 1} messages \u2500\u2500${reset}\n`);
           return 'ok';
         }
 
@@ -376,6 +530,31 @@ export default defineCommand({
           return 'ok';
       }
     }
+
+    // ---- SIGINT handler ----
+    const onSigint = () => {
+      if (waitingForResponse) {
+        stdout.write(`\n${dim}[interrupted]${reset}\n`);
+        sigintCount = 0;
+        waitingForResponse = false;
+        return;
+      }
+      sigintCount++;
+      if (sigintCount >= 2) {
+        stdout.write(`\n${dim}Goodbye!${reset}\n`);
+        running = false;
+        if (typeof stdin.setRawMode === 'function') {
+          stdin.setRawMode(false);
+        }
+        stdin.pause();
+        process.removeListener('SIGINT', onSigint);
+        process.exit(0);
+      } else {
+        stdout.write(`\n${dim}Press Ctrl+C again or type /exit to quit.${reset}\n`);
+      }
+    };
+
+    process.on('SIGINT', onSigint);
 
     const editor = new LineEditor(stdout, '> ', dim, reset);
     let running = true;
@@ -404,8 +583,9 @@ export default defineCommand({
           continue;
         }
 
-        // Placeholder: echo back until chat integration is added
-        stdout.write(`You said: ${trimmed}\n`);
+        // Normal message
+        state.messages.push({ role: 'user', content: trimmed });
+        await sendMessages();
       }
     } finally {
       stdout.write(SHOW_CURSOR);
@@ -413,6 +593,7 @@ export default defineCommand({
         stdin.setRawMode(false);
       }
       stdin.pause();
+      process.removeListener('SIGINT', onSigint);
       stdin.removeAllListeners('data');
       stdout.write('\n');
     }
