@@ -8,6 +8,7 @@ import authStatus from './commands/auth/status';
 import authRefresh from './commands/auth/refresh';
 import authLogout from './commands/auth/logout';
 import textChat from './commands/text/chat';
+import textRepl from './commands/text/repl';
 import speechSynthesize from './commands/speech/synthesize';
 import speechVoices from './commands/speech/voices';
 import imageGenerate from './commands/image/generate';
@@ -284,6 +285,7 @@ export const registry = new CommandRegistry({
   'auth refresh':      authRefresh,
   'auth logout':       authLogout,
   'text chat':         textChat,
+  'text repl':         textRepl,
   'speech synthesize': speechSynthesize,
   'speech generate':   speechSynthesize,
   'speech voices':     speechVoices,
