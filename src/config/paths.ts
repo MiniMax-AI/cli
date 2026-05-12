@@ -11,10 +11,6 @@ export function getConfigPath(): string {
   return join(getConfigDir(), 'config.json');
 }
 
-export function getCredentialsPath(): string {
-  return join(getConfigDir(), 'credentials.json');
-}
-
 export async function ensureConfigDir(): Promise<void> {
   const dir = getConfigDir();
   const fs = await import('fs/promises');

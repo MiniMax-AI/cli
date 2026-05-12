@@ -14,6 +14,20 @@ export const OAUTH_API_HOSTS: Record<Region, string> = {
   cn: 'https://account.minimaxi.com',
   global: 'https://account.minimax.io',
 };
+
+export function oauthApiHostFor(config: { region: Region; oauthApiHost?: string }): string {
+  return config.oauthApiHost || OAUTH_API_HOSTS[config.region];
+}
+
+export interface OAuthCredentials {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string; // ISO 8601
+  token_type: 'Bearer';
+  resource_url?: string;
+  account?: string;
+}
+
 export interface ConfigFile {
   api_key?: string;
   region?: Region;
@@ -21,6 +35,7 @@ export interface ConfigFile {
   output?: 'text' | 'json';
   timeout?: number;
   proxy?: string;
+  oauth?: OAuthCredentials;
   default_text_model?: string;
   default_speech_model?: string;
   default_video_model?: string;
@@ -29,6 +44,23 @@ export interface ConfigFile {
 
 const VALID_REGIONS = new Set<string>(['global', 'cn']);
 const VALID_OUTPUTS = new Set<string>(['text', 'json']);
+
+function parseOAuth(raw: unknown): OAuthCredentials | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.access_token !== 'string' || !o.access_token) return undefined;
+  if (typeof o.refresh_token !== 'string') return undefined;
+  if (typeof o.expires_at !== 'string') return undefined;
+  const out: OAuthCredentials = {
+    access_token: o.access_token,
+    refresh_token: o.refresh_token,
+    expires_at: o.expires_at,
+    token_type: 'Bearer',
+  };
+  if (typeof o.resource_url === 'string' && o.resource_url.length > 0) out.resource_url = o.resource_url;
+  if (typeof o.account === 'string' && o.account.length > 0) out.account = o.account;
+  return out;
+}
 
 export function parseConfigFile(raw: unknown): ConfigFile {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
@@ -41,6 +73,8 @@ export function parseConfigFile(raw: unknown): ConfigFile {
   if (typeof obj.output === 'string' && VALID_OUTPUTS.has(obj.output)) out.output = obj.output as ConfigFile['output'];
   if (typeof obj.timeout === 'number' && obj.timeout > 0) out.timeout = obj.timeout;
   if (typeof obj.proxy === 'string' && obj.proxy.startsWith('http')) out.proxy = obj.proxy;
+  const oauth = parseOAuth(obj.oauth);
+  if (oauth) out.oauth = oauth;
   if (typeof obj.default_text_model === 'string' && obj.default_text_model.length > 0) out.default_text_model = obj.default_text_model;
   if (typeof obj.default_speech_model === 'string' && obj.default_speech_model.length > 0) out.default_speech_model = obj.default_speech_model;
   if (typeof obj.default_video_model === 'string' && obj.default_video_model.length > 0) out.default_video_model = obj.default_video_model;
@@ -56,7 +90,7 @@ export interface Config {
   configPath?: string;
   region: Region;
   baseUrl: string;
-  oauthApiHost: string;
+  oauthApiHost?: string;
   output: 'text' | 'json';
   timeout: number;
   defaultTextModel?: string;

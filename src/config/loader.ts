@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
 import { parseConfigFile, REGIONS, OAUTH_API_HOSTS, type Config, type ConfigFile, type Region } from './schema';
-import { ensureConfigDir, getConfigPath, getCredentialsPath } from './paths';
+import { ensureConfigDir, getConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
@@ -28,17 +28,6 @@ export async function writeConfigFile(data: Record<string, unknown>): Promise<vo
   renameSync(tmp, path);
 }
 
-function readCredentialResourceUrl(): string | undefined {
-  const path = getCredentialsPath();
-  if (!existsSync(path)) return undefined;
-  try {
-    const data = JSON.parse(readFileSync(path, 'utf-8'));
-    return data.resource_url || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 export function loadConfig(flags: GlobalFlags): Config {
   const file = readConfigFile();
 
@@ -63,7 +52,7 @@ export function loadConfig(flags: GlobalFlags): Config {
   const baseUrl = flags.baseUrl
     || process.env.MINIMAX_BASE_URL
     || file.base_url
-    || readCredentialResourceUrl()
+    || file.oauth?.resource_url
     || REGIONS[region]
     || REGIONS.global;
 

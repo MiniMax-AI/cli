@@ -1,51 +1,34 @@
-import { readFileSync, writeFileSync, renameSync, unlinkSync, existsSync, statSync } from 'fs';
-import { getCredentialsPath, ensureConfigDir } from '../config/paths';
+import { readConfigFile, writeConfigFile } from '../config/loader';
 import type { CredentialFile } from './types';
 
-export async function loadCredentials(): Promise<CredentialFile | null> {
-  const path = getCredentialsPath();
-  if (!existsSync(path)) return null;
+/**
+ * OAuth credentials live inside the user's main config file
+ * (`~/.mmx/config.json`) under the `oauth` subobject. This keeps a
+ * single source of truth for all CLI state.
+ */
 
-  try {
-    checkPermissions(path);
-    const raw = readFileSync(path, 'utf-8');
-    const data = JSON.parse(raw) as CredentialFile;
-    if (!data.access_token || !data.refresh_token) return null;
-    return data;
-  } catch (err) {
-    const e = err as Error;
-    if (e instanceof SyntaxError || e.message.includes('JSON')) {
-      process.stderr.write(`Warning: credentials file is corrupted. Run 'mmx auth logout' to reset.\n`);
-    }
-    return null;
-  }
+export async function loadCredentials(): Promise<CredentialFile | null> {
+  const cfg = readConfigFile();
+  if (!cfg.oauth) return null;
+  return {
+    access_token: cfg.oauth.access_token,
+    refresh_token: cfg.oauth.refresh_token,
+    expires_at: cfg.oauth.expires_at,
+    token_type: cfg.oauth.token_type,
+    resource_url: cfg.oauth.resource_url,
+    account: cfg.oauth.account,
+  };
 }
 
 export async function saveCredentials(creds: CredentialFile): Promise<void> {
-  await ensureConfigDir();
-  const path = getCredentialsPath();
-  const tmp = path + '.tmp';
-  writeFileSync(tmp, JSON.stringify(creds, null, 2) + '\n', { mode: 0o600 });
-  renameSync(tmp, path);
+  const existing = readConfigFile() as Record<string, unknown>;
+  existing.oauth = creds;
+  await writeConfigFile(existing);
 }
 
 export async function clearCredentials(): Promise<void> {
-  const path = getCredentialsPath();
-  if (existsSync(path)) {
-    unlinkSync(path);
-  }
-}
-
-function checkPermissions(path: string): void {
-  try {
-    const stat = statSync(path);
-    const mode = stat.mode & 0o777;
-    if (mode !== 0o600) {
-      process.stderr.write(
-        `Warning: ${path} has permissions ${mode.toString(8)}, expected 600.\n`,
-      );
-    }
-  } catch {
-    // Ignore permission check errors on platforms that don't support it
-  }
+  const existing = readConfigFile() as Record<string, unknown>;
+  if (!('oauth' in existing)) return;
+  delete existing.oauth;
+  await writeConfigFile(existing);
 }

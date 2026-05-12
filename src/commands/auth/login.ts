@@ -154,7 +154,7 @@ export default defineCommand({
 
     await saveCredentials(creds);
     process.stderr.write('Logged in successfully.\n');
-    process.stderr.write('Credentials saved to ~/.mmx/credentials.json\n');
+    process.stderr.write('Credentials saved to ~/.mmx/config.json\n');
 
     await showQuotaAfterLogin({ ...config, apiKey: creds.access_token });
   },

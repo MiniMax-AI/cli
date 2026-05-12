@@ -4,7 +4,7 @@ import { ExitCode } from '../../errors/codes';
 import { loadCredentials, saveCredentials } from '../../auth/credentials';
 import { refreshAccessToken } from '../../auth/refresh';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
-import type { Config } from '../../config/schema';
+import { oauthApiHostFor, type Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { CredentialFile } from '../../auth/types';
 
@@ -33,7 +33,7 @@ export default defineCommand({
 
     const tokens = await refreshAccessToken(
       creds.refresh_token,
-      `${config.oauthApiHost}/oauth2/token`,
+      `${oauthApiHostFor(config)}/oauth2/token`,
     );
 
     const updated: CredentialFile = {

@@ -1,4 +1,5 @@
 import type { Config } from '../config/schema';
+import { oauthApiHostFor } from '../config/schema';
 import type { ResolvedCredential } from './types';
 import { loadCredentials } from './credentials';
 import { ensureFreshToken } from './refresh';
@@ -11,11 +12,11 @@ export async function resolveCredential(config: Config): Promise<ResolvedCredent
     return { token: config.apiKey, method: 'api-key', source: 'flag' };
   }
 
-  // 2. OAuth credentials file
+  // 2. OAuth credentials in config file
   const oauth = await loadCredentials();
   if (oauth) {
-    const token = await ensureFreshToken(oauth, `${config.oauthApiHost}/oauth2/token`);
-    return { token, method: 'oauth', source: 'credentials.json' };
+    const token = await ensureFreshToken(oauth, `${oauthApiHostFor(config)}/oauth2/token`);
+    return { token, method: 'oauth', source: 'config.json' };
   }
 
   // 3. API key from config file

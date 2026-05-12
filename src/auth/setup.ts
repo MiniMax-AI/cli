@@ -1,4 +1,5 @@
 import type { Config } from '../config/schema';
+import { oauthApiHostFor } from '../config/schema';
 import { readConfigFile, writeConfigFile } from '../config/loader';
 import { promptText, promptConfirm } from '../utils/prompt';
 import { isInteractive } from '../utils/env';
@@ -54,11 +55,12 @@ export async function ensureAuth(config: Config): Promise<void> {
     }
 
     if (method === 'oauth') {
+      const host = oauthApiHostFor(config);
       const oauthConfig: OAuthConfig = {
         clientId: '659cf4c1-615c-45f6-a5f6-4bf15eb476e5',
         clientName: 'MiniMax CLI',
-        tokenUrl: `${config.oauthApiHost}/oauth2/token`,
-        deviceCodeUrl: `${config.oauthApiHost}/oauth2/device/code`,
+        tokenUrl: `${host}/oauth2/token`,
+        deviceCodeUrl: `${host}/oauth2/device/code`,
         scopes: ['openid', 'profile', 'coding_plan'],
       };
       const tokens = await startDeviceCodeFlow(oauthConfig);
