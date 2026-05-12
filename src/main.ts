@@ -95,13 +95,17 @@ async function main() {
   }
 
   if (config.needsRegionDetection) {
-    const apiKey = config.apiKey || config.fileApiKey;
-    if (apiKey) {
-      const detected = await detectRegion(apiKey);
-      config.region = detected;
-      config.baseUrl = REGIONS[detected];
-      config.needsRegionDetection = false;
-      await saveDetectedRegion(detected);
+    // auth login handles its own region detection during key validation
+    const isAuthLogin = commandPath[0] === 'auth' && commandPath[1] === 'login';
+    if (!isAuthLogin) {
+      const apiKey = config.apiKey || config.fileApiKey;
+      if (apiKey) {
+        const detected = await detectRegion(apiKey);
+        config.region = detected;
+        config.baseUrl = REGIONS[detected];
+        config.needsRegionDetection = false;
+        await saveDetectedRegion(detected);
+      }
     }
   }
 

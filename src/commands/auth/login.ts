@@ -9,6 +9,7 @@ import { renderQuotaTable } from '../../output/quota-table';
 
 import { getConfigPath } from '../../config/paths';
 import { readConfigFile, writeConfigFile } from '../../config/loader';
+import { REGIONS, type Region } from '../../config/schema';
 import { isInteractive } from '../../utils/env';
 import { maskToken } from '../../utils/token';
 import type { Config } from '../../config/schema';
@@ -76,26 +77,46 @@ export default defineCommand({
         );
       }
 
-      // Validate the key by calling quota endpoint
+      // Validate key by probing all regions in parallel.
+      // A CN key fails against the global endpoint (and vice versa), so we must
+      // try every region to avoid false "validation failed" errors.
       if (!config.dryRun) {
         process.stderr.write('Testing key... ');
-        try {
-          const testConfig = { ...config, apiKey: key };
-          await requestJson<QuotaResponse>(testConfig, {
-            url: quotaEndpoint(testConfig.baseUrl),
-          });
-          process.stderr.write('Valid\n');
-        } catch {
+
+        const regions = Object.keys(REGIONS) as Region[];
+        const results = await Promise.all(
+          regions.map(async (region) => {
+            const baseUrl = REGIONS[region];
+            try {
+              const testConfig = { ...config, apiKey: key, baseUrl };
+              await requestJson<QuotaResponse>(testConfig, {
+                url: quotaEndpoint(baseUrl),
+              });
+              return { region, ok: true as const, error: '' };
+            } catch (err) {
+              return { region, ok: false as const, error: err instanceof Error ? err.message : String(err) };
+            }
+          }),
+        );
+
+        const match = results.find((r) => r.ok);
+        if (!match) {
+          const details = results.map((r) => `${r.region}: ${r.error}`).join('; ');
           throw new CLIError(
-            'API key validation failed.',
+            `API key validation failed: ${details}`,
             ExitCode.AUTH,
-            'Check that your key is valid and belongs to a Token Plan.',
+            'Run with --verbose for request details.',
           );
         }
 
-        // Store key in config.json
+        process.stderr.write(`Valid (${match.region})\n`);
+
+        config.region = match.region;
+        config.baseUrl = REGIONS[match.region];
+
         const existing = readConfigFile() as Record<string, unknown>;
         existing.api_key = key;
+        existing.region = match.region;
         await writeConfigFile(existing);
         process.stderr.write(`API key saved to ${getConfigPath()}\n`);
 
