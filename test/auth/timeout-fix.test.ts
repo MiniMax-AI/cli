@@ -127,7 +127,7 @@ describe('refreshAccessToken: timeout and error handling', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
-      if (url.includes('oauth/token')) {
+      if (url.includes('oauth2/token')) {
         return origFetch(`${server.url}/v1/oauth/token`, init);
       }
       return origFetch(input, init);
@@ -147,9 +147,10 @@ describe('refreshAccessToken: timeout and error handling', () => {
       routes: {
         '/v1/oauth/token': () =>
           jsonResponse({
+            status: 'success',
             access_token: 'new-access-token',
             refresh_token: 'new-refresh-token',
-            expires_in: 3600,
+            expired_in: 3600,
             token_type: 'Bearer',
           }),
       },
@@ -160,7 +161,7 @@ describe('refreshAccessToken: timeout and error handling', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString();
-      if (url.includes('oauth/token')) {
+      if (url.includes('oauth2/token')) {
         return origFetch(`${server.url}/v1/oauth/token`, init);
       }
       return origFetch(input, init);
@@ -169,7 +170,7 @@ describe('refreshAccessToken: timeout and error handling', () => {
     try {
       const tokens = await mod.refreshAccessToken('valid-refresh-token');
       expect(tokens.access_token).toBe('new-access-token');
-      expect(tokens.expires_in).toBe(3600);
+      expect(tokens.expired_in).toBe(3600);
     } finally {
       globalThis.fetch = origFetch;
     }
