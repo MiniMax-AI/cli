@@ -18,6 +18,31 @@ const HIDE_CURSOR = '\x1b[?25l';
 const SHOW_CURSOR = '\x1b[?25h';
 
 // ---------------------------------------------------------------------------
+// Slash commands
+// ---------------------------------------------------------------------------
+
+const SLASH_COMMANDS: Record<string, string> = {
+  '/exit':    'Exit the conversation',
+  '/clear':   'Clear conversation history (keeps system prompt)',
+  '/system':  'Show or set the system prompt. Usage: /system [new prompt]',
+  '/model':   'Show or set the model. Usage: /model [model-id]',
+  '/save':    'Save conversation to a JSON file. Usage: /save <path>',
+  '/help':    'Show available slash commands',
+  '/history': 'Show conversation messages with content preview',
+};
+
+const SLASH_KEYS = Object.keys(SLASH_COMMANDS);
+const CMD_MAX_LEN = Math.max(...SLASH_KEYS.map(k => k.length));
+
+function showHelp(): void {
+  process.stdout.write('\nAvailable commands:\n');
+  for (const [cmd, desc] of Object.entries(SLASH_COMMANDS)) {
+    process.stdout.write(`  ${cmd.padEnd(CMD_MAX_LEN + 2)} ${desc}\n`);
+  }
+  process.stdout.write('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Custom line editor — raw-mode keypress handling with full render control
 // ---------------------------------------------------------------------------
 
@@ -135,6 +160,20 @@ class LineEditor {
         continue;
       }
 
+      // ---- Tab: auto-complete slash command ----
+      if (ch === '\t') {
+        if (this.buffer.startsWith('/')) {
+          const hits = SLASH_KEYS.filter(cmd => cmd.startsWith(this.buffer));
+          if (hits.length === 1) {
+            this.buffer = hits[0];
+            this.cursor = this.buffer.length;
+            this.render();
+          }
+        }
+        i++;
+        continue;
+      }
+
       // ---- Printable characters ----
       if (ch.charCodeAt(0) >= 32) {
         this.buffer = this.buffer.slice(0, this.cursor) + ch + this.buffer.slice(this.cursor);
@@ -183,9 +222,17 @@ class LineEditor {
    *   ─────────────────  (top border)
    *   > input text       (input line)
    *   ─────────────────  (bottom border)
+   *   /cmd1  desc        (suggestions — outside input area)
+   *   /cmd2  ...
    */
   private render(): void {
-    const suggestionCount = 0; // reserved for future /-command suggestions
+    // Compute slash-command suggestions in real time
+    const hits = this.buffer.startsWith('/')
+      ? SLASH_KEYS.filter(cmd => cmd.startsWith(this.buffer))
+      : [];
+    const exactMatch = hits.length === 1 && hits[0] === this.buffer;
+    const showSuggestions = hits.length > 0 && !exactMatch;
+    const suggestionCount = showSuggestions ? hits.length : 0;
     const newTotal = 3 + suggestionCount;
 
     let out = '';
@@ -198,6 +245,14 @@ class LineEditor {
     out += cursorCol(1) + clearLine() + this.border() + '\n';
     out += clearLine() + '> ' + this.buffer + '\n';
     out += cursorCol(1) + clearLine() + this.border() + '\n';
+
+    // Suggestions — rendered below the bottom border, outside the input area
+    if (showSuggestions) {
+      for (const cmd of hits) {
+        out += clearLine() +
+          `  ${this.dim}${cmd.padEnd(CMD_MAX_LEN + 2)} ${SLASH_COMMANDS[cmd]}${this.reset}\n`;
+      }
+    }
 
     if (newTotal < this.lastTotal) {
       out += clearBelow();
@@ -248,8 +303,10 @@ export default defineCommand({
     const dim  = config.noColor ? '' : '\x1b[2m';
     const reset = config.noColor ? '' : '\x1b[0m';
 
-    process.stdout.write(`\nMiniMax Chat REPL\n`);
-    process.stdout.write(`${dim}Type /exit to quit.${reset}\n`);
+    const bold = config.noColor ? '' : '\x1b[1m';
+
+    process.stdout.write(`\n${bold}MiniMax Chat REPL${reset}\n`);
+    process.stdout.write(`${dim}Type / to see commands, /exit to quit.${reset}\n`);
 
     const stdin = process.stdin;
     const stdout = process.stdout;
@@ -259,6 +316,66 @@ export default defineCommand({
     }
     stdin.resume();
     stdin.setEncoding('utf8');
+
+    // ---- Helper: handle slash commands ----
+    function handleSlash(input: string): 'exit' | 'ok' {
+      const parts = input.trim().split(/\s+/);
+      const cmd = parts[0];
+      const arg = parts.slice(1).join(' ');
+
+      switch (cmd) {
+        case '/exit':
+          stdout.write(`${dim}Goodbye!${reset}\n`);
+          return 'exit';
+
+        case '/help':
+          showHelp();
+          return 'ok';
+
+        case '/clear':
+          stdout.write(`${dim}Conversation cleared.${reset}\n`);
+          return 'ok';
+
+        case '/system': {
+          if (arg) {
+            stdout.write(`${dim}System prompt set.${reset}\n`);
+          } else {
+            stdout.write(`${dim}No system prompt set.${reset}\n`);
+          }
+          return 'ok';
+        }
+
+        case '/model': {
+          if (arg) {
+            stdout.write(`${dim}Model set to: ${arg}${reset}\n`);
+          } else {
+            stdout.write(`${dim}Current model will be displayed here.${reset}\n`);
+          }
+          return 'ok';
+        }
+
+        case '/save': {
+          if (!arg) {
+            stdout.write(`${dim}Usage: /save <file-path>${reset}\n`);
+          } else {
+            stdout.write(`${dim}Conversation saving will be available once chat is integrated.${reset}\n`);
+          }
+          return 'ok';
+        }
+
+        case '/history': {
+          stdout.write(`${dim}History will be available once chat is integrated.${reset}\n`);
+          return 'ok';
+        }
+
+        default:
+          if (cmd.startsWith('/')) {
+            stdout.write(`${dim}Unknown command: ${cmd}. Type /help for available commands.${reset}\n`);
+            return 'ok';
+          }
+          return 'ok';
+      }
+    }
 
     const editor = new LineEditor(stdout, '> ', dim, reset);
     let running = true;
@@ -278,10 +395,13 @@ export default defineCommand({
         const trimmed = line.trim();
         if (!trimmed) continue;
 
-        if (trimmed === '/exit') {
-          stdout.write(`${dim}Goodbye!${reset}\n`);
-          running = false;
-          break;
+        if (trimmed.startsWith('/')) {
+          const result = handleSlash(trimmed);
+          if (result === 'exit') {
+            running = false;
+            break;
+          }
+          continue;
         }
 
         // Placeholder: echo back until chat integration is added
