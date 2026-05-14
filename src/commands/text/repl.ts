@@ -137,7 +137,7 @@ class LineEditor {
         this.lastTotal = 0;
         const cb = this.resolve;
         this.resolve = null;
-        cb!(line);
+        if (cb) cb(line);
         i++;
         continue;
       }
