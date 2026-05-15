@@ -67,12 +67,26 @@ mmx quota
 ### `mmx text`
 
 ```bash
+# One-shot chat
 mmx text chat --message "Write a poem"
 mmx text chat --model MiniMax-M2.7-highspeed --message "Hello" --stream
 mmx text chat --system "You are a coding assistant" --message "Fizzbuzz in Go"
 mmx text chat --message "user:Hi" --message "assistant:Hey!" --message "How are you?"
 cat messages.json | mmx text chat --messages-file - --output json
+
+# Interactive multi-turn chat REPL
+mmx text repl
+mmx text repl --model MiniMax-M2.7-highspeed
+mmx text repl --system "You are a coding expert" --temperature 0.7
 ```
+
+`mmx text repl` starts an interactive multi-turn chat session with:
+
+- **Automatic context** — conversation history tracked across turns
+- **Real-time slash suggestions** — type `/` to see all commands, filter as you type
+- **Visual input area** — bordered prompt keeps input and suggestions visually separated
+- **Slash commands**: `/exit`, `/clear`, `/system`, `/model`, `/save`, `/help`, `/history`
+- **Line editing**: arrow keys, Home/End, Ctrl+A/E/U/W, history navigation with ↑/↓
 
 ### `mmx image`
 

@@ -67,12 +67,26 @@ mmx quota
 ### `mmx text`
 
 ```bash
+# 单次对话
 mmx text chat --message "写一首诗"
 mmx text chat --model MiniMax-M2.7-highspeed --message "你好" --stream
 mmx text chat --system "你是编程助手" --message "用 Go 写 Fizzbuzz"
 mmx text chat --message "user:你好" --message "assistant:嗨！" --message "你叫什么名字？"
 cat messages.json | mmx text chat --messages-file - --output json
+
+# 交互式多轮对话 REPL
+mmx text repl
+mmx text repl --model MiniMax-M2.7-highspeed
+mmx text repl --system "你是编程专家" --temperature 0.7
 ```
+
+`mmx text repl` 启动交互式多轮对话会话，功能包括：
+
+- **自动上下文** — 对话历史跨轮次自动维护
+- **实时斜杠建议** — 输入 `/` 即可查看所有命令，随输入逐字母过滤
+- **可视化输入区** — 带边框的输入区域，建议列表显示在输入区外部
+- **斜杠命令**: `/exit`（退出）、`/clear`（清空历史）、`/system`（系统提示词）、`/model`（切换模型）、`/save`（保存对话）、`/help`（帮助）、`/history`（查看历史）
+- **行编辑**: 方向键、Home/End、Ctrl+A/E/U/W、↑/↓ 历史导航
 
 ### `mmx image`
 
