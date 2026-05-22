@@ -101,7 +101,9 @@ async function verifySha256(filePath: string, expected: string): Promise<void> {
   }
 }
 
-async function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void): Promise<void> {
+// Exported for unit tests (see test/update/self-update.test.ts). Not part of
+// the public CLI surface; callers go through `applySelfUpdate`.
+export async function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void): Promise<void> {
   const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
   if (!res.ok) throw new CLIError(`Download failed: ${res.status} ${res.statusText}`, ExitCode.GENERAL);
 
@@ -136,8 +138,19 @@ async function downloadFile(url: string, dest: string, onProgress?: (pct: number
       pump();
     });
   } catch (err) {
+    // Tear down the writer BEFORE unlinking dest so any buffered bytes
+    // can't race the unlink and leave a partial file in the pagecache, and
+    // so a slow flush doesn't race the next process opening the same path.
+    // Wait for `close` (fires after destroy on Node streams) unless the
+    // writer has already torn down.
+    if (!writer.destroyed) {
+      await new Promise<void>(r => {
+        writer.once('close', () => r());
+        writer.destroy();
+      });
+    }
     // Don't leave a half-downloaded binary in /tmp on failure.
-    try { (await import('fs')).unlinkSync(dest); } catch { /* best-effort */ }
+    try { (await import('fs')).unlinkSync(dest); } catch { /* best-effort — race with concurrent cleanup is fine */ }
     throw err;
   } finally {
     // Always release the Web Streams reader lock — the API contract requires
