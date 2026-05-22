@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { default as generateCommand } from '../../../src/commands/music/generate';
 
 const baseConfig = {
@@ -107,12 +110,20 @@ describe('music generate command', () => {
   });
 
   it('rejects --instrumental with --lyrics-file', async () => {
-    await expect(
-      generateCommand.execute(
-        { ...baseConfig, dryRun: true },
-        { ...baseFlags, prompt: 'Folk', instrumental: true, lyricsFile: '/dev/null' },
-      ),
-    ).rejects.toThrow('Cannot use --instrumental with --lyrics');
+    const tempDir = mkdtempSync(join(tmpdir(), 'mmx-lyrics-test-'));
+    const lyricsFile = join(tempDir, 'lyrics.txt');
+    writeFileSync(lyricsFile, 'Hello');
+
+    try {
+      await expect(
+        generateCommand.execute(
+          { ...baseConfig, dryRun: true },
+          { ...baseFlags, prompt: 'Folk', instrumental: true, lyricsFile },
+        ),
+      ).rejects.toThrow('Cannot use --instrumental with --lyrics');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('handles "无歌词" as instrumental', async () => {

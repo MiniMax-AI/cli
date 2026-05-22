@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { default as uploadCommand } from '../../../src/commands/file/upload';
 
 const baseConfig = {
@@ -27,6 +30,22 @@ const baseFlags = {
   async: false,
 };
 
+async function captureStdout(fn: () => Promise<void>): Promise<string> {
+  const originalWrite = process.stdout.write;
+  let output = '';
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    output += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf-8');
+    return true;
+  }) as typeof process.stdout.write;
+
+  try {
+    await fn();
+    return output;
+  } finally {
+    process.stdout.write = originalWrite;
+  }
+}
+
 describe('file upload command', () => {
   it('has correct name', () => {
     expect(uploadCommand.name).toBe('file upload');
@@ -45,17 +64,22 @@ describe('file upload command', () => {
   });
 
   it('shows dry-run output with file info', async () => {
-    let captured = '';
-    const origWrite = process.stdout.write;
-    process.stdout.write = (chunk: any): any => { captured += String(chunk); return true; };
+    const tempDir = mkdtempSync(join(tmpdir(), 'mmx-upload-test-'));
+    const filePath = join(tempDir, 'fixture.bin');
+    writeFileSync(filePath, 'fixture');
 
-    await uploadCommand.execute(
-      { ...baseConfig, dryRun: true },
-      { ...baseFlags, dryRun: true, file: '/dev/null', purpose: 'vision' },
-    );
+    try {
+      const captured = await captureStdout(async () => {
+        await uploadCommand.execute(
+          { ...baseConfig, dryRun: true },
+          { ...baseFlags, dryRun: true, file: filePath, purpose: 'vision' },
+        );
+      });
 
-    process.stdout.write = origWrite;
-    expect(captured).toContain('/dev/null');
-    expect(captured).toContain('vision');
+      expect(captured).toContain(filePath);
+      expect(captured).toContain('vision');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
