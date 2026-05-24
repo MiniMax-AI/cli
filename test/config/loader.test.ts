@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdirSync, rmSync } from 'fs';
+import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { mkdirSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { loadConfig } from '../../src/config/loader';
+import { loadConfig, renameWithCrossDeviceFallback, writeConfigFile } from '../../src/config/loader';
 import { CLIError } from '../../src/errors/base';
 import type { GlobalFlags } from '../../src/types/flags';
 
@@ -55,5 +55,75 @@ describe('loadConfig', () => {
 
     expect(config.region).toBe('cn');
     expect(config.baseUrl).toBe('https://api.minimaxi.com');
+  });
+});
+
+describe('writeConfigFile', () => {
+  const testDir = join(tmpdir(), `mmx-config-write-test-${Date.now()}`);
+  const originalConfigDir = process.env.MMX_CONFIG_DIR;
+
+  beforeEach(() => {
+    process.env.MMX_CONFIG_DIR = testDir;
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (originalConfigDir === undefined) delete process.env.MMX_CONFIG_DIR;
+    else process.env.MMX_CONFIG_DIR = originalConfigDir;
+    rmSync(testDir, { recursive: true, force: true });
+    mock.restore();
+  });
+
+  it('falls back to copy and unlink when rename crosses devices', async () => {
+    const calls: string[] = [];
+    const renameMock = mock((from: string, _to: string) => {
+      calls.push(`rename:${from}`);
+      const err = new Error('cross-device link not permitted') as NodeJS.ErrnoException;
+      err.code = 'EXDEV';
+      err.path = from;
+      throw err;
+    });
+    const copyMock = mock((from: string, _to: string) => {
+      calls.push(`copy:${from}`);
+    });
+    const unlinkMock = mock((path: string) => {
+      calls.push(`unlink:${path}`);
+    });
+
+    renameWithCrossDeviceFallback('config.json.tmp', 'config.json', {
+      rename: renameMock,
+      copy: copyMock,
+      unlink: unlinkMock,
+    });
+
+    expect(renameMock).toHaveBeenCalledTimes(1);
+    expect(copyMock).toHaveBeenCalledTimes(1);
+    expect(unlinkMock).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      'rename:config.json.tmp',
+      'copy:config.json.tmp',
+      'unlink:config.json.tmp',
+    ]);
+  });
+
+  it('rethrows non-EXDEV rename errors', () => {
+    const renameMock = mock(() => {
+      const err = new Error('permission denied') as NodeJS.ErrnoException;
+      err.code = 'EACCES';
+      throw err;
+    });
+
+    expect(() => renameWithCrossDeviceFallback('config.json.tmp', 'config.json', {
+      rename: renameMock,
+      copy: mock(() => {}),
+      unlink: mock(() => {}),
+    })).toThrow('permission denied');
+  });
+
+  it('uses atomic rename on the normal path', async () => {
+    await writeConfigFile({ output: 'json' });
+
+    const configPath = join(testDir, 'config.json');
+    expect(JSON.parse(readFileSync(configPath, 'utf-8')).output).toBe('json');
   });
 });
