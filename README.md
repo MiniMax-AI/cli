@@ -18,12 +18,13 @@
 ## Features
 
 - **Text** — Multi-turn chat, streaming, system prompts, JSON output
-- **Image** — Text-to-image with aspect ratio and batch controls
+- **Image** — Text-to-image with aspect ratio, batch controls, and fine-grained sizing
 - **Video** — Async video generation with progress tracking
-- **Speech** — TTS with 30+ voices, speed control, streaming playback
+- **Speech** — TTS with 30+ voices, speed control, streaming playback, SRT subtitles
 - **Music** — Text-to-music with lyrics, instrumental mode, auto lyrics, and cover generation from reference audio
 - **Vision** — Image understanding and description
 - **Search** — Web search powered by MiniMax
+- **File** — Upload, list, and delete files from MiniMax storage
 - **Dual Region** — Seamless Global (`api.minimax.io`) and CN (`api.minimaxi.com`) support
 
 <img src="https://file.cdn.minimax.io/public/MMX-CLI.png" alt="MiniMax" width="100%" />
@@ -60,12 +61,16 @@ mmx music generate --prompt "Upbeat pop" --lyrics "[verse] La da dee, sunny day"
 mmx search "MiniMax AI latest news"
 mmx vision photo.jpg
 mmx quota
+
+# File management
+mmx file upload --file doc.pdf
+mmx file list
+mmx file delete --file-id 123456789
 ```
 
 ## Commands
 
 ### `mmx text`
-
 ```bash
 mmx text chat --message "Write a poem"
 mmx text chat --model MiniMax-M2.7-highspeed --message "Hello" --stream
@@ -80,10 +85,13 @@ cat messages.json | mmx text chat --messages-file - --output json
 mmx image "A cat in a spacesuit"
 mmx image generate --prompt "A cat" --n 3 --aspect-ratio 16:9
 mmx image generate --prompt "Logo" --out-dir ./out/
+# Fine-grained sizing
+mmx image generate --prompt "A photo" --width 1024 --height 768
+# With prompt optimizer
+mmx image generate --prompt "cat spacesuit" --prompt-optimizer
 ```
 
 ### `mmx video`
-
 ```bash
 mmx video generate --prompt "Ocean waves at sunset" --download sunset.mp4
 mmx video generate --prompt "A robot painting" --async
@@ -98,6 +106,9 @@ mmx speech synthesize --text "Hello!" --out hello.mp3
 mmx speech synthesize --text "Stream me" --stream | mpv -
 mmx speech synthesize --text "Hi" --voice English_magnetic_voiced_man --speed 1.2
 echo "Breaking news" | mmx speech synthesize --text-file - --out news.mp3
+# With SRT subtitles (if voice model supports it)
+mmx speech synthesize --text "Hello world" --subtitles --out hello.mp3
+#  saves hello.mp3 + hello.srt
 mmx speech voices
 ```
 
@@ -116,7 +127,6 @@ mmx music cover --prompt "Indie folk" --audio https://example.com/song.mp3 --out
 ```
 
 ### `mmx vision`
-
 ```bash
 mmx vision photo.jpg
 mmx vision describe --image https://example.com/img.jpg --prompt "What breed?"
@@ -128,6 +138,21 @@ mmx vision describe --file-id file-123
 ```bash
 mmx search "MiniMax AI"
 mmx search query --q "latest news" --output json
+```
+
+### `mmx file`
+
+```bash
+# Upload a file (returns file ID for use with vision, speech, etc.)
+mmx file upload --file doc.pdf
+mmx file upload --file image.png --purpose vision
+
+# List all uploaded files
+mmx file list
+mmx file list --output json
+
+# Delete a file by ID
+mmx file delete --file-id 123456789
 ```
 
 ### `mmx auth`
@@ -153,6 +178,7 @@ is auto-detected by probing both Global and CN.
 
 ```bash
 mmx quota
+mmx quotas                                  # show detailed quota breakdown per modality
 mmx config show
 mmx config set --key region --value cn
 mmx config set --key default-text-model --value MiniMax-M2.7-highspeed
@@ -162,8 +188,8 @@ mmx config export-schema | jq .
 ### `mmx update`
 
 ```bash
-mmx update
-mmx update latest
+mmx update                                 # update to latest stable
+mmx update latest                          # update to latest pre-release
 ```
 
 ## Thanks to
