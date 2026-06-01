@@ -128,7 +128,10 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
   const L = config.region === 'cn' ? LABELS_CN : LABELS_EN;
 
   const rows = models.map((m) => {
-    const displayName = displayModelName(m.model_name, config.region);
+    const baseName = displayModelName(m.model_name, config.region);
+    const boost = m.interval_boost_permille;
+    const boostTag = (boost && boost > 1000) ? ` ×${boost / 1000}` : '';
+    const displayName = baseName + boostTag;
     const current = renderMetric(
       L.current,
       m.current_interval_usage_count,

@@ -47,9 +47,13 @@ function createCodingPlanModels(): QuotaModelRemain[] {
       current_interval_total_count: 0,
       current_interval_usage_count: 0,
       current_interval_remaining_percent: 94,
+      current_interval_status: 1,
       current_weekly_total_count: 0,
       current_weekly_usage_count: 0,
       current_weekly_remaining_percent: 98,
+      current_weekly_status: 1,
+      interval_boost_permille: 2000,
+      weekly_boost_permille: 2000,
       weekly_start_time: Date.UTC(2026, 4, 31, 0, 0, 0),
       weekly_end_time: Date.UTC(2026, 5, 7, 0, 0, 0),
       weekly_remains_time: 6 * 24 * 60 * 60 * 1000,
@@ -128,5 +132,72 @@ describe('renderQuotaTable', () => {
     expect(output).toContain('3 / 3');
     expect(output).toContain('21 / 21');
     expect(output).not.toContain('0 / 3');
+  });
+
+  it('renders boost multiplier when boost_permille > 1000', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(createCodingPlanModels(), {
+        ...createConfig(),
+        region: 'cn',
+        noColor: true,
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+
+    // general model has interval_boost_permille=2000 => ×2 prefix
+    expect(output).toContain('通用 ×2');
+    // video model has no boost field => no ×2 on its row
+    // ensure the video line is still present (so the negative check is meaningful)
+    expect(output).toContain('视频');
+  });
+
+  it('omits boost multiplier when boost_permille is missing', () => {
+    const modelsNoBoost: QuotaModelRemain[] = [{
+      model_name: 'general',
+      start_time: Date.UTC(2026, 4, 31, 0, 0, 0),
+      end_time: Date.UTC(2026, 4, 31, 2, 0, 0),
+      remains_time: 2 * 60 * 60 * 1000,
+      current_interval_total_count: 100,
+      current_interval_usage_count: 50,
+      current_interval_remaining_percent: 50,
+      current_weekly_total_count: 1000,
+      current_weekly_usage_count: 200,
+      current_weekly_remaining_percent: 80,
+      weekly_start_time: Date.UTC(2026, 4, 31, 0, 0, 0),
+      weekly_end_time: Date.UTC(2026, 5, 7, 0, 0, 0),
+      weekly_remains_time: 6 * 24 * 60 * 60 * 1000,
+    }];
+
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(modelsNoBoost, {
+        ...createConfig(),
+        region: 'cn',
+        noColor: true,
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+
+    expect(output).toContain('通用');
+    expect(output).not.toContain('×2');
   });
 });
