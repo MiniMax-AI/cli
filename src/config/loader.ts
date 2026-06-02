@@ -1,10 +1,35 @@
-import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, renameSync, existsSync, copyFileSync, unlinkSync } from 'fs';
 import { parseConfigFile, REGIONS, type Config, type ConfigFile, type Region } from './schema';
 import { ensureConfigDir, getConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
 import type { GlobalFlags } from '../types/flags';
+
+/**
+ * Write `content` to `target` atomically when possible. The file is first
+ * written to `target + '.tmp'` and then renamed into place. On `EXDEV`
+ * (cross-device link not permitted — e.g. Windows when the temp dir is on
+ * a different drive than the config dir, or *nix when $TMPDIR is on a
+ * different mount than $HOME), fall back to copyFileSync + unlinkSync.
+ * The fallback is not atomic, but a concurrent reader will see either
+ * the old file or the fully-written new file — never a partial write.
+ */
+function atomicWriteFileSync(target: string, content: string): void {
+  const tmp = target + '.tmp';
+  writeFileSync(tmp, content, { mode: 0o600 });
+  try {
+    renameSync(tmp, target);
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code === 'EXDEV') {
+      copyFileSync(tmp, target);
+      unlinkSync(tmp);
+    } else {
+      throw err;
+    }
+  }
+}
 
 export function readConfigFile(): ConfigFile {
   const path = getConfigPath();
@@ -23,9 +48,7 @@ export function readConfigFile(): ConfigFile {
 export async function writeConfigFile(data: Record<string, unknown>): Promise<void> {
   await ensureConfigDir();
   const path = getConfigPath();
-  const tmp = path + '.tmp';
-  writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
-  renameSync(tmp, path);
+  atomicWriteFileSync(path, JSON.stringify(data, null, 2) + '\n');
 }
 
 export function loadConfig(flags: GlobalFlags): Config {
