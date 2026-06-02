@@ -159,11 +159,11 @@ export default defineCommand({
   apiDocs: '/docs/api-reference/text-post',
   usage: 'mmx text chat --message <text> [flags]',
   options: [
-    { flag: '--model <model>', description: 'Model ID (default: MiniMax-M2.7)' },
+    { flag: '--model <model>', description: 'Model ID (default: MiniMax-M3)' },
     { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
-    { flag: '--max-tokens <n>',        description: 'Maximum tokens to generate (default: 4096)', type: 'number' },
+    { flag: '--max-tokens <n>',        description: 'Maximum tokens to generate (default: 8192)', type: 'number' },
     { flag: '--temperature <n>',       description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
     { flag: '--top-p <n>',             description: 'Nucleus sampling threshold', type: 'number' },
     { flag: '--stream',                description: 'Stream response tokens (default: on in TTY)' },
@@ -197,7 +197,7 @@ export default defineCommand({
 
     const model = (flags.model as string)
       || config.defaultTextModel
-      || 'MiniMax-M2.7';
+      || 'MiniMax-M3';
     const format = detectOutputFormat(config.output);
     const shouldStream = flags.stream === true || (
       flags.stream === undefined
@@ -208,7 +208,7 @@ export default defineCommand({
     const body: ChatRequest = {
       model,
       messages,
-      max_tokens: (flags.maxTokens as number) ?? 4096,
+      max_tokens: (flags.maxTokens as number) ?? 8192,
       stream: shouldStream,
     };
 

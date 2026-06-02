@@ -56,8 +56,8 @@ export class TextSDK extends Client {
 
     return {
       ...params,
-      model: params.model ?? 'MiniMax-M2.7',
-      max_tokens: params.max_tokens ?? 4096,
+      model: params.model ?? 'MiniMax-M3',
+      max_tokens: params.max_tokens ?? 8192,
     } as ChatRequest;
   }
 }

@@ -96,7 +96,7 @@ describe('text chat command', () => {
       });
 
       const parsed = JSON.parse(output);
-      expect(parsed.request.model).toBe('MiniMax-M2.7');
+      expect(parsed.request.model).toBe('MiniMax-M3');
       expect(parsed.request.messages).toHaveLength(1);
     } finally {
       console.log = originalLog;

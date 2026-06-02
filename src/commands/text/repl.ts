@@ -294,9 +294,9 @@ export default defineCommand({
   description: 'Start an interactive multi-turn chat session',
   usage: 'mmx text repl [flags]',
   options: [
-    { flag: '--model <model>',     description: 'Model ID (default: MiniMax-M2.7)' },
+    { flag: '--model <model>',     description: 'Model ID (default: MiniMax-M3)' },
     { flag: '--system <text>',     description: 'System prompt' },
-    { flag: '--max-tokens <n>',    description: 'Maximum tokens per response (default: 4096)', type: 'number' },
+    { flag: '--max-tokens <n>',    description: 'Maximum tokens per response (default: 8192)', type: 'number' },
     { flag: '--temperature <n>',   description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
     { flag: '--top-p <n>',         description: 'Nucleus sampling threshold', type: 'number' },
   ],
@@ -325,8 +325,8 @@ export default defineCommand({
     const state: ReplState = {
       messages: [],
       system: flags.system as string | undefined,
-      model: (flags.model as string) || config.defaultTextModel || 'MiniMax-M2.7',
-      maxTokens: (flags.maxTokens as number) ?? 4096,
+      model: (flags.model as string) || config.defaultTextModel || 'MiniMax-M3',
+      maxTokens: (flags.maxTokens as number) ?? 8192,
       temperature: flags.temperature !== undefined ? flags.temperature as number : undefined,
       topP: flags.topP !== undefined ? flags.topP as number : undefined,
     };
