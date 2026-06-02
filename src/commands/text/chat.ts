@@ -171,7 +171,7 @@ export default defineCommand({
   ],
   examples: [
     'mmx text chat --message "What is MiniMax?"',
-    'mmx text chat --model MiniMax-M2.7-highspeed --system "You are a coding assistant." --message "Write fizzbuzz in Python"',
+    'mmx text chat --system "You are a coding assistant." --message "Write fizzbuzz in Python"',
     'mmx text chat --message "Hello" --message "assistant:Hi!" --message "How are you?"',
     'cat conversation.json | mmx text chat --messages-file - --stream',
     'mmx text chat --message "Hello" --output json',

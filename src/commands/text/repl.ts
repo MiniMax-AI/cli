@@ -302,7 +302,7 @@ export default defineCommand({
   ],
   examples: [
     'mmx text repl',
-    'mmx text repl --model MiniMax-M2.7-highspeed --system "You are a coding assistant."',
+    'mmx text repl --system "You are a coding assistant."',
     'mmx text repl --temperature 0.7 --max-tokens 8192',
   ],
   async run(config: Config, flags: GlobalFlags) {
