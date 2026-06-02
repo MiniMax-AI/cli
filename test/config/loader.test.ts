@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { mkdirSync, readFileSync, rmSync } from 'fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { loadConfig, renameWithCrossDeviceFallback, writeConfigFile } from '../../src/config/loader';
@@ -104,6 +104,35 @@ describe('writeConfigFile', () => {
       'copy:config.json.tmp',
       'unlink:config.json.tmp',
     ]);
+  });
+
+  it('writes the config file when the final rename crosses devices', async () => {
+    const renameMock = mock((from: string, _to: string) => {
+      const err = new Error('cross-device link not permitted') as Error & {
+        code?: string;
+        path?: string;
+      };
+      err.code = 'EXDEV';
+      err.path = from;
+      throw err;
+    });
+    const copyMock = mock((from: string, to: string) => copyFileSync(from, to));
+    const unlinkMock = mock((path: string) => unlinkSync(path));
+
+    await writeConfigFile({ region: 'cn', output: 'json' }, {
+      rename: renameMock,
+      copy: copyMock,
+      unlink: unlinkMock,
+    });
+
+    const configPath = join(testDir, 'config.json');
+    const parsed = JSON.parse(readFileSync(configPath, 'utf-8'));
+
+    expect(renameMock).toHaveBeenCalledTimes(1);
+    expect(copyMock).toHaveBeenCalledTimes(1);
+    expect(unlinkMock).toHaveBeenCalledTimes(1);
+    expect(parsed.region).toBe('cn');
+    expect(parsed.output).toBe('json');
   });
 
   it('rethrows non-EXDEV rename errors', () => {

@@ -12,6 +12,12 @@ interface RenameWithFallbackOps {
   unlink: (path: string) => void;
 }
 
+function isCrossDeviceError(err: unknown): err is Error & { code: 'EXDEV' } {
+  return err instanceof Error
+    && 'code' in err
+    && (err as { code?: string }).code === 'EXDEV';
+}
+
 export function renameWithCrossDeviceFallback(
   from: string,
   to: string,
@@ -24,7 +30,7 @@ export function renameWithCrossDeviceFallback(
   try {
     ops.rename(from, to);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+    if (!isCrossDeviceError(err)) throw err;
     ops.copy(from, to);
     ops.unlink(from);
   }
@@ -44,12 +50,15 @@ export function readConfigFile(): ConfigFile {
   }
 }
 
-export async function writeConfigFile(data: Record<string, unknown>): Promise<void> {
+export async function writeConfigFile(
+  data: Record<string, unknown>,
+  renameOps?: RenameWithFallbackOps,
+): Promise<void> {
   await ensureConfigDir();
   const path = getConfigPath();
   const tmp = path + '.tmp';
   writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
-  renameWithCrossDeviceFallback(tmp, path);
+  renameWithCrossDeviceFallback(tmp, path, renameOps);
 }
 
 export function loadConfig(flags: GlobalFlags): Config {
