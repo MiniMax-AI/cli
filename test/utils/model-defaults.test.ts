@@ -33,13 +33,13 @@ function resolveModel(
 
 describe('model resolution (flag > config default > fallback)', () => {
   it('uses flag when provided', () => {
-    const model = resolveModel('defaultTextModel', 'MiniMax-M2.7', baseConfig, { model: 'MiniMax-M2.7-highspeed' });
-    expect(model).toBe('MiniMax-M2.7-highspeed');
+    const model = resolveModel('defaultTextModel', 'MiniMax-M2.7', baseConfig, { model: 'MiniMax-M2.5' });
+    expect(model).toBe('MiniMax-M2.5');
   });
 
   it('falls back to config default when flag is absent', () => {
-    const model = resolveModel('defaultTextModel', 'MiniMax-M2.7', { ...baseConfig, defaultTextModel: 'MiniMax-M2.7-highspeed' }, {});
-    expect(model).toBe('MiniMax-M2.7-highspeed');
+    const model = resolveModel('defaultTextModel', 'MiniMax-M2.7', { ...baseConfig, defaultTextModel: 'MiniMax-M2.5' }, {});
+    expect(model).toBe('MiniMax-M2.5');
   });
 
   it('falls back to hardcoded when neither flag nor config', () => {
