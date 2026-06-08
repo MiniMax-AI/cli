@@ -30,10 +30,11 @@ interface Labels {
   resetsIn: string;
   noData: string;
   now: string;
+  notInPlan: string;
 }
 
-const LABELS_EN: Labels = { dashboard: 'TokenPlan Quota', week: 'Week', current: 'Left', weekly: 'Wk left', resetsIn: 'Reset', noData: 'No quota data available.', now: 'now' };
-const LABELS_CN: Labels = { dashboard: 'TokenPlan 配额面板', week: '周期', current: '剩余', weekly: '周剩余', resetsIn: '重置', noData: '暂无配额数据', now: '即将' };
+const LABELS_EN: Labels = { dashboard: 'TokenPlan Quota', week: 'Week', current: 'Left', weekly: 'Wk left', resetsIn: 'Reset', noData: 'No quota data available.', now: 'now', notInPlan: 'not in plan' };
+const LABELS_CN: Labels = { dashboard: 'TokenPlan 配额面板', week: '周期', current: '剩余', weekly: '周剩余', resetsIn: '重置', noData: '暂无配额数据', now: '即将', notInPlan: '不在当前套餐中' };
 
 const MODEL_NAME_CN: Record<string, string> = {
   'general': '通用',
@@ -98,13 +99,22 @@ function renderBar(remainingPct: number, color: boolean, barWidth: number = BAR_
   return showPct ? `${bar} ${fg}${B}${pctStr}${R}` : bar;
 }
 
+// Server status for a model not bundled in the plan: counts read 0/0 with
+// percent 100, so only status distinguishes it from an in-plan 0/0 row (=1).
+const STATUS_NOT_IN_PLAN = 3;
+
 function renderMetric(
   label: string,
   remaining: number,
   total: number,
   percent: number | undefined | null,
   color: boolean,
+  status: number | undefined | null,
+  notInPlanLabel: string,
 ): string {
+  if (status === STATUS_NOT_IN_PLAN) {
+    return color ? `${D}${label}${R} ${FG_RED}${notInPlanLabel}${R}` : `${label} ${notInPlanLabel}`;
+  }
   const pct = remainingPct(percent, remaining, total);
   const bar = renderBar(pct, color, COMPACT_BAR_WIDTH, total <= 0);
   if (total > 0) {
@@ -138,6 +148,8 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
       m.current_interval_total_count,
       m.current_interval_remaining_percent,
       useColor,
+      m.current_interval_status,
+      L.notInPlan,
     );
     const weekly = renderMetric(
       L.weekly,
@@ -145,6 +157,8 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
       m.current_weekly_total_count,
       m.current_weekly_remaining_percent,
       useColor,
+      m.current_weekly_status,
+      L.notInPlan,
     );
     const reset = `${L.resetsIn} ${formatDuration(m.remains_time, L.now)}`;
     return { displayName, current, weekly, reset };

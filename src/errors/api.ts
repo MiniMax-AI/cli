@@ -69,8 +69,8 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     );
   }
 
-  // MiniMax insufficient quota
-  if (apiCode === 1028 || apiCode === 1030) {
+  // MiniMax insufficient quota / weekly usage limit (2056)
+  if (apiCode === 1028 || apiCode === 1030 || apiCode === 2056) {
     const hint = planHintForUrl(url);
     return new CLIError(
       `Quota exhausted. ${apiMsg}`,

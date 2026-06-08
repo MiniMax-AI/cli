@@ -200,4 +200,35 @@ describe('renderQuotaTable', () => {
     expect(output).toContain('通用');
     expect(output).not.toContain('×2');
   });
+
+  it('renders "not in plan" for status=3 rows instead of a misleading 100%', () => {
+    // issue #173: a plan without video. The server marks the unavailable row
+    // status=3 (counts 0/0, percent 100); the in-plan general row stays status=1.
+    const base = createCodingPlanModels();
+    const models: QuotaModelRemain[] = [
+      { ...base[0]!, current_interval_status: 1, current_weekly_status: 1 },
+      { ...base[1]!, current_interval_status: 3, current_weekly_status: 3 },
+    ];
+
+    const lines: string[] = [];
+    const originalLog = console.log;
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+    try {
+      renderQuotaTable(models, { ...createConfig(), region: 'cn', noColor: true });
+    } finally {
+      console.log = originalLog;
+    }
+
+    // video (status=3) says "not in plan"; its percent/bar must not leak through
+    const videoLine = lines.find((l) => l.includes('视频')) ?? '';
+    expect(videoLine).toContain('不在当前套餐中');
+    expect(videoLine).not.toContain('100%');
+    expect(videoLine).not.toContain('[');
+    // the in-plan general row (status=1) still renders its bar
+    const generalLine = lines.find((l) => l.includes('通用')) ?? '';
+    expect(generalLine).not.toContain('不在当前套餐中');
+    expect(generalLine).toContain('[');
+  });
 });

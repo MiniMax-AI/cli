@@ -43,4 +43,17 @@ describe('mapApiError', () => {
     const err = mapApiError(500, { base_resp: { status_code: 0, status_msg: 'something broke' } });
     expect(err.message).toContain('something broke');
   });
+
+  it('maps MiniMax usage-limit code 2056 to QUOTA with upgrade hint', () => {
+    // issue #173: mmx video generate rejected with 2056 / (0/0 used)
+    const err = mapApiError(
+      400,
+      { base_resp: { status_code: 2056, status_msg: 'weekly usage limit reached (0/0 used)' } },
+      'https://api.minimaxi.com/v1/video_generation',
+    );
+    expect(err.exitCode).toBe(ExitCode.QUOTA);
+    expect(err.message).toContain('0/0 used');
+    expect(err.hint).toContain('quota show');
+    expect(err.hint).toContain('Upgrade plan');
+  });
 });
