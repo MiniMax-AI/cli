@@ -1,6 +1,10 @@
 import type { GlobalFlags } from './types/flags';
 import type { OptionDef } from './command';
 
+/** Recognised spellings for an explicit boolean flag value, e.g. `--flag=false`. */
+const BOOLEAN_TRUE_VALUES = new Set(['true', '1', 'yes', 'on']);
+const BOOLEAN_FALSE_VALUES = new Set(['false', '0', 'no', 'off']);
+
 function kebabToCamel(str: string): string {
   return str.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }
@@ -115,11 +119,22 @@ export function parseFlags(argv: string[], options: OptionDef[]): GlobalFlags {
 
       if (schema.booleans.has(camelKey)) {
         // A bare boolean flag (`--flag`) is true. Honour an explicit value
-        // such as `--flag=false` / `--flag=0` instead of silently forcing the
-        // flag to true and discarding what the user typed.
-        (flags as Record<string, unknown>)[camelKey] =
-          value === undefined ||
-          !['false', '0', 'no', 'off'].includes(value.trim().toLowerCase());
+        // (`--flag=false`, `--flag=0`, ...) and reject an unrecognised one so a
+        // typo cannot silently enable the flag, mirroring numeric-flag handling.
+        if (value === undefined) {
+          (flags as Record<string, unknown>)[camelKey] = true;
+        } else {
+          const normalized = value.trim().toLowerCase();
+          if (BOOLEAN_TRUE_VALUES.has(normalized)) {
+            (flags as Record<string, unknown>)[camelKey] = true;
+          } else if (BOOLEAN_FALSE_VALUES.has(normalized)) {
+            (flags as Record<string, unknown>)[camelKey] = false;
+          } else {
+            throw new Error(
+              `Flag --${key} requires a boolean value (e.g. true/false), got "${value}".`,
+            );
+          }
+        }
         i++;
         continue;
       }

@@ -31,10 +31,25 @@ describe('parseFlags', () => {
     expect(parseFlags(['--verbose'], OPTIONS).verbose).toBe(true);
   });
 
-  it('honours an explicit value on a boolean flag instead of forcing true', () => {
+  it('honours explicit false-like values on a boolean flag', () => {
     // Regression: `--flag=false` / `--flag=0` were silently set to true.
-    expect(parseFlags(['--verbose=false'], OPTIONS).verbose).toBe(false);
-    expect(parseFlags(['--verbose=0'], OPTIONS).verbose).toBe(false);
-    expect(parseFlags(['--verbose=true'], OPTIONS).verbose).toBe(true);
+    for (const v of ['false', '0', 'no', 'off', ' OFF ', 'False']) {
+      expect(parseFlags([`--verbose=${v}`], OPTIONS).verbose).toBe(false);
+    }
+  });
+
+  it('honours explicit true-like values on a boolean flag', () => {
+    for (const v of ['true', '1', 'yes', 'on', 'TRUE']) {
+      expect(parseFlags([`--verbose=${v}`], OPTIONS).verbose).toBe(true);
+    }
+  });
+
+  it('rejects an unrecognised explicit boolean value', () => {
+    expect(() => parseFlags(['--verbose=maybe'], OPTIONS)).toThrow(
+      'Flag --verbose requires a boolean value',
+    );
+    expect(() => parseFlags(['--verbose='], OPTIONS)).toThrow(
+      'Flag --verbose requires a boolean value',
+    );
   });
 });
