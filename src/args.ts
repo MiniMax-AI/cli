@@ -114,7 +114,12 @@ export function parseFlags(argv: string[], options: OptionDef[]): GlobalFlags {
       const camelKey = kebabToCamel(key);
 
       if (schema.booleans.has(camelKey)) {
-        (flags as Record<string, unknown>)[camelKey] = true;
+        // A bare boolean flag (`--flag`) is true. Honour an explicit value
+        // such as `--flag=false` / `--flag=0` instead of silently forcing the
+        // flag to true and discarding what the user typed.
+        (flags as Record<string, unknown>)[camelKey] =
+          value === undefined ||
+          !['false', '0', 'no', 'off'].includes(value.trim().toLowerCase());
         i++;
         continue;
       }
