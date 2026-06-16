@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'bun:test';
-import { renderQuotaTable } from '../../src/output/quota-table';
+import {
+  renderQuotaTable,
+  isNotInPlan,
+  isUnweekly,
+} from '../../src/output/quota-table';
 import type { Config } from '../../src/config/schema';
 import type { QuotaModelRemain } from '../../src/types/api';
 
@@ -189,7 +193,11 @@ describe('renderQuotaTable', () => {
     expect(output).not.toContain('300%');
   });
 
-  it('renders "无限" for weekly when status=3 (CN region)', () => {
+  // Behavior change for #173: when status=3 but total_count=0, the API is
+  // signalling "not in your plan" (a 0/0 bucket), not "unlimited". The CLI
+  // must surface this so users do not see "100% remaining" for a model
+  // they cannot actually use.
+  it('renders "不在套餐中" for weekly when status=3 + total_count=0 (CN region)', () => {
     const lines: string[] = [];
     const originalLog = console.log;
 
@@ -216,13 +224,13 @@ describe('renderQuotaTable', () => {
     }
 
     const output = lines.join('\n');
-    expect(output).toContain('[██████████]');
     expect(output).toContain('周剩余');
-    expect(output).toContain('无限');
+    expect(output).toContain('不在套餐中');
+    expect(output).not.toContain('无限');
     expect(output).not.toContain('150%');
   });
 
-  it('renders "unlimited" for weekly when status=3 (global region)', () => {
+  it('renders "not in plan" for weekly when status=3 + total_count=0 (global region)', () => {
     const lines: string[] = [];
     const originalLog = console.log;
 
@@ -248,9 +256,117 @@ describe('renderQuotaTable', () => {
     }
 
     const output = lines.join('\n');
-    expect(output).toContain('[██████████]');
+    expect(output).toContain('Wk left');
+    expect(output).toContain('not in plan');
+    expect(output).not.toContain('unlimited');
+    expect(output).not.toContain('100%');
+  });
+
+  it('still renders "unlimited" when status=3 + total_count > 0 (genuine unlimited)', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [
+          {
+            ...createModel(),
+            current_weekly_total_count: 5000,
+            current_weekly_usage_count: 100,
+            current_weekly_remaining_percent: 98,
+            current_weekly_status: 3,
+          },
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
     expect(output).toContain('Wk left');
     expect(output).toContain('unlimited');
+    expect(output).not.toContain('not in plan');
+  });
+
+  it('renders "not in plan" for interval (current) row when status=3 + total_count=0', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [
+          {
+            ...createModel(),
+            model_name: 'video',
+            current_interval_total_count: 0,
+            current_interval_usage_count: 0,
+            current_interval_remaining_percent: 100,
+            current_interval_status: 3,
+            current_weekly_total_count: 0,
+            current_weekly_usage_count: 0,
+            current_weekly_remaining_percent: 100,
+            current_weekly_status: 3,
+          },
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+    expect(output).toContain('Left');
+    expect(output).toContain('not in plan');
+    // The bug: previously this rendered "100%" via current_interval_remaining_percent.
     expect(output).not.toContain('100%');
+  });
+});
+
+describe('isNotInPlan', () => {
+  it('returns true when total_count is 0 and status is 3', () => {
+    expect(isNotInPlan(0, 3)).toBe(true);
+  });
+
+  it('returns false when total_count is positive (real unlimited)', () => {
+    expect(isNotInPlan(100, 3)).toBe(false);
+  });
+
+  it('returns false when status is not 3 (plain zero quota)', () => {
+    expect(isNotInPlan(0, 1)).toBe(false);
+    expect(isNotInPlan(0, 2)).toBe(false);
+  });
+
+  it('returns false when status is undefined or null', () => {
+    expect(isNotInPlan(0, undefined)).toBe(false);
+    expect(isNotInPlan(0, null)).toBe(false);
+  });
+});
+
+describe('isUnweekly', () => {
+  it('returns true only when status is 3 and total_count is positive', () => {
+    expect(isUnweekly(3, 100)).toBe(true);
+  });
+
+  it('returns false when total_count is 0 (would be not-in-plan)', () => {
+    expect(isUnweekly(3, 0)).toBe(false);
+  });
+
+  it('returns false when status is not 3', () => {
+    expect(isUnweekly(1, 100)).toBe(false);
+    expect(isUnweekly(2, 100)).toBe(false);
+  });
+
+  it('returns false when status is undefined or null', () => {
+    expect(isUnweekly(undefined, 100)).toBe(false);
+    expect(isUnweekly(null, 100)).toBe(false);
   });
 });
