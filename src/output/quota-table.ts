@@ -78,10 +78,29 @@ const COMPACT_BAR_WIDTH = 10;
 // at 200% to leave headroom and keep the bar/text readable.
 const MAX_DISPLAY_PCT = 200;
 
-// Weekly quota is unlimited when the server reports `current_weekly_status: 3`
-// (per the status enum: 1=normal, 2=exhausted, 3=unlimited).
-function isUnweekly(status: number | undefined | null): boolean {
-  return status === 3;
+// Server-side status enum: 1=normal (limited), 2=exhausted, 3=unlimited.
+//
+// Caveat: when `total_count === 0 && status === 3` the model is not in the
+// user's plan at all (the API conflates "no bucket" with "unlimited").
+// Callers must check `isNotInPlan` first; only treat status=3 as truly
+// unlimited when there is a real allowance bucket (total > 0).
+export function isUnweekly(
+  status: number | undefined | null,
+  totalCount: number,
+): boolean {
+  return status === 3 && totalCount > 0;
+}
+
+// Detect models whose status=3 actually means "not in your plan" rather
+// than unlimited. The signal is `total_count === 0 && status === 3`:
+// the server has no allowance bucket (count is zero) but still reports
+// status 3, which would otherwise render as "100% unlimited" — the very
+// inconsistency reported in #173.
+export function isNotInPlan(
+  totalCount: number,
+  status: number | undefined | null,
+): boolean {
+  return totalCount === 0 && status === 3;
 }
 
 function clampPct(value: number): number {
@@ -124,6 +143,8 @@ function renderBar(remainingPct: number, color: boolean, barWidth: number = BAR_
 const UNLIMITED_SYMBOL = '∞';
 const UNLIMITED_LABEL_CN = '无限';
 const UNLIMITED_LABEL_EN = 'unlimited';
+const NOT_IN_PLAN_LABEL_CN = '不在套餐中';
+const NOT_IN_PLAN_LABEL_EN = 'not in plan';
 
 function renderMetric(
   label: string,
@@ -134,7 +155,18 @@ function renderMetric(
   boostPermille?: number | null,
   unlimited?: boolean,
   unlimitedLabel?: string,
+  notInPlan?: boolean,
+  notInPlanLabel?: string,
 ): string {
+  if (notInPlan) {
+    const nip = notInPlanLabel ?? NOT_IN_PLAN_LABEL_EN;
+    if (color) {
+      const bar = `${BG_EMPTY}${' '.repeat(COMPACT_BAR_WIDTH)}${R}`;
+      return `${D}${label}${R} ${bar} ${D}${nip}${R}`;
+    }
+    const bar = `[${'.'.repeat(COMPACT_BAR_WIDTH)}]`;
+    return `${label} ${bar} ${nip}`;
+  }
   if (unlimited) {
     const ul = unlimitedLabel ?? UNLIMITED_SYMBOL;
     const ulStr = ul.padStart(4);
@@ -169,12 +201,20 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
 
   const rows = models.map((m) => {
     const displayName = displayModelName(m.model_name, config.region);
+    const notInPlanLabel = config.region === 'cn' ? NOT_IN_PLAN_LABEL_CN : NOT_IN_PLAN_LABEL_EN;
+    const intervalNotInPlan = isNotInPlan(m.current_interval_total_count, m.current_interval_status);
+    const weeklyNotInPlan = isNotInPlan(m.current_weekly_total_count, m.current_weekly_status);
     const current = renderMetric(
       L.current,
       m.current_interval_usage_count,
       m.current_interval_total_count,
       m.current_interval_remaining_percent,
       useColor,
+      undefined,
+      false,
+      undefined,
+      intervalNotInPlan,
+      notInPlanLabel,
     );
     const weekly = renderMetric(
       L.weekly,
@@ -183,8 +223,10 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
       m.current_weekly_remaining_percent,
       useColor,
       m.weekly_boost_permille,
-      isUnweekly(m.current_weekly_status),
+      isUnweekly(m.current_weekly_status, m.current_weekly_total_count),
       config.region === 'cn' ? UNLIMITED_LABEL_CN : UNLIMITED_LABEL_EN,
+      weeklyNotInPlan,
+      notInPlanLabel,
     );
     const reset = `${L.resetsIn} ${formatDuration(m.remains_time, L.now)}`;
     return { displayName, current, weekly, reset };
