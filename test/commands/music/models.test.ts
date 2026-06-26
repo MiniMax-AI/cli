@@ -22,6 +22,11 @@ describe('music models', () => {
     expect(musicCoverModel(config)).toBe('music-cover');
   });
 
+  it('musicCoverModel accepts music-cover-free as default', () => {
+    const config = { defaultMusicModel: 'music-cover-free' } as Config;
+    expect(musicCoverModel(config)).toBe('music-cover-free');
+  });
+
   it('musicCoverModel defaults to music-cover', () => {
     expect(musicCoverModel({} as Config)).toBe('music-cover');
   });
