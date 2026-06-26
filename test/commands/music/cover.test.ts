@@ -147,6 +147,31 @@ describe('music cover command', () => {
     ).rejects.toThrow('Invalid model');
   });
 
+  it('accepts music-cover-free model in dry-run', async () => {
+    let captured = '';
+    const origLog = console.log;
+    console.log = (msg: string) => { captured += msg; };
+
+    try {
+      await coverCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' as const },
+        {
+          ...baseFlags,
+          dryRun: true,
+          prompt: 'Folk cover',
+          audio: 'https://example.com/ref.mp3',
+          model: 'music-cover-free',
+        },
+      );
+    } catch {
+      // dry-run may resolve or reject
+    }
+
+    console.log = origLog;
+    const parsed = JSON.parse(captured);
+    expect(parsed.request.model).toBe('music-cover-free');
+  });
+
   it('rejects invalid audio format', async () => {
     await expect(
       coverCommand.execute(

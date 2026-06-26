@@ -64,6 +64,21 @@ export function handleError(err: unknown): never {
       msg.includes("eai_AGAIN");
 
     if (isNetworkError) {
+      // Network-level timeouts (ETIMEDOUT) should use TIMEOUT exit code, not NETWORK
+      if (msg.includes("etimedout") || (msg.includes("timeout") && !msg.includes("timed out"))) {
+        const timeout = new CLIError(
+          "Connection timed out.",
+          ExitCode.TIMEOUT,
+          "Try increasing --timeout (e.g. --timeout 120).\n" +
+            "If this happens on every request with a valid API key, you may be hitting the wrong region.\n" +
+            "Run: mmx auth status   — to check your credentials and region.\n" +
+            "Run: mmx config set region global   (or cn) — to override the region.",
+        );
+        return handleError(timeout);
+      }
+
+      const causeCode = (err as any).cause?.code;
+      const detail = causeCode ? ` (${causeCode})` : "";
       let hint =
         "Check your network connection.\n" +
         "To use a proxy: set HTTPS_PROXY env var, or run: mmx config set --key proxy --value http://HOST:PORT";
@@ -73,7 +88,7 @@ export function handleError(err: unknown): never {
           "Check: HTTPS_PROXY / HTTP_PROXY env vars, or mmx config show for configured proxy.";
       }
       const networkErr = new CLIError(
-        "Network request failed.",
+        `Network request failed${detail}.`,
         ExitCode.NETWORK,
         hint,
       );

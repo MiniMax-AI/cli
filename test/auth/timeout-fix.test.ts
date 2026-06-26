@@ -231,4 +231,63 @@ describe('handleError: timeout message includes region/auth hint', () => {
     expect(err.hint).toContain('mmx auth status');
     expect(err.hint).toContain('mmx config set region');
   });
+
+  it('network-level ETIMEDOUT error routes to TIMEOUT exit code', async () => {
+    const { handleError } = await import('../../src/errors/handler');
+
+    const etimedoutErr = new Error('connect ETIMEDOUT 1.2.3.4:443');
+
+    let captured = '';
+    let exitCode = -1;
+    const origWrite = process.stderr.write.bind(process.stderr);
+    const origExit = process.exit;
+    (process.stderr as NodeJS.WriteStream).write = (chunk: unknown) => {
+      captured += String(chunk);
+      return true;
+    };
+    (process as unknown as Record<string, unknown>).exit = (code?: number) => {
+      exitCode = code ?? 0;
+      throw new Error('exit');
+    };
+
+    try {
+      handleError(etimedoutErr);
+    } catch {
+      // mocked process.exit throws — expected
+    } finally {
+      (process.stderr as NodeJS.WriteStream).write = origWrite;
+      (process as unknown as Record<string, unknown>).exit = origExit;
+    }
+
+    expect(captured).toContain('timed out');
+    expect(exitCode).toBe(ExitCode.TIMEOUT);
+  });
+
+  it('generic network error includes cause code when available', async () => {
+    const { handleError } = await import('../../src/errors/handler');
+
+    const networkErr = new Error('failed to fetch');
+    (networkErr as any).cause = { code: 'ENOTFOUND' };
+
+    let captured = '';
+    const origWrite = process.stderr.write.bind(process.stderr);
+    const origExit = process.exit;
+    (process.stderr as NodeJS.WriteStream).write = (chunk: unknown) => {
+      captured += String(chunk);
+      return true;
+    };
+    (process as unknown as Record<string, unknown>).exit = () => { throw new Error('exit'); };
+
+    try {
+      handleError(networkErr);
+    } catch {
+      // mocked process.exit throws — expected
+    } finally {
+      (process.stderr as NodeJS.WriteStream).write = origWrite;
+      (process as unknown as Record<string, unknown>).exit = origExit;
+    }
+
+    expect(captured).toContain('Network request failed');
+    expect(captured).toContain('ENOTFOUND');
+  });
 });

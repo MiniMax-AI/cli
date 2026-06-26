@@ -19,7 +19,7 @@ export default defineCommand({
   apiDocs: '/docs/api-reference/music-generation',
   usage: 'mmx music cover --prompt <text> (--audio <url> | --audio-file <path>) [--lyrics <text>] [--out <path>] [flags]',
   options: [
-    { flag: '--model <model>', description: 'Model: music-cover (default).' },
+    { flag: '--model <model>', description: 'Model: music-cover (default, paid), music-cover-free (free tier).' },
     { flag: '--prompt <text>', description: 'Target cover style, e.g. "Indie folk, acoustic guitar, warm male vocal"' },
     { flag: '--audio <url>', description: 'URL of the reference audio (mp3, wav, flac, etc. — 6s to 6min, max 50MB)' },
     { flag: '--audio-file <path>', description: 'Local reference audio file (auto base64-encoded)' },
@@ -72,7 +72,7 @@ export default defineCommand({
     const format = detectOutputFormat(config.output);
 
     const model = (flags.model as string) || musicCoverModel(config);
-    const VALID_MODELS = ['music-cover'];
+    const VALID_MODELS = ['music-cover', 'music-cover-free'];
     if (flags.model && !VALID_MODELS.includes(model)) {
       throw new CLIError(
         `Invalid model "${model}". Valid models: ${VALID_MODELS.join(', ')}`,
