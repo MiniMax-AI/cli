@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { default as generateCommand } from '../../../src/commands/music/generate';
+import { createMockServer, jsonResponse, type MockServer } from '../../helpers/mock-server';
 
 const baseConfig = {
   apiKey: 'test-key',
@@ -28,6 +32,13 @@ const baseFlags = {
 };
 
 describe('music generate command', () => {
+  let server: MockServer | undefined;
+
+  afterEach(() => {
+    server?.close();
+    server = undefined;
+  });
+
   it('has correct name', () => {
     expect(generateCommand.name).toBe('music generate');
   });
@@ -87,6 +98,7 @@ describe('music generate command', () => {
     expect(optionFlags.some((f) => f.startsWith('--extra'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--instrumental'))).toBe(true);
     expect(optionFlags.some((f) => f.startsWith('--aigc-watermark'))).toBe(true);
+    expect(optionFlags.some((f) => f.startsWith('--lyrics-out'))).toBe(true);
   });
 
   it('examples include vocal, instrumental, and lyrics-optimizer usage', () => {
@@ -208,4 +220,125 @@ describe('music generate command', () => {
       }
     },
   );
+
+  it('saves provided lyrics to the current directory by default', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/music_generation': () => jsonResponse({
+          base_resp: { status_code: 0, status_msg: 'ok' },
+          data: {
+            audio: Buffer.from('test music').toString('hex'),
+            status: 0,
+          },
+        }),
+      },
+    });
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'mmx-music-generate-'));
+    const previousCwd = process.cwd();
+    const audioPath = join(tempDir, 'song.mp3');
+    const expectedLyricsPath = join(tempDir, 'song.lyrics.txt');
+
+    try {
+      process.chdir(tempDir);
+      await generateCommand.execute(
+        { ...baseConfig, baseUrl: server.url, quiet: true },
+        { ...baseFlags, quiet: true, prompt: 'Folk', lyrics: '[verse] hello world', out: audioPath },
+      );
+      expect(existsSync(expectedLyricsPath)).toBe(true);
+      expect(readFileSync(expectedLyricsPath, 'utf-8')).toBe('[verse] hello world');
+    } finally {
+      process.chdir(previousCwd);
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses lyrics_generation output for --lyrics-optimizer and saves to the requested path', async () => {
+    const expectedLyrics = '[verse] generated lyrics';
+    let musicRequestBody: Record<string, unknown> | undefined;
+
+    server = createMockServer({
+      routes: {
+        async '/v1/lyrics_generation'(req) {
+          const body = await req.json() as Record<string, unknown>;
+          expect(body.mode).toBe('write_full_song');
+          expect(body.prompt).toBe('Upbeat pop about summer');
+          return jsonResponse({
+            base_resp: { status_code: 0, status_msg: 'ok' },
+            lyrics: expectedLyrics,
+            song_title: 'Summer Song',
+          });
+        },
+        async '/v1/music_generation'(req) {
+          musicRequestBody = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            base_resp: { status_code: 0, status_msg: 'ok' },
+            data: {
+              audio: Buffer.from('test music').toString('hex'),
+              status: 0,
+            },
+          });
+        },
+      },
+    });
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'mmx-music-lyrics-optimizer-'));
+    const audioPath = join(tempDir, 'song.mp3');
+    const lyricsPath = join(tempDir, 'lyrics.txt');
+
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, baseUrl: server.url, quiet: true },
+        {
+          ...baseFlags,
+          quiet: true,
+          prompt: 'Upbeat pop about summer',
+          lyricsOptimizer: true,
+          out: audioPath,
+          lyricsOut: lyricsPath,
+        },
+      );
+      expect(musicRequestBody?.lyrics).toBe(expectedLyrics);
+      expect(musicRequestBody?.lyrics_optimizer).toBeUndefined();
+      expect(existsSync(lyricsPath)).toBe(true);
+      expect(readFileSync(lyricsPath, 'utf-8')).toBe(expectedLyrics);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('still saves lyrics when audio is requested as url output', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/music_generation': () => jsonResponse({
+          base_resp: { status_code: 0, status_msg: 'ok' },
+          data: {
+            audio_url: 'https://example.com/song.mp3',
+            status: 0,
+          },
+        }),
+      },
+    });
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'mmx-music-url-output-'));
+    const lyricsPath = join(tempDir, 'lyrics.txt');
+
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, baseUrl: server.url, quiet: true },
+        {
+          ...baseFlags,
+          quiet: true,
+          prompt: 'Folk',
+          lyrics: '[verse] hello world',
+          outputFormat: 'url',
+          lyricsOut: lyricsPath,
+        },
+      );
+      expect(existsSync(lyricsPath)).toBe(true);
+      expect(readFileSync(lyricsPath, 'utf-8')).toBe('[verse] hello world');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });
