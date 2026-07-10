@@ -26,6 +26,8 @@ export async function resolveCredential(config: Config): Promise<ResolvedCredent
   throw new CLIError(
     'No credentials found.',
     ExitCode.AUTH,
-    'Log in:        mmx auth login\nPass directly:  --api-key sk-xxxxx',
+    'Log in:          mmx auth login\n' +
+      'Pass per-call:   --api-key sk-xxxxx\n' +
+      'Or set env var:  MMX_CONFIG_DIR=/path/to/.mmx',
   );
 }
