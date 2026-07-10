@@ -202,6 +202,105 @@ describe('speech synthesize command', () => {
       console.log = originalLog;
     }
   });
+
+  it('--pronunciation serializes multiple values with the API-compatible shape', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await synthesizeCommand.execute(config, {
+        text: '处理这个危险的情况。',
+        pronunciation: [
+          '处理/(chu3)(li3)',
+          '危险/dangerous',
+        ],
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+
+      // pronunciation_dict is an object with a tone string array — not the
+      // old array-of-{text,tone} shape — and each value is preserved verbatim
+      // (no splitting, trimming, or rewriting), covering both the pinyin form
+      // and the plain-replacement form shown in the official API docs.
+      expect(Array.isArray(parsed.request.pronunciation_dict)).toBe(false);
+      expect(parsed.request.pronunciation_dict).toEqual({
+        tone: [
+          '处理/(chu3)(li3)',
+          '危险/dangerous',
+        ],
+      });
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('--pronunciation with a single value serializes under tone', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await synthesizeCommand.execute(config, {
+        text: 'Omg, the real danger is not that computers start thinking.',
+        pronunciation: ['Omg/Oh my god'],
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+
+      expect(parsed.request.pronunciation_dict).toEqual({
+        tone: ['Omg/Oh my god'],
+      });
+    } finally {
+      console.log = originalLog;
+    }
+  });
 });
 
 describe('speech synthesize format validation', () => {

@@ -105,7 +105,7 @@ export interface SpeechRequest {
     channel?: number;
   };
   language_boost?: string;
-  pronunciation_dict?: Array<{ tone: string; text: string }>;
+  pronunciation_dict?: { tone: string[] };
   output_format?: 'url' | 'hex';
   stream?: boolean;
   subtitle_enable?: boolean;  // Correct API parameter name (not 'subtitle')
