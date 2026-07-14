@@ -212,6 +212,7 @@ export interface MusicRequest {
   lyrics_optimizer?: boolean;
   audio_url?: string;
   audio_base64?: string;
+  cover_feature_id?: string;
   seed?: number;
   audio_setting?: {
     format?: string;
@@ -237,6 +238,21 @@ export interface MusicResponse {
     audio_size?: number;
     bitrate?: number;
   };
+}
+
+export interface CoverPreprocessRequest {
+  model: 'music-cover';
+  audio_url?: string;
+  audio_base64?: string;
+}
+
+export interface CoverPreprocessResponse {
+  cover_feature_id: string;
+  formatted_lyrics?: string;
+  structure_result?: string;
+  audio_duration?: number;
+  trace_id?: string;
+  base_resp: BaseResp;
 }
 
 // ---- Quota ----

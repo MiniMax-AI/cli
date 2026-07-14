@@ -105,7 +105,11 @@ describe('music cover command', () => {
 
     console.log = origLog;
     const parsed = JSON.parse(captured);
+    expect(parsed.preprocess_request.model).toBe('music-cover');
+    expect(parsed.preprocess_request.audio_url).toBe('https://example.com/ref.mp3');
     expect(parsed.request.lyrics).toBe('New lyrics here');
+    expect(parsed.request.cover_feature_id).toBe('__cover_feature_id_from_preprocess__');
+    expect(parsed.request.audio_url).toBeUndefined();
   });
 
   it('accepts optional --seed', async () => {

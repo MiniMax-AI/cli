@@ -3,14 +3,14 @@ import { defineCommand } from '../../command';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { request, requestJson } from '../../client/http';
-import { musicEndpoint } from '../../client/endpoints';
+import { musicCoverPreprocessEndpoint, musicEndpoint } from '../../client/endpoints';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
 import { MUSIC_FORMATS, formatList, validateAudioFormat } from '../../utils/audio-formats';
 import { pipeAudioStream } from '../../utils/audio-stream';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { MusicRequest, MusicResponse } from '../../types/api';
+import type { CoverPreprocessRequest, CoverPreprocessResponse, MusicRequest, MusicResponse } from '../../types/api';
 import { musicCoverModel } from './models';
 
 export default defineCommand({
@@ -23,8 +23,8 @@ export default defineCommand({
     { flag: '--prompt <text>', description: 'Target cover style, e.g. "Indie folk, acoustic guitar, warm male vocal"' },
     { flag: '--audio <url>', description: 'URL of the reference audio (mp3, wav, flac, etc. — 6s to 6min, max 50MB)' },
     { flag: '--audio-file <path>', description: 'Local reference audio file (auto base64-encoded)' },
-    { flag: '--lyrics <text>', description: 'Cover lyrics. If omitted, extracted from reference audio via ASR.' },
-    { flag: '--lyrics-file <path>', description: 'Read lyrics from file (use - for stdin)' },
+    { flag: '--lyrics <text>', description: 'Cover lyrics. If provided, CLI auto-runs cover preprocess first. If omitted, lyrics are extracted from reference audio via ASR.' },
+    { flag: '--lyrics-file <path>', description: 'Read lyrics from file (use - for stdin). Triggers cover preprocess automatically.' },
     { flag: '--seed <number>', description: 'Random seed 0–1000000 for reproducible results', type: 'number' },
     { flag: '--format <fmt>', description: `Audio format: ${formatList(MUSIC_FORMATS)} (default: mp3)` },
     { flag: '--sample-rate <hz>', description: 'Sample rate: 16000, 24000, 32000, 44100 (default: 44100)', type: 'number' },
@@ -80,6 +80,10 @@ export default defineCommand({
         'mmx music cover --model music-cover',
       );
     }
+    const audioSource: Pick<MusicRequest, 'audio_url' | 'audio_base64'> = audioUrl
+      ? { audio_url: audioUrl }
+      : { audio_base64: readFileSync(audioFile!).toString('base64') };
+
     const body: MusicRequest = {
       model,
       prompt,
@@ -93,20 +97,40 @@ export default defineCommand({
       },
       output_format: 'hex',
       stream: flags.stream === true,
+      ...audioSource,
     };
 
-    if (audioUrl) {
-      body.audio_url = audioUrl;
-    } else {
-      body.audio_base64 = readFileSync(audioFile!).toString('base64');
+    const needsPreprocess = Boolean(lyrics?.trim());
+    const preprocessBody: CoverPreprocessRequest | undefined = needsPreprocess
+      ? {
+          model: 'music-cover',
+          ...audioSource,
+        }
+      : undefined;
+
+    if (needsPreprocess) {
+      delete body.audio_url;
+      delete body.audio_base64;
+      body.cover_feature_id = '__cover_feature_id_from_preprocess__';
     }
 
     if (config.dryRun) {
-      console.log(formatOutput({ request: body }, format));
+      console.log(formatOutput(needsPreprocess ? { preprocess_request: preprocessBody, request: body } : { request: body }, format));
       return;
     }
 
     const url = musicEndpoint(config.baseUrl);
+
+    if (needsPreprocess) {
+      const preprocessUrl = musicCoverPreprocessEndpoint(config.baseUrl);
+      const preprocessResponse = await requestJson<CoverPreprocessResponse>(config, {
+        url: preprocessUrl,
+        method: 'POST',
+        body: preprocessBody,
+      });
+
+      body.cover_feature_id = preprocessResponse.cover_feature_id;
+    }
 
     if (flags.stream) {
       const res = await request(config, { url, method: 'POST', body, stream: true });
