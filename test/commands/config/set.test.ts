@@ -1,11 +1,5 @@
-import { describe, it, expect, mock } from 'bun:test';
+import { describe, it, expect } from 'bun:test';
 import { default as setCommand } from '../../../src/commands/config/set';
-
-// Mock file I/O
-mock.module('../../../src/config/loader', () => ({
-  readConfigFile: () => ({}),
-  writeConfigFile: mock(() => Promise.resolve()),
-}));
 
 describe('config set command', () => {
   it('has correct name', () => {

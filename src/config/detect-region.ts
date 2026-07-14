@@ -1,7 +1,11 @@
 import { REGIONS, type Region } from "./schema";
 import { readConfigFile, writeConfigFile } from "./loader";
+import { CLIError } from "../errors/base";
+import { ExitCode } from "../errors/codes";
 
 const QUOTA_PATH = "/v1/token_plan/remains";
+
+type ProbeResult = "authorized" | "unauthorized" | "unreachable" | "inconclusive";
 
 function quotaUrl(region: Region): string {
   return REGIONS[region] + QUOTA_PATH;
@@ -11,7 +15,7 @@ async function probeRegion(
   region: Region,
   apiKey: string,
   timeoutMs: number,
-): Promise<boolean> {
+): Promise<ProbeResult> {
   // MiniMax endpoints accept either Bearer or x-api-key auth — try both.
   // Some API key types only work with one style; trying both prevents false
   // negatives that would cause the wrong region to be selected, leading to
@@ -21,22 +25,41 @@ async function probeRegion(
     { "x-api-key": apiKey },
   ];
 
+  let sawNetworkFailure = false;
+  let sawInconclusiveResponse = false;
+
   for (const authHeader of authHeaders) {
+    let res: Response;
     try {
-      const res = await fetch(quotaUrl(region), {
+      res = await fetch(quotaUrl(region), {
         headers: { ...authHeader, "Content-Type": "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
       });
-      if (!res.ok) continue;
+    } catch {
+      sawNetworkFailure = true;
+      continue;
+    }
+
+    if (res.status === 401 || res.status === 403) continue;
+    if (!res.ok) {
+      sawInconclusiveResponse = true;
+      continue;
+    }
+
+    try {
       const data = (await res.json()) as {
         base_resp?: { status_code?: number };
       };
-      if (data.base_resp?.status_code === 0) return true;
+      if (data.base_resp?.status_code === 0) return "authorized";
+      sawInconclusiveResponse = true;
     } catch {
-      // Try next auth style before giving up on this region
+      sawInconclusiveResponse = true;
     }
   }
-  return false;
+
+  if (sawInconclusiveResponse) return "inconclusive";
+  if (sawNetworkFailure) return "unreachable";
+  return "unauthorized";
 }
 
 export async function detectRegion(apiKey: string): Promise<Region> {
@@ -45,19 +68,34 @@ export async function detectRegion(apiKey: string): Promise<Region> {
   const results = await Promise.all(
     regions.map(async (r) => ({
       region: r,
-      ok: await probeRegion(r, apiKey, 5000),
+      result: await probeRegion(r, apiKey, 5000),
     })),
   );
-  const match = results.find((r) => r.ok);
+  const match = results.find((r) => r.result === "authorized");
   if (!match) {
     process.stderr.write(" failed\n");
-    process.stderr.write(
-      `Warning: API key failed validation against all regions (global, cn).\n` +
-      `  This usually means the API key is invalid or the network is blocking requests.\n` +
-      `  Falling back to 'global'. Subsequent requests may fail.\n` +
-      `  Run 'mmx auth status' to verify your credentials.\n`,
+
+    if (results.every((r) => r.result === "unauthorized")) {
+      throw new CLIError(
+        "API key was rejected by all regions.",
+        ExitCode.AUTH,
+        "No credentials were changed. Check that the key is valid and belongs to a Token Plan.",
+      );
+    }
+
+    if (results.some((r) => r.result === "unreachable")) {
+      throw new CLIError(
+        "Could not reach the regional API endpoints.",
+        ExitCode.NETWORK,
+        "No region was changed. Check the network or proxy, then retry or pass --region global|cn explicitly.",
+      );
+    }
+
+    throw new CLIError(
+      "Could not determine the API key region.",
+      ExitCode.GENERAL,
+      "No region was changed because the API returned an inconclusive response. Retry later or pass --region global|cn explicitly.",
     );
-    return "global";
   }
   const detected: Region = match.region;
   process.stderr.write(` ${detected}\n`);
