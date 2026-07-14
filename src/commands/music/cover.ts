@@ -11,15 +11,15 @@ import { pipeAudioStream } from '../../utils/audio-stream';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { CoverPreprocessRequest, CoverPreprocessResponse, MusicRequest, MusicResponse } from '../../types/api';
-import { musicCoverModel } from './models';
+import { MUSIC_COVER_MODELS, musicCoverModel } from './models';
 
 export default defineCommand({
   name: 'music cover',
-  description: 'Generate a cover version of a song based on reference audio (music-cover)',
+  description: 'Generate a cover version of a song based on reference audio',
   apiDocs: '/docs/api-reference/music-generation',
   usage: 'mmx music cover --prompt <text> (--audio <url> | --audio-file <path>) [--lyrics <text>] [--out <path>] [flags]',
   options: [
-    { flag: '--model <model>', description: 'Model: music-cover (default).' },
+    { flag: '--model <model>', description: 'Model: music-cover (default) or music-cover-free.' },
     { flag: '--prompt <text>', description: 'Target cover style, e.g. "Indie folk, acoustic guitar, warm male vocal"' },
     { flag: '--audio <url>', description: 'URL of the reference audio (mp3, wav, flac, etc. — 6s to 6min, max 50MB)' },
     { flag: '--audio-file <path>', description: 'Local reference audio file (auto base64-encoded)' },
@@ -37,6 +37,7 @@ export default defineCommand({
     'mmx music cover --prompt "Indie folk, acoustic guitar, warm male vocal" --audio https://example.com/song.mp3 --out cover.mp3',
     'mmx music cover --prompt "Jazz, piano, slow" --audio-file original.mp3 --lyrics-file lyrics.txt --out jazz_cover.mp3',
     'mmx music cover --prompt "Pop, upbeat" --audio https://example.com/ref.mp3 --seed 42 --out reproducible.mp3',
+    'mmx music cover --model music-cover-free --prompt "Jazz, piano, slow" --audio https://example.com/ref.mp3 --out free_cover.mp3',
   ],
   async run(config: Config, flags: GlobalFlags) {
     const prompt = flags.prompt as string | undefined;
@@ -72,10 +73,9 @@ export default defineCommand({
     const format = detectOutputFormat(config.output);
 
     const model = (flags.model as string) || musicCoverModel(config);
-    const VALID_MODELS = ['music-cover'];
-    if (flags.model && !VALID_MODELS.includes(model)) {
+    if (flags.model && !MUSIC_COVER_MODELS.includes(model as typeof MUSIC_COVER_MODELS[number])) {
       throw new CLIError(
-        `Invalid model "${model}". Valid models: ${VALID_MODELS.join(', ')}`,
+        `Invalid model "${model}". Valid models: ${MUSIC_COVER_MODELS.join(', ')}`,
         ExitCode.USAGE,
         'mmx music cover --model music-cover',
       );

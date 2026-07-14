@@ -4,12 +4,9 @@ interface SseAudioPayload {
   data?: { audio?: string; status?: number };
 }
 
-export async function pipeAudioStream(response: Response): Promise<void> {
-  process.stdout.on('error', (err: NodeJS.ErrnoException) => {
-    if (err.code === 'EPIPE') process.exit(0);
-    throw err;
-  });
-
+export async function* decodeAudioStream(
+  response: Response,
+): AsyncGenerator<Uint8Array<ArrayBuffer>> {
   for await (const event of parseSSE(response)) {
     if (!event.data || event.data === '[DONE]') break;
 
@@ -21,7 +18,17 @@ export async function pipeAudioStream(response: Response): Promise<void> {
     const hex = parsed.data?.audio;
     if (!hex) continue;
 
-    const chunk = Buffer.from(hex, 'hex');
+    yield Uint8Array.from(Buffer.from(hex, 'hex'));
+  }
+}
+
+export async function pipeAudioStream(response: Response): Promise<void> {
+  process.stdout.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EPIPE') process.exit(0);
+    throw err;
+  });
+
+  for await (const chunk of decodeAudioStream(response)) {
     if (!process.stdout.write(chunk)) {
       await new Promise<void>(r => process.stdout.once('drain', r));
     }
