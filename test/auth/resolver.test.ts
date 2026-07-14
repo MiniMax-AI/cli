@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { resolveCredential } from '../../src/auth/resolver';
+import { ensureAuth } from '../../src/auth/setup';
+import { CLIError } from '../../src/errors/base';
 import type { Config } from '../../src/config/schema';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -24,18 +26,23 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
 
 describe('resolveCredential', () => {
   const testDir = join(tmpdir(), `mmx-resolver-test-${Date.now()}`);
-  const originalConfigDir = process.env.MMX_CONFIG_DIR;
+  let originalConfigDir: string | undefined;
+  let originalApiKey: string | undefined;
 
   beforeEach(() => {
+    originalConfigDir = process.env.MMX_CONFIG_DIR;
+    originalApiKey = process.env.MINIMAX_API_KEY;
     const configDir = join(testDir, '.mmx');
     mkdirSync(configDir, { recursive: true });
     process.env.MMX_CONFIG_DIR = configDir;
+    delete process.env.MINIMAX_API_KEY;
   });
 
   afterEach(() => {
-    if (originalConfigDir) process.env.MMX_CONFIG_DIR = originalConfigDir;
+    if (originalConfigDir !== undefined) process.env.MMX_CONFIG_DIR = originalConfigDir;
     else delete process.env.MMX_CONFIG_DIR;
-    delete process.env.MINIMAX_API_KEY;
+    if (originalApiKey !== undefined) process.env.MINIMAX_API_KEY = originalApiKey;
+    else delete process.env.MINIMAX_API_KEY;
     rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -59,9 +66,61 @@ describe('resolveCredential', () => {
     await expect(resolveCredential(config)).rejects.toThrow('No credentials found');
   });
 
+  it('no-credentials hint mentions MMX_CONFIG_DIR and working remediation options', async () => {
+    const config = makeConfig();
+    try {
+      await resolveCredential(config);
+      throw new Error('expected resolveCredential to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(CLIError);
+      const hint = (err as CLIError).hint ?? '';
+      expect(hint).toContain('mmx auth login');
+      expect(hint).toContain('--api-key');
+      expect(hint).toContain('MMX_CONFIG_DIR');
+      expect(hint).toContain(join(testDir, '.mmx', 'config.json'));
+    }
+  });
+
   it('prefers flag over file api key', async () => {
     const config = makeConfig({ apiKey: 'sk-flag', fileApiKey: 'sk-file' });
     const cred = await resolveCredential(config);
     expect(cred.token).toBe('sk-flag');
+  });
+});
+
+describe('ensureAuth (non-interactive, no credentials)', () => {
+  const testDir = join(tmpdir(), `mmx-setup-test-${Date.now()}`);
+  let originalConfigDir: string | undefined;
+  let originalApiKey: string | undefined;
+
+  beforeEach(() => {
+    originalConfigDir = process.env.MMX_CONFIG_DIR;
+    originalApiKey = process.env.MINIMAX_API_KEY;
+    mkdirSync(join(testDir, '.mmx'), { recursive: true });
+    process.env.MMX_CONFIG_DIR = join(testDir, '.mmx');
+    delete process.env.MINIMAX_API_KEY;
+  });
+
+  afterEach(() => {
+    if (originalConfigDir !== undefined) process.env.MMX_CONFIG_DIR = originalConfigDir;
+    else delete process.env.MMX_CONFIG_DIR;
+    if (originalApiKey !== undefined) process.env.MINIMAX_API_KEY = originalApiKey;
+    else delete process.env.MINIMAX_API_KEY;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it('no-credentials hint mentions MMX_CONFIG_DIR and working remediation options', async () => {
+    const config = makeConfig({ nonInteractive: true });
+    try {
+      await ensureAuth(config);
+      throw new Error('expected ensureAuth to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(CLIError);
+      const hint = (err as CLIError).hint ?? '';
+      expect(hint).toContain('mmx auth login');
+      expect(hint).toContain('--api-key');
+      expect(hint).toContain('MMX_CONFIG_DIR');
+      expect(hint).toContain(join(testDir, '.mmx', 'config.json'));
+    }
   });
 });

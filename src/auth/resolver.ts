@@ -4,6 +4,7 @@ import { loadCredentials } from './credentials';
 import { ensureFreshToken } from './refresh';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { buildNoCredentialsHint } from './hints';
 
 export async function resolveCredential(config: Config): Promise<ResolvedCredential> {
   // 1. --api-key flag
@@ -26,6 +27,6 @@ export async function resolveCredential(config: Config): Promise<ResolvedCredent
   throw new CLIError(
     'No credentials found.',
     ExitCode.AUTH,
-    'Log in:        mmx auth login\nPass directly:  --api-key sk-xxxxx',
+    buildNoCredentialsHint(config.configPath),
   );
 }
