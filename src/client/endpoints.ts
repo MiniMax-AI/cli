@@ -43,7 +43,7 @@ export function quotaEndpoint(baseUrl: string): string {
 }
 
 export function fileUploadEndpoint(baseUrl: string): string {
-  return `${baseUrl}/v1/files`;
+  return `${baseUrl}/v1/files/upload`;
 }
 
 export function fileListEndpoint(baseUrl: string): string {
