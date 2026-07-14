@@ -118,7 +118,7 @@ const music = await sdk.music.generate({
 // Instrumental
 const instrumental = await sdk.music.generate({
   prompt: 'Cinematic orchestral',
-  instrumental: true,
+  is_instrumental: true,
 });
 
 // Auto-generate lyrics
@@ -135,7 +135,7 @@ const stream = await sdk.music.generate({
 });
 
 for await (const chunk of stream) {
-  // process audio chunks
+  // chunk contains decoded audio bytes
 }
 
 // Structured prompt

@@ -12,6 +12,11 @@ describe('music models', () => {
     expect(musicGenerateModel({} as Config)).toBe('music-2.6');
   });
 
+  it('musicGenerateModel accepts the free-tier model', () => {
+    const config = { defaultMusicModel: 'music-2.6-free' } as Config;
+    expect(musicGenerateModel(config)).toBe('music-2.6-free');
+  });
+
   it('musicCoverModel ignores defaultMusicModel for non-cover models', () => {
     const config = { defaultMusicModel: 'music-2.6' } as Config;
     expect(musicCoverModel(config)).toBe('music-cover');
@@ -20,6 +25,11 @@ describe('music models', () => {
   it('musicCoverModel uses defaultMusicModel when it is a cover model', () => {
     const config = { defaultMusicModel: 'music-cover' } as Config;
     expect(musicCoverModel(config)).toBe('music-cover');
+  });
+
+  it('musicCoverModel accepts the free-tier cover model', () => {
+    const config = { defaultMusicModel: 'music-cover-free' } as Config;
+    expect(musicCoverModel(config)).toBe('music-cover-free');
   });
 
   it('musicCoverModel defaults to music-cover', () => {

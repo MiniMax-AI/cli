@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { createMockServer, jsonResponse, type MockServer } from '../helpers/mock-server';
+import { createMockServer, jsonResponse, sseResponse, type MockServer } from '../helpers/mock-server';
 import { MiniMaxSDK } from '../../src/sdk';
-import { MusicSDK } from '../../src/sdk/music';
+import { MusicSDK, type MusicGenerateRequest } from '../../src/sdk/music';
 import { existsSync, unlinkSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -24,13 +24,17 @@ describe('MiniMaxSDK.music', () => {
     server?.close();
   });
 
-  it('should generate music successfully', async () => {
+  it('maps the instrumental alias to the official field and accepts the free model', async () => {
+    let requestBody: Record<string, unknown> | undefined;
     server = createMockServer({
       routes: {
-        '/v1/music_generation': () => jsonResponse({
-          data: { audio_url: 'https://example.com/music.mp3' },
-          base_resp: { status_code: 0, status_msg: 'success' },
-        }),
+        '/v1/music_generation': async (req) => {
+          requestBody = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            data: { audio_url: 'https://example.com/music.mp3' },
+            base_resp: { status_code: 0, status_msg: 'success' },
+          });
+        },
       },
     });
 
@@ -40,11 +44,44 @@ describe('MiniMaxSDK.music', () => {
     });
 
     const result = await sdk.music.generate({
-      lyrics: 'no lyrics',
+      model: 'music-2.6-free',
+      prompt: 'Cinematic orchestral',
+      genre: 'soundtrack',
       instrumental: true,
     });
 
     expect(result.data.audio_url).toBe('https://example.com/music.mp3');
+    expect(requestBody?.model).toBe('music-2.6-free');
+    expect(requestBody?.is_instrumental).toBe(true);
+    expect(requestBody?.instrumental).toBeUndefined();
+    expect(requestBody?.genre).toBeUndefined();
+    expect(requestBody?.prompt).toContain('Genre: soundtrack');
+  });
+
+  it('decodes SSE hex payloads into streaming audio bytes', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/music_generation': () => sseResponse([
+          { data: JSON.stringify({ data: { audio: '4142', status: 1 } }) },
+          { data: JSON.stringify({ data: { audio: '4344', status: 1 } }) },
+          { data: JSON.stringify({ data: { status: 2 } }) },
+        ]),
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+    const stream = await sdk.music.generate({
+      prompt: 'Upbeat pop',
+      lyrics: '[verse] Hello world',
+      stream: true,
+    });
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of stream) chunks.push(chunk);
+
+    expect(Buffer.concat(chunks).toString()).toBe('ABCD');
   });
 });
 
@@ -90,49 +127,69 @@ describe('MusicSDK.validateParams', () => {
 
   it('throws when is_instrumental and lyrics are both provided', async () => {
     await expect(
-      sdk.generate({ is_instrumental: true, lyrics: 'hello' } as any),
+      sdk.generate({ is_instrumental: true, lyrics: 'hello' }),
     ).rejects.toThrow('Cannot use is_instrumental with lyrics');
   });
 
   it('throws when lyrics_optimizer is used with lyrics', async () => {
     await expect(
-      sdk.generate({ lyrics_optimizer: true, lyrics: 'hello' } as any),
+      sdk.generate({ lyrics_optimizer: true, lyrics: 'hello' }),
     ).rejects.toThrow('Cannot use lyrics_optimizer with lyrics or is_instrumental');
   });
 
   it('throws when lyrics_optimizer is used with is_instrumental', async () => {
     await expect(
-      sdk.generate({ lyrics_optimizer: true, is_instrumental: true } as any),
+      sdk.generate({ lyrics_optimizer: true, is_instrumental: true }),
     ).rejects.toThrow('Cannot use lyrics_optimizer with lyrics or is_instrumental');
   });
 
   it('throws when no prompt, lyrics, is_instrumental, or lyrics_optimizer', async () => {
     await expect(
-      sdk.generate({} as any),
+      sdk.generate({}),
     ).rejects.toThrow('At least one of prompt or lyrics or is_instrumental or lyrics_optimizer is required');
   });
 
   it('throws when lyrics is missing (not is_instrumental, not lyrics_optimizer)', async () => {
     await expect(
-      sdk.generate({ prompt: 'Upbeat pop' } as any),
+      sdk.generate({ prompt: 'Upbeat pop' }),
     ).rejects.toThrow('lyrics is required');
+  });
+
+  it('requires prompt for instrumental generation', async () => {
+    await expect(
+      sdk.generate({ is_instrumental: true }),
+    ).rejects.toThrow('prompt is required with is_instrumental');
+  });
+
+  it('rejects conflicting instrumental aliases', async () => {
+    await expect(
+      sdk.generate({
+        prompt: 'Cinematic',
+        instrumental: true,
+        is_instrumental: false,
+      }),
+    ).rejects.toThrow('instrumental and is_instrumental must not conflict');
   });
 
   it('throws on invalid model', async () => {
     await expect(
-      sdk.generate({ prompt: 'Folk', lyrics: 'no lyrics', model: 'music-2.0' } as any),
+      sdk.generate({ prompt: 'Folk', lyrics: 'no lyrics', model: 'music-2.0' }),
     ).rejects.toThrow('Invalid model');
   });
 
   it('throws on invalid output_format', async () => {
     await expect(
-      sdk.generate({ prompt: 'Folk', lyrics: 'no lyrics', output_format: 'mp3' } as any),
+      sdk.generate({
+        prompt: 'Folk',
+        lyrics: 'no lyrics',
+        output_format: 'mp3' as MusicGenerateRequest['output_format'],
+      }),
     ).rejects.toThrow('Invalid output format');
   });
 
   it('throws when stream and output_format=url are used together', async () => {
     await expect(
-      sdk.generate({ prompt: 'Folk', lyrics: 'no lyrics', stream: true, output_format: 'url' } as any),
+      sdk.generate({ prompt: 'Folk', lyrics: 'no lyrics', stream: true, output_format: 'url' }),
     ).rejects.toThrow('stream and output_format url cannot be used together');
   });
 });

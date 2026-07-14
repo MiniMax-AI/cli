@@ -1,13 +1,33 @@
 import type { Config } from '../../config/schema';
 
-export function musicGenerateModel(config: Config): string {
-  return config.defaultMusicModel ?? 'music-2.6';
+export const MUSIC_GENERATE_MODELS = [
+  'music-2.6',
+  'music-2.6-free',
+  'music-2.5+',
+  'music-2.5',
+] as const;
+
+export const MUSIC_COVER_MODELS = ['music-cover', 'music-cover-free'] as const;
+
+function includesModel(models: readonly string[], model: string): boolean {
+  return models.includes(model);
 }
 
-const VALID_COVER_MODELS = new Set(['music-cover']);
+export function musicGenerateModel(config: Config): string {
+  if (
+    config.defaultMusicModel
+    && includesModel(MUSIC_GENERATE_MODELS, config.defaultMusicModel)
+  ) {
+    return config.defaultMusicModel;
+  }
+  return 'music-2.6';
+}
 
 export function musicCoverModel(config: Config): string {
-  if (config.defaultMusicModel && VALID_COVER_MODELS.has(config.defaultMusicModel)) {
+  if (
+    config.defaultMusicModel
+    && includesModel(MUSIC_COVER_MODELS, config.defaultMusicModel)
+  ) {
     return config.defaultMusicModel;
   }
   return 'music-cover';

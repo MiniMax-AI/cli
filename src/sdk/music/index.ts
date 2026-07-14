@@ -7,7 +7,8 @@ import { ModelPartial } from "../types";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
-import { musicGenerateModel } from "../../commands/music/models";
+import { MUSIC_GENERATE_MODELS, musicGenerateModel } from "../../commands/music/models";
+import { decodeAudioStream } from "../../utils/audio-stream";
 
 function hexToBuffer(hex: string): Buffer {
   if (!/^[0-9a-fA-F]*$/.test(hex)) {
@@ -64,20 +65,11 @@ export class MusicSDK extends Client {
       stream: true,
     });
 
-    const reader = res.body?.getReader();
-    if (!reader) {
+    if (!res.body) {
       throw new SDKError('No response body', ExitCode.GENERAL);
-    };
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        yield value;
-      }
-    } finally {
-      reader.releaseLock();
     }
+
+    yield* decodeAudioStream(res);
   }
 
   async generate(request: ModelPartial<MusicGenerateRequest> & { stream: true }): Promise<AsyncGenerator<Uint8Array<ArrayBuffer>>>;
@@ -140,16 +132,15 @@ export class MusicSDK extends Client {
     if (request.bpm)         structuredParts.push(`BPM: ${request.bpm as number}`);
     if (request.key)         structuredParts.push(`Key: ${request.key as string}`);
     if (request.avoid)       structuredParts.push(`Avoid: ${request.avoid as string}`);
-    if (request.useCase)     structuredParts.push(`Use case: ${request.useCase as string}`);
+    const useCase = request.useCase || request.use_case;
+    if (useCase)             structuredParts.push(`Use case: ${useCase}`);
     if (request.structure)   structuredParts.push(`Structure: ${request.structure as string}`);
     if (request.references)  structuredParts.push(`References: ${request.references as string}`);
     if (request.extra)       structuredParts.push(`Extra: ${request.extra as string}`);
 
-    let lyrics = request.lyrics;
     let prompt = request.prompt;
 
-    if (request.instrumental || !lyrics || lyrics === '无歌词' || lyrics === 'no lyrics') {
-      lyrics = '[intro] [outro]';
+    if (request.is_instrumental || request.instrumental) {
       structuredParts.push('Style: instrumental, no vocals, pure music');
     }
 
@@ -161,9 +152,43 @@ export class MusicSDK extends Client {
   }
 
   private validateParams(params: ModelPartial<MusicGenerateRequest>) {
+    const instrumental = params.instrumental;
+    const apiParams = { ...params };
+    const sdkOnlyFields: Array<keyof MusicGenerateRequest> = [
+      'instrumental',
+      'vocals',
+      'genre',
+      'mood',
+      'instruments',
+      'tempo',
+      'bpm',
+      'key',
+      'avoid',
+      'use_case',
+      'useCase',
+      'structure',
+      'references',
+      'extra',
+    ];
+    for (const field of sdkOnlyFields) delete apiParams[field];
+    if (
+      instrumental !== undefined
+      && params.is_instrumental !== undefined
+      && instrumental !== params.is_instrumental
+    ) {
+      throw new SDKError(
+        'instrumental and is_instrumental must not conflict',
+        ExitCode.USAGE,
+      );
+    }
+
+    const normalized: ModelPartial<MusicGenerateRequest> = {
+      ...apiParams,
+      is_instrumental: params.is_instrumental ?? instrumental,
+    };
     const {
       model, output_format, stream, prompt, lyrics, is_instrumental, lyrics_optimizer,
-    } = params;
+    } = normalized;
     if (is_instrumental && lyrics) {
       throw new SDKError('Cannot use is_instrumental with lyrics', ExitCode.USAGE);
     }
@@ -176,14 +201,20 @@ export class MusicSDK extends Client {
       throw new SDKError('At least one of prompt or lyrics or is_instrumental or lyrics_optimizer is required', ExitCode.USAGE);
     }
 
+    if ((is_instrumental || lyrics_optimizer) && !prompt?.trim()) {
+      throw new SDKError(
+        'prompt is required with is_instrumental or lyrics_optimizer',
+        ExitCode.USAGE,
+      );
+    }
+
     if (!is_instrumental && !lyrics_optimizer && !lyrics?.trim()) {
       throw new SDKError('lyrics is required', ExitCode.USAGE);
     }
 
-    const VALID_MODELS = ['music-2.6', 'music-2.5+', 'music-2.5'];
-    if (model && !VALID_MODELS.includes(model)) {
+    if (model && !MUSIC_GENERATE_MODELS.includes(model as typeof MUSIC_GENERATE_MODELS[number])) {
       throw new SDKError(
-        `Invalid model: ${model}. Valid models are ${VALID_MODELS.join(', ')}.`, 
+        `Invalid model: ${model}. Valid models are ${MUSIC_GENERATE_MODELS.join(', ')}.`,
         ExitCode.USAGE,
       );
     }
@@ -202,7 +233,10 @@ export class MusicSDK extends Client {
       );
     }
 
-    const targetPrompt = this.buildPrompt(params);
+    const targetPrompt = this.buildPrompt({
+      ...params,
+      is_instrumental,
+    });
 
     return toMerged({
       model: musicGenerateModel(this.config),
@@ -213,7 +247,7 @@ export class MusicSDK extends Client {
       },
       output_format: 'hex',
     }, {
-      ...params,
+      ...normalized,
       prompt: targetPrompt,
     });
   }

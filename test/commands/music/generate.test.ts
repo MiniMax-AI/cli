@@ -181,6 +181,38 @@ describe('music generate command', () => {
     expect(parsed.request.model).toBe('music-2.5');
   });
 
+  it('accepts the official music-2.6-free model', async () => {
+    let captured = '';
+    const origLog = console.log;
+    console.log = (msg: string) => { captured += msg; };
+
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' as const },
+        {
+          ...baseFlags,
+          dryRun: true,
+          prompt: 'Folk',
+          lyrics: 'la la',
+          model: 'music-2.6-free',
+        },
+      );
+    } finally {
+      console.log = origLog;
+    }
+
+    expect(JSON.parse(captured).request.model).toBe('music-2.6-free');
+  });
+
+  it('requires prompt for instrumental generation', async () => {
+    await expect(
+      generateCommand.execute(
+        { ...baseConfig, dryRun: true },
+        { ...baseFlags, dryRun: true, instrumental: true },
+      ),
+    ).rejects.toThrow('--prompt is required with --instrumental');
+  });
+
   it('rejects invalid audio format', async () => {
     await expect(
       generateCommand.execute(
