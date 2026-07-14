@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'bun:test';
 import { createMockServer, jsonResponse, type MockServer } from '../helpers/mock-server';
 import { MiniMaxSDK } from '../../src/sdk';
-import { ImageSDK, ImageSaveOptions } from '../../src/sdk/image';
+import { ImageSDK } from '../../src/sdk/image';
 import { existsSync, unlinkSync, rmdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
