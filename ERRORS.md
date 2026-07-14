@@ -15,7 +15,7 @@ This document lists all error scenarios and the messages users will see.
 | OAuth error in callback | `OAuth error: ${error}` |
 | OAuth token exchange failed | `OAuth token exchange failed: ${body}` |
 | `MINIMAX_API_KEY` already set (non-interactive) | `Warning: MINIMAX_API_KEY is already set in environment.` |
-| No credentials found (non-interactive) | `No credentials found.` + hint: `Log in: mmx auth login`, `--api-key sk-xxxxx`, or `MMX_CONFIG_DIR=/path/to/.mmx` |
+| No credentials found (non-interactive) | `No credentials found.` + the searched `config.json` path and hint: `Log in: mmx auth login`, `--api-key sk-xxxxx`, or `MMX_CONFIG_DIR=/path/to/.mmx` |
 
 ### `mmx auth logout`
 

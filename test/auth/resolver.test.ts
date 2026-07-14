@@ -26,18 +26,23 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
 
 describe('resolveCredential', () => {
   const testDir = join(tmpdir(), `mmx-resolver-test-${Date.now()}`);
-  const originalConfigDir = process.env.MMX_CONFIG_DIR;
+  let originalConfigDir: string | undefined;
+  let originalApiKey: string | undefined;
 
   beforeEach(() => {
+    originalConfigDir = process.env.MMX_CONFIG_DIR;
+    originalApiKey = process.env.MINIMAX_API_KEY;
     const configDir = join(testDir, '.mmx');
     mkdirSync(configDir, { recursive: true });
     process.env.MMX_CONFIG_DIR = configDir;
+    delete process.env.MINIMAX_API_KEY;
   });
 
   afterEach(() => {
-    if (originalConfigDir) process.env.MMX_CONFIG_DIR = originalConfigDir;
+    if (originalConfigDir !== undefined) process.env.MMX_CONFIG_DIR = originalConfigDir;
     else delete process.env.MMX_CONFIG_DIR;
-    delete process.env.MINIMAX_API_KEY;
+    if (originalApiKey !== undefined) process.env.MINIMAX_API_KEY = originalApiKey;
+    else delete process.env.MINIMAX_API_KEY;
     rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -72,6 +77,7 @@ describe('resolveCredential', () => {
       expect(hint).toContain('mmx auth login');
       expect(hint).toContain('--api-key');
       expect(hint).toContain('MMX_CONFIG_DIR');
+      expect(hint).toContain(join(testDir, '.mmx', 'config.json'));
     }
   });
 
@@ -84,17 +90,22 @@ describe('resolveCredential', () => {
 
 describe('ensureAuth (non-interactive, no credentials)', () => {
   const testDir = join(tmpdir(), `mmx-setup-test-${Date.now()}`);
-  const originalConfigDir = process.env.MMX_CONFIG_DIR;
+  let originalConfigDir: string | undefined;
+  let originalApiKey: string | undefined;
 
   beforeEach(() => {
+    originalConfigDir = process.env.MMX_CONFIG_DIR;
+    originalApiKey = process.env.MINIMAX_API_KEY;
     mkdirSync(join(testDir, '.mmx'), { recursive: true });
     process.env.MMX_CONFIG_DIR = join(testDir, '.mmx');
+    delete process.env.MINIMAX_API_KEY;
   });
 
   afterEach(() => {
-    if (originalConfigDir) process.env.MMX_CONFIG_DIR = originalConfigDir;
+    if (originalConfigDir !== undefined) process.env.MMX_CONFIG_DIR = originalConfigDir;
     else delete process.env.MMX_CONFIG_DIR;
-    delete process.env.MINIMAX_API_KEY;
+    if (originalApiKey !== undefined) process.env.MINIMAX_API_KEY = originalApiKey;
+    else delete process.env.MINIMAX_API_KEY;
     rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -109,6 +120,7 @@ describe('ensureAuth (non-interactive, no credentials)', () => {
       expect(hint).toContain('mmx auth login');
       expect(hint).toContain('--api-key');
       expect(hint).toContain('MMX_CONFIG_DIR');
+      expect(hint).toContain(join(testDir, '.mmx', 'config.json'));
     }
   });
 });

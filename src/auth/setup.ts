@@ -8,6 +8,7 @@ import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
 import { deviceCodeLogin } from './oauth';
 import { loadCredentials } from './credentials';
+import { buildNoCredentialsHint } from './hints';
 
 interface AuthChoice {
   value: 'oauth-global' | 'oauth-cn' | 'api-key';
@@ -46,9 +47,7 @@ export async function ensureAuth(config: Config): Promise<void> {
     throw new CLIError(
       'No credentials found.',
       ExitCode.AUTH,
-      'Log in:          mmx auth login\n' +
-        'Pass per-call:   --api-key sk-xxxxx\n' +
-        'Or set env var:  MMX_CONFIG_DIR=/path/to/.mmx',
+      buildNoCredentialsHint(config.configPath),
     );
   }
 
