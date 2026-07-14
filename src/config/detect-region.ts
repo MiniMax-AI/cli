@@ -1,5 +1,7 @@
 import { REGIONS, type Region } from "./schema";
 import { readConfigFile, writeConfigFile } from "./loader";
+import { CLIError } from "../errors/base";
+import { ExitCode } from "../errors/codes";
 
 const QUOTA_PATH = "/v1/token_plan/remains";
 
@@ -51,13 +53,11 @@ export async function detectRegion(apiKey: string): Promise<Region> {
   const match = results.find((r) => r.ok);
   if (!match) {
     process.stderr.write(" failed\n");
-    process.stderr.write(
-      `Warning: API key failed validation against all regions (global, cn).\n` +
-      `  This usually means the API key is invalid or the network is blocking requests.\n` +
-      `  Falling back to 'global'. Subsequent requests may fail.\n` +
-      `  Run 'mmx auth status' to verify your credentials.\n`,
+    throw new CLIError(
+      "Could not determine the API key region.",
+      ExitCode.AUTH,
+      "No region was changed. Check the key and network, then retry or pass --region global|cn explicitly.",
     );
-    return "global";
   }
   const detected: Region = match.region;
   process.stderr.write(` ${detected}\n`);

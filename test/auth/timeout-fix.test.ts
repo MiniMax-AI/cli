@@ -77,7 +77,7 @@ describe('detect-region: probeRegion auth style fallback', () => {
     }
   });
 
-  it('falls back to global when key is invalid for all auth styles and regions', async () => {
+  it('fails closed when key is invalid for all auth styles and regions', async () => {
     server = createMockServer({
       routes: {
         '/v1/token_plan/remains': () =>
@@ -93,8 +93,14 @@ describe('detect-region: probeRegion auth style fallback', () => {
 
     try {
       const { detectRegion } = await import('../../src/config/detect-region');
-      const region = await detectRegion('bad-key');
-      expect(region).toBe('global'); // graceful fallback
+      try {
+        await detectRegion('bad-key');
+        throw new Error('Expected region detection to fail');
+      } catch (error) {
+        expect(error).toBeInstanceOf(CLIError);
+        expect((error as CLIError).message).toBe('Could not determine the API key region.');
+        expect((error as CLIError).exitCode).toBe(ExitCode.AUTH);
+      }
     } finally {
       (REGIONS as Record<string, string>).global = origGlobal;
       (REGIONS as Record<string, string>).cn = origCn;

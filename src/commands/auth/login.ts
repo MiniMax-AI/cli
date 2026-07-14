@@ -76,7 +76,7 @@ export default defineCommand({
     }
 
     if (flags.apiKey) {
-      await loginWithApiKey(config, flags.apiKey as string);
+      await loginWithApiKey(config, flags.apiKey as string, flags.region as Region | undefined);
       return;
     }
 
@@ -109,7 +109,7 @@ export default defineCommand({
         validate: (v) => (v && v.length > 0 ? undefined : 'API key cannot be empty.'),
       });
       if (isCancel(key)) throw new CLIError('Authentication cancelled.', ExitCode.AUTH);
-      await loginWithApiKey(config, key as string);
+      await loginWithApiKey(config, key as string, flags.region as Region | undefined);
       return;
     }
 
@@ -131,19 +131,22 @@ async function completeOAuthLogin(config: Config, region: Region): Promise<void>
   await showDashboardAfterLogin(cfg);
 }
 
-async function loginWithApiKey(config: Config, key: string): Promise<void> {
+async function loginWithApiKey(
+  config: Config,
+  key: string,
+  explicitRegion?: Region,
+): Promise<void> {
   if (config.dryRun) {
     console.log('Would validate and save API key.');
     return;
   }
 
-  // Probe both regions and pick the one the key actually authenticates against.
-  // This doubles as key validation — if neither region accepts it, the key is bad.
-  const detected = await detectRegion(key);
+  // An explicit region is authoritative. Otherwise probe both regions and fail
+  // closed if neither can be confirmed; never persist a guessed fallback.
+  const detected = explicitRegion ?? await detectRegion(key);
   const cfg: Config = { ...config, region: detected, baseUrl: REGIONS[detected], apiKey: key };
 
-  // Verify the detection actually authorizes the quota endpoint (defends against
-  // detectRegion's graceful 'global' fallback when the network is unreachable).
+  // Verify the selected region actually authorizes the quota endpoint.
   try {
     await requestJson<QuotaApiResponse>(cfg, { url: quotaEndpoint(cfg.baseUrl) });
   } catch {
