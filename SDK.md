@@ -138,6 +138,22 @@ for await (const chunk of stream) {
   // chunk contains decoded audio bytes
 }
 
+// One-step cover — lyrics are extracted from the reference audio when omitted
+const cover = await sdk.music.generate({
+  model: 'music-cover-free',
+  prompt: 'Jazz piano trio with a warm intimate vocal',
+  audio_url: 'https://example.com/reference.mp3',
+  output_format: 'url',
+});
+
+// Two-step cover — use a feature ID returned by the cover preprocess API
+const rewrittenCover = await sdk.music.generate({
+  model: 'music-cover',
+  prompt: 'Acoustic folk with gentle strings and soft vocals',
+  cover_feature_id: 'feature-id-from-preprocess',
+  lyrics: '[Verse]\nThese are the rewritten lyrics for the cover',
+});
+
 // Structured prompt
 const structured = await sdk.music.generate({
   prompt: 'A beautiful song',
