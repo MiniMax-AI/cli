@@ -17,6 +17,14 @@ function makeMusicResponse(hexAudio?: string): MusicResponse {
   };
 }
 
+async function collectAudio(
+  stream: AsyncGenerator<Uint8Array<ArrayBuffer>>,
+): Promise<Buffer> {
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
 describe('MiniMaxSDK.music', () => {
   let server: MockServer;
 
@@ -64,7 +72,7 @@ describe('MiniMaxSDK.music', () => {
         '/v1/music_generation': () => sseResponse([
           { data: JSON.stringify({ data: { audio: '4142', status: 1 } }) },
           { data: JSON.stringify({ data: { audio: '4344', status: 1 } }) },
-          { data: JSON.stringify({ data: { status: 2 } }) },
+          { data: JSON.stringify({ data: { audio: '4546', status: 2 } }) },
         ]),
       },
     });
@@ -78,10 +86,100 @@ describe('MiniMaxSDK.music', () => {
       lyrics: '[verse] Hello world',
       stream: true,
     });
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of stream) chunks.push(chunk);
+    const audio = await collectAudio(stream);
 
-    expect(Buffer.concat(chunks).toString()).toBe('ABCD');
+    expect(audio.toString()).toBe('ABCDEF');
+  });
+
+  it('throws when a streaming request returns a JSON business error', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/music_generation': () => jsonResponse({
+          base_resp: {
+            status_code: 1008,
+            status_msg: 'insufficient balance',
+          },
+        }),
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+    const stream = await sdk.music.generate({
+      prompt: 'Upbeat pop',
+      lyrics: '[verse] Hello world',
+      stream: true,
+    });
+
+    await expect(collectAudio(stream)).rejects.toThrow('insufficient balance');
+  });
+
+  it('supports one-step covers without replacement lyrics', async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    server = createMockServer({
+      routes: {
+        '/v1/music_generation': async (req) => {
+          requestBody = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            data: { audio_url: 'https://example.com/cover.mp3', status: 2 },
+            base_resp: { status_code: 0, status_msg: 'success' },
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+    const result = await sdk.music.generate({
+      model: 'music-cover-free',
+      prompt: 'Jazz piano trio with warm intimate vocals',
+      audio_url: 'https://example.com/reference.mp3',
+      is_instrumental: false,
+      lyrics_optimizer: false,
+      output_format: 'url',
+    });
+
+    expect(result.data.audio_url).toBe('https://example.com/cover.mp3');
+    expect(requestBody?.model).toBe('music-cover-free');
+    expect(requestBody?.audio_url).toBe('https://example.com/reference.mp3');
+    expect(requestBody?.lyrics).toBeUndefined();
+    expect(requestBody?.is_instrumental).toBeUndefined();
+    expect(requestBody?.lyrics_optimizer).toBeUndefined();
+  });
+
+  it('supports two-step covers with replacement lyrics', async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    server = createMockServer({
+      routes: {
+        '/v1/music_generation': async (req) => {
+          requestBody = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            data: { audio: '4142', status: 2 },
+            base_resp: { status_code: 0, status_msg: 'success' },
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+    await sdk.music.generate({
+      model: 'music-cover',
+      prompt: 'Acoustic folk with gentle strings and soft vocals',
+      cover_feature_id: 'cover-feature-id',
+      lyrics: '[Verse] These are replacement lyrics for the song',
+    });
+
+    expect(requestBody?.model).toBe('music-cover');
+    expect(requestBody?.cover_feature_id).toBe('cover-feature-id');
+    expect(requestBody?.lyrics).toContain('replacement lyrics');
+    expect(requestBody?.audio_url).toBeUndefined();
   });
 });
 
@@ -175,6 +273,45 @@ describe('MusicSDK.validateParams', () => {
     await expect(
       sdk.generate({ prompt: 'Folk', lyrics: 'no lyrics', model: 'music-2.0' }),
     ).rejects.toThrow('Invalid model');
+  });
+
+  it('requires exactly one audio source for cover models', async () => {
+    await expect(
+      sdk.generate({
+        model: 'music-cover-free',
+        prompt: 'Jazz piano trio with warm intimate vocals',
+      }),
+    ).rejects.toThrow('Exactly one of audio_url, audio_base64, or cover_feature_id');
+
+    await expect(
+      sdk.generate({
+        model: 'music-cover',
+        prompt: 'Jazz piano trio with warm intimate vocals',
+        audio_url: 'https://example.com/reference.mp3',
+        cover_feature_id: 'cover-feature-id',
+      }),
+    ).rejects.toThrow('Exactly one of audio_url, audio_base64, or cover_feature_id');
+  });
+
+  it('requires replacement lyrics with cover_feature_id', async () => {
+    await expect(
+      sdk.generate({
+        model: 'music-cover',
+        prompt: 'Jazz piano trio with warm intimate vocals',
+        cover_feature_id: 'cover-feature-id',
+      }),
+    ).rejects.toThrow('lyrics is required with cover_feature_id');
+  });
+
+  it('rejects generation-only options for cover models', async () => {
+    await expect(
+      sdk.generate({
+        model: 'music-cover',
+        prompt: 'Jazz piano trio with warm intimate vocals',
+        audio_url: 'https://example.com/reference.mp3',
+        is_instrumental: true,
+      }),
+    ).rejects.toThrow('is_instrumental is only supported by music generation models');
   });
 
   it('throws on invalid output_format', async () => {

@@ -7,7 +7,11 @@ import { ModelPartial } from "../types";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
-import { MUSIC_GENERATE_MODELS, musicGenerateModel } from "../../commands/music/models";
+import {
+  MUSIC_COVER_MODELS,
+  MUSIC_GENERATE_MODELS,
+  musicGenerateModel,
+} from "../../commands/music/models";
 import { decodeAudioStream } from "../../utils/audio-stream";
 
 function hexToBuffer(hex: string): Buffer {
@@ -189,32 +193,19 @@ export class MusicSDK extends Client {
     const {
       model, output_format, stream, prompt, lyrics, is_instrumental, lyrics_optimizer,
     } = normalized;
-    if (is_instrumental && lyrics) {
-      throw new SDKError('Cannot use is_instrumental with lyrics', ExitCode.USAGE);
-    }
-
-    if (lyrics_optimizer && (lyrics || is_instrumental)) {
-      throw new SDKError('Cannot use lyrics_optimizer with lyrics or is_instrumental', ExitCode.USAGE);
-    }
-
-    if (!prompt && !lyrics && !is_instrumental && !lyrics_optimizer) {
-      throw new SDKError('At least one of prompt or lyrics or is_instrumental or lyrics_optimizer is required', ExitCode.USAGE);
-    }
-
-    if ((is_instrumental || lyrics_optimizer) && !prompt?.trim()) {
+    const effectiveModel = model ?? musicGenerateModel(this.config);
+    const isGenerateModel = MUSIC_GENERATE_MODELS.includes(
+      effectiveModel as typeof MUSIC_GENERATE_MODELS[number],
+    );
+    const isCoverModel = MUSIC_COVER_MODELS.includes(
+      effectiveModel as typeof MUSIC_COVER_MODELS[number],
+    );
+    if (!isGenerateModel && !isCoverModel) {
       throw new SDKError(
-        'prompt is required with is_instrumental or lyrics_optimizer',
-        ExitCode.USAGE,
-      );
-    }
-
-    if (!is_instrumental && !lyrics_optimizer && !lyrics?.trim()) {
-      throw new SDKError('lyrics is required', ExitCode.USAGE);
-    }
-
-    if (model && !MUSIC_GENERATE_MODELS.includes(model as typeof MUSIC_GENERATE_MODELS[number])) {
-      throw new SDKError(
-        `Invalid model: ${model}. Valid models are ${MUSIC_GENERATE_MODELS.join(', ')}.`,
+        `Invalid model: ${effectiveModel}. Valid models are ${[
+          ...MUSIC_GENERATE_MODELS,
+          ...MUSIC_COVER_MODELS,
+        ].join(', ')}.`,
         ExitCode.USAGE,
       );
     }
@@ -233,13 +224,102 @@ export class MusicSDK extends Client {
       );
     }
 
-    const targetPrompt = this.buildPrompt({
+    let targetPrompt = this.buildPrompt({
       ...params,
       is_instrumental,
     });
 
+    if (isCoverModel) {
+      if (is_instrumental) {
+        throw new SDKError(
+          'is_instrumental is only supported by music generation models',
+          ExitCode.USAGE,
+        );
+      }
+      if (lyrics_optimizer) {
+        throw new SDKError(
+          'lyrics_optimizer is only supported by music generation models',
+          ExitCode.USAGE,
+        );
+      }
+      delete normalized.is_instrumental;
+      delete normalized.lyrics_optimizer;
+
+      targetPrompt = targetPrompt?.trim();
+      const coverPromptLength = targetPrompt?.length ?? 0;
+      if (coverPromptLength < 10 || coverPromptLength > 300) {
+        throw new SDKError(
+          'prompt must be between 10 and 300 characters for music cover models',
+          ExitCode.USAGE,
+        );
+      }
+
+      const hasAudioUrl = Boolean(normalized.audio_url?.trim());
+      const hasAudioBase64 = Boolean(normalized.audio_base64?.trim());
+      const hasCoverFeatureId = Boolean(normalized.cover_feature_id?.trim());
+      const sourceCount = [hasAudioUrl, hasAudioBase64, hasCoverFeatureId]
+        .filter(Boolean).length;
+      if (sourceCount !== 1) {
+        throw new SDKError(
+          'Exactly one of audio_url, audio_base64, or cover_feature_id is required for music cover models',
+          ExitCode.USAGE,
+        );
+      }
+      if (hasAudioUrl) normalized.audio_url = normalized.audio_url?.trim();
+      else delete normalized.audio_url;
+      if (hasAudioBase64) normalized.audio_base64 = normalized.audio_base64?.trim();
+      else delete normalized.audio_base64;
+      if (hasCoverFeatureId) {
+        normalized.cover_feature_id = normalized.cover_feature_id?.trim();
+      } else {
+        delete normalized.cover_feature_id;
+      }
+
+      const coverLyrics = lyrics?.trim();
+      const lyricsLength = coverLyrics?.length ?? 0;
+      if (hasCoverFeatureId && lyricsLength === 0) {
+        throw new SDKError(
+          'lyrics is required with cover_feature_id',
+          ExitCode.USAGE,
+        );
+      }
+      if (coverLyrics) normalized.lyrics = coverLyrics;
+      else delete normalized.lyrics;
+      if (lyricsLength > 0 && (lyricsLength < 10 || lyricsLength > 1000)) {
+        throw new SDKError(
+          'lyrics must be between 10 and 1000 characters for music cover models',
+          ExitCode.USAGE,
+        );
+      }
+    } else {
+      if (normalized.audio_url || normalized.audio_base64 || normalized.cover_feature_id) {
+        throw new SDKError(
+          'audio_url, audio_base64, and cover_feature_id are only supported by music cover models',
+          ExitCode.USAGE,
+        );
+      }
+      if (is_instrumental && lyrics) {
+        throw new SDKError('Cannot use is_instrumental with lyrics', ExitCode.USAGE);
+      }
+      if (lyrics_optimizer && (lyrics || is_instrumental)) {
+        throw new SDKError('Cannot use lyrics_optimizer with lyrics or is_instrumental', ExitCode.USAGE);
+      }
+      if (!prompt && !lyrics && !is_instrumental && !lyrics_optimizer) {
+        throw new SDKError('At least one of prompt or lyrics or is_instrumental or lyrics_optimizer is required', ExitCode.USAGE);
+      }
+      if ((is_instrumental || lyrics_optimizer) && !prompt?.trim()) {
+        throw new SDKError(
+          'prompt is required with is_instrumental or lyrics_optimizer',
+          ExitCode.USAGE,
+        );
+      }
+      if (!is_instrumental && !lyrics_optimizer && !lyrics?.trim()) {
+        throw new SDKError('lyrics is required', ExitCode.USAGE);
+      }
+    }
+
     return toMerged({
-      model: musicGenerateModel(this.config),
+      model: effectiveModel,
       audio_setting: {
         format: 'mp3',
         sample_rate: 44100,
