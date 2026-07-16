@@ -109,7 +109,7 @@ export default defineCommand({
       );
     }
 
-    // Build structured prompt from optional music characteristic flags.
+    // Build structured prompt from optional music characteristic flags before request assembly.
     const structuredParts: string[] = [];
     if (flags.vocals)      structuredParts.push(`Vocals: ${flags.vocals as string}`);
     if (flags.genre)       structuredParts.push(`Genre: ${flags.genre as string}`);
