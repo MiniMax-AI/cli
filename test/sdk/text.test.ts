@@ -18,7 +18,7 @@ describe('MiniMaxSDK.text', () => {
           type: 'message',
           role: 'assistant',
           content: [{ type: 'text', text: 'Hello!' }],
-          model: 'MiniMax-M2.7',
+          model: 'MiniMax-M3',
           stop_reason: 'end_turn',
           usage: { input_tokens: 10, output_tokens: 5 },
         }),

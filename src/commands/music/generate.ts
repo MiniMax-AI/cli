@@ -15,7 +15,7 @@ import { MUSIC_GENERATE_MODELS, musicGenerateModel } from './models';
 
 export default defineCommand({
   name: 'music generate',
-  description: 'Generate a song (music-2.6, including free tier)',
+  description: 'Generate a song (music-3.0)',
   apiDocs: '/docs/api-reference/music-generation',
   usage: 'mmx music generate --prompt <text> (--lyrics <text> | --instrumental | --lyrics-optimizer) [--out <path>] [flags]',
   options: [
@@ -36,7 +36,7 @@ export default defineCommand({
     { flag: '--structure <text>', description: 'Song structure, e.g. "verse-chorus-verse-bridge-chorus"' },
     { flag: '--references <text>', description: 'Reference tracks or artists, e.g. "similar to Ed Sheeran"' },
     { flag: '--extra <text>', description: 'Additional fine-grained requirements not covered above' },
-    { flag: '--model <model>', description: 'Model: music-2.6 (default), music-2.6-free, music-2.5+, or music-2.5.' },
+    { flag: '--model <model>', description: 'Model: music-3.0 (default), music-2.6, music-2.6-free, music-2.5+, or music-2.5.' },
     { flag: '--output-format <fmt>', description: 'Return format: hex (default, saved to file) or url (24h expiry, download promptly). When --stream, only hex.' },
     { flag: '--aigc-watermark', description: 'Embed AI-generated content watermark in audio for content provenance' },
     { flag: '--format <fmt>', description: `Audio format: ${formatList(MUSIC_FORMATS)} (default: mp3)` },
@@ -54,8 +54,8 @@ export default defineCommand({
     'mmx music generate --prompt "Cinematic orchestral, building tension" --instrumental --out bgm.mp3',
     '# URL output (24h expiry — download promptly):',
     'mmx music generate --prompt "Upbeat pop" --lyrics "La la la..." --output-format url',
-    '# Instrumental with music-2.5+:',
-    'mmx music generate --prompt "Cinematic orchestral" --model "music-2.5+" --instrumental --out bgm.mp3',
+    '# Instrumental with music-3.0:',
+    'mmx music generate --prompt "Cinematic orchestral" --model "music-3.0" --instrumental --out bgm.mp3',
     '# Detailed prompt with vocal characteristics:',
     'mmx music generate --prompt "Warm morning folk" --vocals "male and female duet, harmonies in chorus" --instruments "acoustic guitar, piano" --bpm 95 --lyrics-file song.txt --out duet.mp3',
   ],
@@ -109,7 +109,7 @@ export default defineCommand({
       );
     }
 
-    // Build structured prompt from optional music characteristic flags.
+    // Build structured prompt from optional music characteristic flags before request assembly.
     const structuredParts: string[] = [];
     if (flags.vocals)      structuredParts.push(`Vocals: ${flags.vocals as string}`);
     if (flags.genre)       structuredParts.push(`Genre: ${flags.genre as string}`);
@@ -139,7 +139,7 @@ export default defineCommand({
       throw new CLIError(
         `Invalid model "${model}". Valid models: ${MUSIC_GENERATE_MODELS.join(', ')}`,
         ExitCode.USAGE,
-        'mmx music generate --model music-2.6',
+        'mmx music generate --model music-3.0',
       );
     }
     const outFormat = (flags.outputFormat as string) || 'hex';

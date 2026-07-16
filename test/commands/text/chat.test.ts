@@ -96,7 +96,7 @@ describe('text chat command', () => {
       });
 
       const parsed = JSON.parse(output);
-      expect(parsed.request.model).toBe('MiniMax-M2.7');
+      expect(parsed.request.model).toBe('MiniMax-M3');
       expect(parsed.request.messages).toHaveLength(1);
     } finally {
       console.log = originalLog;
@@ -112,7 +112,7 @@ describe('text chat command', () => {
       baseUrl: 'https://api.mmx.io',
       output: 'json',
       timeout: 10,
-      defaultTextModel: 'MiniMax-M2.7-highspeed',
+      defaultTextModel: 'MiniMax-M3',
       verbose: false,
       quiet: false,
       noColor: true,
@@ -140,7 +140,7 @@ describe('text chat command', () => {
       });
 
       const parsed = JSON.parse(output);
-      expect(parsed.request.model).toBe('MiniMax-M2.7-highspeed');
+      expect(parsed.request.model).toBe('MiniMax-M3');
     } finally {
       console.log = originalLog;
     }
@@ -268,7 +268,7 @@ describe('text chat command', () => {
       baseUrl: 'https://api.mmx.io',
       output: 'json',
       timeout: 10,
-      defaultTextModel: 'MiniMax-M2.7-highspeed',
+      defaultTextModel: 'MiniMax-M3',
       verbose: false,
       quiet: false,
       noColor: true,

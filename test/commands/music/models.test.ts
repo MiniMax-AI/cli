@@ -4,12 +4,12 @@ import type { Config } from '../../../src/config/schema';
 
 describe('music models', () => {
   it('musicGenerateModel uses defaultMusicModel when set', () => {
-    const config = { defaultMusicModel: 'music-2.5+' } as Config;
-    expect(musicGenerateModel(config)).toBe('music-2.5+');
+    const config = { defaultMusicModel: 'music-3.0' } as Config;
+    expect(musicGenerateModel(config)).toBe('music-3.0');
   });
 
-  it('musicGenerateModel defaults to music-2.6', () => {
-    expect(musicGenerateModel({} as Config)).toBe('music-2.6');
+  it('musicGenerateModel defaults to music-3.0', () => {
+    expect(musicGenerateModel({} as Config)).toBe('music-3.0');
   });
 
   it('musicGenerateModel accepts the free-tier model', () => {
@@ -18,7 +18,7 @@ describe('music models', () => {
   });
 
   it('musicCoverModel ignores defaultMusicModel for non-cover models', () => {
-    const config = { defaultMusicModel: 'music-2.6' } as Config;
+    const config = { defaultMusicModel: 'music-3.0' } as Config;
     expect(musicCoverModel(config)).toBe('music-cover');
   });
 

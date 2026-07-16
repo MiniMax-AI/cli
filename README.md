@@ -68,7 +68,7 @@ mmx quota
 
 ```bash
 mmx text chat --message "Write a poem"
-mmx text chat --model MiniMax-M2.7-highspeed --message "Hello" --stream
+mmx text chat --model MiniMax-M3 --message "Hello" --stream
 mmx text chat --system "You are a coding assistant" --message "Fizzbuzz in Go"
 mmx text chat --message "user:Hi" --message "assistant:Hey!" --message "How are you?"
 cat messages.json | mmx text chat --messages-file - --output json
@@ -175,7 +175,7 @@ Credential priority: `--api-key` flag > OAuth (config) > `api_key` (config).
 mmx quota
 mmx config show
 mmx config set --key region --value cn
-mmx config set --key default-text-model --value MiniMax-M2.7-highspeed
+mmx config set --key default-text-model --value MiniMax-M3
 mmx config export-schema | jq .
 ```
 

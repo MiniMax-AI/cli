@@ -4,10 +4,10 @@ import * as configLoader from '../../../src/config/loader';
 
 const CONFIG_FILE = {
   api_key: 'sk-cp-test-key',
-  default_text_model: 'MiniMax-M2.7-highspeed',
+  default_text_model: 'MiniMax-M3',
   default_speech_model: 'speech-2.8-hd',
   default_video_model: 'MiniMax-Hailuo-2.3-6s-768p',
-  default_music_model: 'music-2.6',
+  default_music_model: 'music-3.0',
 };
 
 describe('config show command', () => {
@@ -90,10 +90,10 @@ describe('config show command', () => {
       });
 
       const parsed = JSON.parse(output);
-      expect(parsed.default_text_model).toBe('MiniMax-M2.7-highspeed');
+      expect(parsed.default_text_model).toBe('MiniMax-M3');
       expect(parsed.default_speech_model).toBe('speech-2.8-hd');
       expect(parsed.default_video_model).toBe('MiniMax-Hailuo-2.3-6s-768p');
-      expect(parsed.default_music_model).toBe('music-2.6');
+      expect(parsed.default_music_model).toBe('music-3.0');
     } finally {
       console.log = originalLog;
       readConfigFile.mockRestore();

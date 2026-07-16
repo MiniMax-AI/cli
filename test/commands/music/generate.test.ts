@@ -161,7 +161,7 @@ describe('music generate command', () => {
 
     try {
       await generateCommand.execute(
-        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-2.6' },
+        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-3.0' },
         { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: 'no lyrics' },
       );
     } catch {
@@ -170,7 +170,7 @@ describe('music generate command', () => {
 
     console.log = origLog;
     const parsed = JSON.parse(captured);
-    expect(parsed.request.model).toBe('music-2.6');
+    expect(parsed.request.model).toBe('music-3.0');
   });
 
   it('--model flag overrides defaultMusicModel', async () => {
@@ -180,7 +180,7 @@ describe('music generate command', () => {
 
     try {
       await generateCommand.execute(
-        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-2.6' },
+        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-3.0' },
         { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: 'no lyrics', model: 'music-2.5' },
       );
     } catch {
@@ -192,7 +192,7 @@ describe('music generate command', () => {
     expect(parsed.request.model).toBe('music-2.5');
   });
 
-  it('accepts the official music-2.6-free model', async () => {
+  it('accepts the official music-3.0 model', async () => {
     let captured = '';
     const origLog = console.log;
     console.log = (msg: string) => { captured += msg; };
@@ -205,14 +205,14 @@ describe('music generate command', () => {
           dryRun: true,
           prompt: 'Folk',
           lyrics: 'la la',
-          model: 'music-2.6-free',
+          model: 'music-3.0',
         },
       );
     } finally {
       console.log = origLog;
     }
 
-    expect(JSON.parse(captured).request.model).toBe('music-2.6-free');
+    expect(JSON.parse(captured).request.model).toBe('music-3.0');
   });
 
   it('requires prompt for instrumental generation', async () => {
