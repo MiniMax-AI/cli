@@ -46,7 +46,7 @@ Always use these flags in non-interactive (agent/CI) contexts:
 
 ### text chat
 
-Chat completion. Default model: `MiniMax-M2.7`.
+Chat completion. Default model: `MiniMax-M3`.
 
 ```bash
 mmx text chat --message <text> [flags]
@@ -57,7 +57,7 @@ mmx text chat --message <text> [flags]
 | `--message <text>` | string, **required**, repeatable | Message text. Prefix with `role:` to set role (e.g. `"system:You are helpful"`, `"user:Hello"`) |
 | `--messages-file <path>` | string | JSON file with messages array. Use `-` for stdin |
 | `--system <text>` | string | System prompt |
-| `--model <model>` | string | Model ID (default: `MiniMax-M2.7`) |
+| `--model <model>` | string | Model ID (default: `MiniMax-M3`) |
 | `--max-tokens <n>` | number | Max tokens (default: 4096) |
 | `--temperature <n>` | number | Sampling temperature (0.0, 1.0] |
 | `--top-p <n>` | number | Nucleus sampling threshold |
@@ -206,7 +206,7 @@ echo "Breaking news." | mmx speech synthesize --text-file - --out news.mp3
 
 Generate music. Responds well to rich, structured descriptions.
 
-**Model:** `music-2.6-free` — unlimited for API key users, RPM = 3.
+**Model:** `music-3.0` — default model.
 
 ```bash
 mmx music generate --prompt <text> [--lyrics <text>] [flags]
@@ -422,10 +422,10 @@ Set per-modality defaults so you don't need `--model` every time:
 
 ```bash
 # Set defaults
-mmx config set --key default-text-model --value MiniMax-M2.7-highspeed
+mmx config set --key default-text-model --value MiniMax-M3
 mmx config set --key default-speech-model --value speech-2.8-hd
 mmx config set --key default-video-model --value MiniMax-Hailuo-2.3
-mmx config set --key default-music-model --value music-2.6
+mmx config set --key default-music-model --value music-3.0
 
 # Use without --model
 mmx text chat --message "Hello"
@@ -434,7 +434,7 @@ mmx video generate --prompt "Ocean waves"
 mmx music generate --prompt "Upbeat pop" --instrumental
 
 # --model still overrides per-call
-mmx text chat --model MiniMax-M2.7 --message "Hello"
+mmx text chat --model MiniMax-M3 --message "Hello"
 ```
 
 **Resolution priority**: `--model` flag > config default > hardcoded fallback.

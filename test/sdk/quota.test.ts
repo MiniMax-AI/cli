@@ -8,7 +8,7 @@ describe('MiniMaxSDK.quota', () => {
         return new Response(JSON.stringify({
           model_remains: [
             {
-              model_name: 'MiniMax-M2.7',
+              model_name: 'MiniMax-M3',
               start_time: 0,
               end_time: 9999999999,
               remains_time: 1000,
@@ -41,7 +41,7 @@ describe('MiniMaxSDK.quota', () => {
       const result = await sdk.quota.info();
 
       expect(result.model_remains).toHaveLength(1);
-      expect(result.model_remains[0].model_name).toBe('MiniMax-M2.7');
+      expect(result.model_remains[0].model_name).toBe('MiniMax-M3');
     } finally {
       globalThis.fetch = originalFetch;
     }

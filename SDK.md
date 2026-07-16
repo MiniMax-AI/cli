@@ -27,14 +27,14 @@ You can also omit `apiKey` if it's already configured via `mmx config set api-ke
 
 ```typescript
 const response = await sdk.text.chat({
-  model: 'MiniMax-M2.7',
+  model: 'MiniMax-M3',
   messages: [{ role: 'user', content: 'Hello!' }],
   max_tokens: 4096,
 });
 
 // Streaming
 const stream = await sdk.text.chat({
-  model: 'MiniMax-M2.7',
+  model: 'MiniMax-M3',
   messages: [{ role: 'user', content: 'Write a poem' }],
   stream: true,
 });
@@ -109,7 +109,7 @@ const englishVoices = await sdk.speech.voices('en');
 
 ```typescript
 const music = await sdk.music.generate({
-  model: 'music-2.6',
+  model: 'music-3.0',
   prompt: 'Upbeat pop song',
   lyrics: '[verse] La da dee, sunny day',
   output_format: 'hex',

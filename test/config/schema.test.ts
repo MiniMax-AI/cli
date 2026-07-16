@@ -87,15 +87,15 @@ describe('parseConfigFile', () => {
 
   it('parses default model settings', () => {
     const cfg = parseConfigFile({
-      default_text_model: 'MiniMax-M2.7',
+      default_text_model: 'MiniMax-M3',
       default_speech_model: 'speech-2.8-hd',
       default_video_model: 'MiniMax-Hailuo-2.3',
-      default_music_model: 'music-2.6',
+      default_music_model: 'music-3.0',
     });
-    expect(cfg.default_text_model).toBe('MiniMax-M2.7');
+    expect(cfg.default_text_model).toBe('MiniMax-M3');
     expect(cfg.default_speech_model).toBe('speech-2.8-hd');
     expect(cfg.default_video_model).toBe('MiniMax-Hailuo-2.3');
-    expect(cfg.default_music_model).toBe('music-2.6');
+    expect(cfg.default_music_model).toBe('music-3.0');
   });
 
   it('rejects empty string default model', () => {
@@ -110,7 +110,7 @@ describe('parseConfigFile', () => {
       output: 'json',
       timeout: 120,
       proxy: 'http://proxy:3128',
-      default_text_model: 'MiniMax-M2.7',
+      default_text_model: 'MiniMax-M3',
     });
     expect(cfg.api_key).toBe('sk-cp-test');
     expect(cfg.region).toBe('cn');
@@ -118,7 +118,7 @@ describe('parseConfigFile', () => {
     expect(cfg.output).toBe('json');
     expect(cfg.timeout).toBe(120);
     expect(cfg.proxy).toBe('http://proxy:3128');
-    expect(cfg.default_text_model).toBe('MiniMax-M2.7');
+    expect(cfg.default_text_model).toBe('MiniMax-M3');
   });
 
   it('silently ignores unknown keys', () => {

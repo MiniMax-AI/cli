@@ -8,7 +8,7 @@
       "text": "Hello! How can I help you today?"
     }
   ],
-  "model": "MiniMax-M2.7",
+  "model": "MiniMax-M3",
   "stop_reason": "end_turn",
   "usage": {
     "input_tokens": 12,

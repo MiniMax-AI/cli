@@ -86,7 +86,7 @@ describe('config set command', () => {
     await expect(
       setCommand.execute(config, {
         key: 'default_text_model',
-        value: 'MiniMax-M2.7-highspeed',
+        value: 'MiniMax-M3',
         quiet: false,
         verbose: false,
         noColor: true,
@@ -118,7 +118,7 @@ describe('config set command', () => {
     await expect(
       setCommand.execute(config, {
         key: 'default-text-model',
-        value: 'MiniMax-M2.7-highspeed',
+        value: 'MiniMax-M3',
         quiet: false,
         verbose: false,
         noColor: true,

@@ -1,6 +1,7 @@
 import type { Config } from '../../config/schema';
 
 export const MUSIC_GENERATE_MODELS = [
+  'music-3.0',
   'music-2.6',
   'music-2.6-free',
   'music-2.5+',
@@ -20,7 +21,7 @@ export function musicGenerateModel(config: Config): string {
   ) {
     return config.defaultMusicModel;
   }
-  return 'music-2.6';
+  return 'music-3.0';
 }
 
 export function musicCoverModel(config: Config): string {

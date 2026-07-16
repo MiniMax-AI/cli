@@ -33,18 +33,18 @@ function resolveModel(
 
 describe('model resolution (flag > config default > fallback)', () => {
   it('uses flag when provided', () => {
-    const model = resolveModel('defaultTextModel', 'MiniMax-M2.7', baseConfig, { model: 'MiniMax-M2.7-highspeed' });
-    expect(model).toBe('MiniMax-M2.7-highspeed');
+    const model = resolveModel('defaultTextModel', 'MiniMax-M3', baseConfig, { model: 'MiniMax-M2.7' });
+    expect(model).toBe('MiniMax-M2.7');
   });
 
   it('falls back to config default when flag is absent', () => {
-    const model = resolveModel('defaultTextModel', 'MiniMax-M2.7', { ...baseConfig, defaultTextModel: 'MiniMax-M2.7-highspeed' }, {});
-    expect(model).toBe('MiniMax-M2.7-highspeed');
+    const model = resolveModel('defaultTextModel', 'MiniMax-M3', { ...baseConfig, defaultTextModel: 'MiniMax-M3' }, {});
+    expect(model).toBe('MiniMax-M3');
   });
 
   it('falls back to hardcoded when neither flag nor config', () => {
-    const model = resolveModel('defaultTextModel', 'MiniMax-M2.7', baseConfig, {});
-    expect(model).toBe('MiniMax-M2.7');
+    const model = resolveModel('defaultTextModel', 'MiniMax-M3', baseConfig, {});
+    expect(model).toBe('MiniMax-M3');
   });
 
   it('flag overrides config default', () => {
@@ -58,7 +58,7 @@ describe('model resolution (flag > config default > fallback)', () => {
   });
 
   it('handles music model default', () => {
-    const model = resolveModel('defaultMusicModel', 'music-2.6', { ...baseConfig, defaultMusicModel: 'music-2.6' }, {});
-    expect(model).toBe('music-2.6');
+    const model = resolveModel('defaultMusicModel', 'music-3.0', { ...baseConfig, defaultMusicModel: 'music-3.0' }, {});
+    expect(model).toBe('music-3.0');
   });
 });
