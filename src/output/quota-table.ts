@@ -30,10 +30,11 @@ interface Labels {
   resetsIn: string;
   noData: string;
   now: string;
+  notInPlan: string;
 }
 
-const LABELS_EN: Labels = { dashboard: 'TokenPlan Quota', week: 'Week', current: 'Left', weekly: 'Wk left', resetsIn: 'Reset', noData: 'No quota data available.', now: 'now' };
-const LABELS_CN: Labels = { dashboard: 'TokenPlan 配额面板', week: '周期', current: '剩余', weekly: '周剩余', resetsIn: '重置', noData: '暂无配额数据', now: '即将' };
+const LABELS_EN: Labels = { dashboard: 'TokenPlan Quota', week: 'Week', current: 'Left', weekly: 'Wk left', resetsIn: 'Reset', noData: 'No quota data available.', now: 'now', notInPlan: 'not in plan' };
+const LABELS_CN: Labels = { dashboard: 'TokenPlan 配额面板', week: '周期', current: '剩余', weekly: '周剩余', resetsIn: '重置', noData: '暂无配额数据', now: '即将', notInPlan: '不在当前套餐中' };
 
 const MODEL_NAME_CN: Record<string, string> = {
   'general': '通用',
@@ -82,6 +83,16 @@ const MAX_DISPLAY_PCT = 200;
 // (per the status enum: 1=normal, 2=exhausted, 3=unlimited).
 function isUnweekly(status: number | undefined | null): boolean {
   return status === 3;
+}
+
+function isUnavailablePlan(model: QuotaModelRemain): boolean {
+  // Weekly status 3 is normally unlimited. When both windows are status 3 and
+  // both totals are zero, however, the API uses the same status for a model
+  // that has no quota bucket in the current plan (see issue #173).
+  return model.current_interval_total_count === 0
+    && model.current_weekly_total_count === 0
+    && model.current_interval_status === 3
+    && model.current_weekly_status === 3;
 }
 
 function clampPct(value: number): number {
@@ -154,6 +165,14 @@ function renderMetric(
   return `${label} ${bar}`;
 }
 
+function renderUnavailableMetric(label: string, unavailableLabel: string, color: boolean): string {
+  if (color) {
+    const bar = `${BG_EMPTY}${' '.repeat(COMPACT_BAR_WIDTH)}${R}`;
+    return `${D}${label}${R} ${bar} ${FG_RED}${B}${unavailableLabel}${R}`;
+  }
+  return `${label} [${'.'.repeat(COMPACT_BAR_WIDTH)}] ${unavailableLabel}`;
+}
+
 function boxLine(w: number, l: string, f: string, r: string, c: boolean): string {
   return c ? `${D}${l}${f.repeat(w)}${r}${R}` : `+${'-'.repeat(w)}+`;
 }
@@ -169,24 +188,31 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
 
   const rows = models.map((m) => {
     const displayName = displayModelName(m.model_name, config.region);
-    const current = renderMetric(
-      L.current,
-      m.current_interval_usage_count,
-      m.current_interval_total_count,
-      m.current_interval_remaining_percent,
-      useColor,
-    );
-    const weekly = renderMetric(
-      L.weekly,
-      m.current_weekly_usage_count,
-      m.current_weekly_total_count,
-      m.current_weekly_remaining_percent,
-      useColor,
-      m.weekly_boost_permille,
-      isUnweekly(m.current_weekly_status),
-      config.region === 'cn' ? UNLIMITED_LABEL_CN : UNLIMITED_LABEL_EN,
-    );
-    const reset = `${L.resetsIn} ${formatDuration(m.remains_time, L.now)}`;
+    const unavailable = isUnavailablePlan(m);
+    const current = unavailable
+      ? renderUnavailableMetric(L.current, L.notInPlan, useColor)
+      : renderMetric(
+        L.current,
+        m.current_interval_usage_count,
+        m.current_interval_total_count,
+        m.current_interval_remaining_percent,
+        useColor,
+      );
+    const weekly = unavailable
+      ? renderUnavailableMetric(L.weekly, L.notInPlan, useColor)
+      : renderMetric(
+        L.weekly,
+        m.current_weekly_usage_count,
+        m.current_weekly_total_count,
+        m.current_weekly_remaining_percent,
+        useColor,
+        m.weekly_boost_permille,
+        isUnweekly(m.current_weekly_status),
+        config.region === 'cn' ? UNLIMITED_LABEL_CN : UNLIMITED_LABEL_EN,
+      );
+    const reset = unavailable
+      ? `${L.resetsIn} —`
+      : `${L.resetsIn} ${formatDuration(m.remains_time, L.now)}`;
     return { displayName, current, weekly, reset };
   });
 
