@@ -253,4 +253,41 @@ describe('renderQuotaTable', () => {
     expect(output).toContain('unlimited');
     expect(output).not.toContain('100%');
   });
+
+  it('renders a zero-allocation model as unavailable instead of unlimited', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [
+          {
+            ...createModel(),
+            model_name: 'video',
+            current_interval_total_count: 0,
+            current_interval_usage_count: 0,
+            current_interval_remaining_percent: 100,
+            current_interval_status: 3,
+            current_weekly_total_count: 0,
+            current_weekly_usage_count: 0,
+            current_weekly_remaining_percent: 100,
+            current_weekly_status: 3,
+          },
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+    expect(output).toContain('not in plan');
+    expect(output).toContain('Reset —');
+    expect(output).not.toContain('unlimited');
+    expect(output).not.toContain('100%');
+  });
 });
