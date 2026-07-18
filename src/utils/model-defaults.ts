@@ -82,12 +82,23 @@ export function resolveTemperature(value: unknown): number | undefined {
 }
 
 /**
- * Recommended nucleus sampling threshold per the Messages API contract.
+ * Per-model default `top_p` (nucleus sampling threshold) recommended by the
+ * current Messages API contract:
+ *   - MiniMax-M3:  0.95
+ *   - M2.x models (M2.5, M2.7, etc.):  0.9
  *
- * Documented in help text so users know the API's recommended default. The
- * CLI does not auto-send 0.95 when the flag is omitted — preserving
- * backward-compat for users who pass nothing today and rely on whatever the
- * API defaults to on the server side.
+ * `top_p` is only sent on the wire when the user explicitly passes
+ * `--top-p <n>`. The CLI does NOT auto-send the model-aware default — that
+ * would be a behavior change for existing users who pass nothing today and
+ * rely on whatever the API defaults to on the server side.
+ *
+ * This function returns the recommended value to display in help text and
+ * to mirror in tests, so the documentation stays aligned with the API
+ * contract if a future model ships a different default. Unknown models
+ * fall back to the M2.x default (0.9) as the safer middle ground.
  */
-export const TOP_P_DEFAULT = 0.95;
+export function resolveTopPDefault(model: string): number {
+  if (model === 'MiniMax-M3') return 0.95;
+  return 0.9;
+}
 

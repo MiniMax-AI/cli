@@ -4,8 +4,8 @@ import {
   resolveMaxTokens,
   resolveThinkingMode,
   resolveTemperature,
+  resolveTopPDefault,
   THINKING_MODES,
-  TOP_P_DEFAULT,
   TEMPERATURE_MIN,
   TEMPERATURE_MAX,
 } from '../../src/utils/model-defaults';
@@ -170,8 +170,22 @@ describe('resolveTemperature ([0, 2] validation)', () => {
     expect(TEMPERATURE_MIN).toBe(0);
     expect(TEMPERATURE_MAX).toBe(2);
   });
+});
 
-  it('exposes the documented top_p default', () => {
-    expect(TOP_P_DEFAULT).toBe(0.95);
+describe('resolveTopPDefault (model-aware per Messages API contract)', () => {
+  it('returns 0.95 for MiniMax-M3 (the documented M3 default)', () => {
+    expect(resolveTopPDefault('MiniMax-M3')).toBe(0.95);
+  });
+
+  it('returns 0.9 for MiniMax-M2.7 (the documented M2.x default)', () => {
+    expect(resolveTopPDefault('MiniMax-M2.7')).toBe(0.9);
+  });
+
+  it('returns 0.9 for MiniMax-M2.5 (the documented M2.x default)', () => {
+    expect(resolveTopPDefault('MiniMax-M2.5')).toBe(0.9);
+  });
+
+  it('returns 0.9 for unknown models (safe M2.x fallback)', () => {
+    expect(resolveTopPDefault('gpt-9-snowflake')).toBe(0.9);
   });
 });

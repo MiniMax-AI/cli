@@ -166,7 +166,7 @@ export default defineCommand({
     { flag: '--system <text>',         description: 'System prompt' },
     { flag: '--max-tokens <n>',        description: 'Maximum tokens to generate (default: 131072 for M3, 65536 for other models)', type: 'number' },
     { flag: '--temperature <n>',       description: 'Sampling temperature [0, 2] (default: 1)', type: 'number' },
-    { flag: '--top-p <n>',             description: 'Nucleus sampling threshold (default: 0.95 per Messages API)', type: 'number' },
+    { flag: '--top-p <n>',             description: 'Nucleus sampling threshold (default: 0.95 for M3, 0.9 for M2.x per Messages API)', type: 'number' },
     { flag: '--stream',                description: 'Stream response tokens (default: on in TTY)' },
     { flag: '--thinking <mode>',       description: 'Thinking mode for M3: enabled | disabled | adaptive (default: omitted — thinking disabled per Messages API contract)' },
     { flag: '--tool <json-or-path>',   description: 'Tool definition as JSON or file path (repeatable)', type: 'array' },
