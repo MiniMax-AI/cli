@@ -71,4 +71,41 @@ describe('downloadFile', () => {
     expect(existsSync(destPath)).toBe(true);
     expect(readdirSync(dir)).toEqual(['video.mp4']);
   });
+
+  it('rejects a cleanly ended response whose body is shorter than Content-Length', async () => {
+    const dir = makeTempDir();
+    const destPath = join(dir, 'video.mp4');
+    writeFileSync(destPath, 'original');
+
+    globalThis.fetch = (async () => new Response(new TextEncoder().encode('new'), {
+      status: 200,
+      headers: { 'content-length': '10' },
+    })) as unknown as typeof fetch;
+
+    await expect(
+      downloadFile('https://example.com/video.mp4', destPath, { quiet: true, retries: 0 }),
+    ).rejects.toThrow('Download truncated: expected 10 bytes, received 3');
+
+    expect(readFileSync(destPath, 'utf-8')).toBe('original');
+    expect(readdirSync(dir)).toEqual(['video.mp4']);
+  });
+
+  it('does not compare decoded response bytes with compressed Content-Length', async () => {
+    const dir = makeTempDir();
+    const destPath = join(dir, 'video.mp4');
+
+    globalThis.fetch = (async () => new Response(new TextEncoder().encode('new'), {
+      status: 200,
+      headers: {
+        'content-encoding': 'gzip',
+        'content-length': '10',
+      },
+    })) as unknown as typeof fetch;
+
+    await expect(
+      downloadFile('https://example.com/video.mp4', destPath, { quiet: true, retries: 0 }),
+    ).resolves.toEqual({ size: 3 });
+
+    expect(readFileSync(destPath, 'utf-8')).toBe('new');
+  });
 });

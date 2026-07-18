@@ -37,7 +37,11 @@ export async function downloadFile(
         throw new CLIError(`Download failed: HTTP ${res.status}`, ExitCode.GENERAL);
       }
 
-      const contentLength = Number(res.headers.get('content-length') || 0);
+      // fetch transparently decodes compressed responses, so Content-Length
+      // only describes the readable body when no Content-Encoding is present.
+      const contentLength = res.headers.get('content-encoding')
+        ? 0
+        : Number(res.headers.get('content-length') || 0);
       const reader = res.body?.getReader();
       if (!reader) throw new CLIError('No response body', ExitCode.GENERAL);
 
@@ -68,6 +72,13 @@ export async function downloadFile(
 
           received += value.byteLength;
           progress?.update(received);
+        }
+
+        if (contentLength > 0 && received !== contentLength) {
+          throw new CLIError(
+            `Download truncated: expected ${contentLength} bytes, received ${received}.`,
+            ExitCode.NETWORK,
+          );
         }
         readComplete = true;
       } finally {
