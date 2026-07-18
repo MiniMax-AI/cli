@@ -9,7 +9,7 @@ import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { ChatMessage, ChatRequest, StreamEvent } from '../../types/api';
 import { writeFileSync } from 'node:fs';
-import { resolveMaxTokens, resolveThinkingMode, type ThinkingMode } from '../../utils/model-defaults';
+import { resolveMaxTokens, resolveThinkingMode, resolveTemperature, type ThinkingMode } from '../../utils/model-defaults';
 
 // ---------------------------------------------------------------------------
 // ANSI helpers
@@ -299,8 +299,8 @@ export default defineCommand({
     { flag: '--model <model>',     description: 'Model ID (default: MiniMax-M3)' },
     { flag: '--system <text>',     description: 'System prompt' },
     { flag: '--max-tokens <n>',    description: 'Maximum tokens per response (default: 131072 for M3, 65536 for other models)', type: 'number' },
-    { flag: '--temperature <n>',   description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
-    { flag: '--top-p <n>',         description: 'Nucleus sampling threshold', type: 'number' },
+    { flag: '--temperature <n>',   description: 'Sampling temperature [0, 2] (default: 1)', type: 'number' },
+    { flag: '--top-p <n>',         description: 'Nucleus sampling threshold (default: 0.95 per Messages API)', type: 'number' },
     { flag: '--thinking <mode>',   description: 'Thinking mode for M3: enabled | disabled | adaptive (default: omitted — thinking disabled per Messages API contract)' },
   ],
   examples: [
@@ -335,6 +335,17 @@ export default defineCommand({
       );
     }
 
+    // ---- Validate --temperature up-front (same surface as chat) ----
+    let temperature: number | undefined;
+    try {
+      temperature = resolveTemperature(flags.temperature);
+    } catch (err) {
+      throw new CLIError(
+        err instanceof Error ? err.message : String(err),
+        ExitCode.USAGE,
+      );
+    }
+
     // ---- Initialize state ----
     const state: ReplState = {
       messages: [],
@@ -344,7 +355,7 @@ export default defineCommand({
         (flags.model as string) || config.defaultTextModel || 'MiniMax-M3',
         flags.maxTokens as number | undefined,
       ),
-      temperature: flags.temperature !== undefined ? flags.temperature as number : undefined,
+      temperature,
       topP: flags.topP !== undefined ? flags.topP as number : undefined,
       thinking: thinkingMode,
     };

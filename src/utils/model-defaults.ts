@@ -51,3 +51,43 @@ export function resolveThinkingMode(value: unknown): ThinkingMode | undefined {
     `Invalid --thinking value "${String(value)}". Expected one of: ${THINKING_MODES.join(', ')}.`,
   );
 }
+
+/**
+ * Sampling temperature bounds for the Messages API.
+ *
+ * M3 documents `[0, 2]` with default `1`. The CLI rejects out-of-range values
+ * to fail fast on a common typo (e.g. `1.5e1` or a stray negative sign).
+ */
+export const TEMPERATURE_MIN = 0;
+export const TEMPERATURE_MAX = 2;
+export const TEMPERATURE_DEFAULT = 1;
+
+/**
+ * Validate a `--temperature` value. Returns the number when within `[0, 2]`,
+ * `undefined` when no value was supplied, or throws on out-of-range / non-numeric
+ * input.
+ */
+export function resolveTemperature(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    throw new Error(`Invalid --temperature value "${String(value)}". Must be a number in [${TEMPERATURE_MIN}, ${TEMPERATURE_MAX}].`);
+  }
+  if (n < TEMPERATURE_MIN || n > TEMPERATURE_MAX) {
+    throw new Error(
+      `Invalid --temperature value ${n}. Must be in [${TEMPERATURE_MIN}, ${TEMPERATURE_MAX}] (per Messages API contract).`,
+    );
+  }
+  return n;
+}
+
+/**
+ * Recommended nucleus sampling threshold per the Messages API contract.
+ *
+ * Documented in help text so users know the API's recommended default. The
+ * CLI does not auto-send 0.95 when the flag is omitted — preserving
+ * backward-compat for users who pass nothing today and rely on whatever the
+ * API defaults to on the server side.
+ */
+export const TOP_P_DEFAULT = 0.95;
+
