@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'bun:test';
 import type { Config } from '../../src/config/schema';
+import {
+  resolveMaxTokens,
+  resolveThinkingMode,
+  resolveTemperature,
+  THINKING_MODES,
+  TOP_P_DEFAULT,
+  TEMPERATURE_MIN,
+  TEMPERATURE_MAX,
+} from '../../src/utils/model-defaults';
 
 const baseConfig: Config = {
   region: 'global',
@@ -60,5 +69,109 @@ describe('model resolution (flag > config default > fallback)', () => {
   it('handles music model default', () => {
     const model = resolveModel('defaultMusicModel', 'music-3.0', { ...baseConfig, defaultMusicModel: 'music-3.0' }, {});
     expect(model).toBe('music-3.0');
+  });
+});
+
+describe('resolveMaxTokens (model-aware defaults)', () => {
+  it('uses 131072 for MiniMax-M3 when flag is absent', () => {
+    expect(resolveMaxTokens('MiniMax-M3', undefined)).toBe(131072);
+  });
+
+  it('uses 65536 for MiniMax-M2.7 when flag is absent', () => {
+    expect(resolveMaxTokens('MiniMax-M2.7', undefined)).toBe(65536);
+  });
+
+  it('uses 65536 for MiniMax-M2.5 when flag is absent', () => {
+    expect(resolveMaxTokens('MiniMax-M2.5', undefined)).toBe(65536);
+  });
+
+  it('uses 65536 for unknown / other models', () => {
+    expect(resolveMaxTokens('gpt-9-snowflake', undefined)).toBe(65536);
+  });
+
+  it('flag value 100 always overrides M3 default', () => {
+    expect(resolveMaxTokens('MiniMax-M3', 100)).toBe(100);
+  });
+
+  it('flag value 100 always overrides M2.7 default', () => {
+    expect(resolveMaxTokens('MiniMax-M2.7', 100)).toBe(100);
+  });
+
+  it('flag value 524288 (M3 documented max) passes through', () => {
+    expect(resolveMaxTokens('MiniMax-M3', 524288)).toBe(524288);
+  });
+});
+
+describe('resolveThinkingMode', () => {
+  it('returns undefined for absent / empty input', () => {
+    expect(resolveThinkingMode(undefined)).toBeUndefined();
+    expect(resolveThinkingMode(null)).toBeUndefined();
+    expect(resolveThinkingMode('')).toBeUndefined();
+  });
+
+  it('returns the mode for known values', () => {
+    expect(resolveThinkingMode('enabled')).toBe('enabled');
+    expect(resolveThinkingMode('disabled')).toBe('disabled');
+    expect(resolveThinkingMode('adaptive')).toBe('adaptive');
+  });
+
+  it('normalizes case', () => {
+    expect(resolveThinkingMode('Enabled')).toBe('enabled');
+    expect(resolveThinkingMode('ADAPTIVE')).toBe('adaptive');
+  });
+
+  it('throws on unknown values', () => {
+    expect(() => resolveThinkingMode('bogus')).toThrow(/Invalid --thinking value/);
+  });
+
+  it('exposes the full allowed set', () => {
+    expect(THINKING_MODES).toEqual(['enabled', 'disabled', 'adaptive']);
+  });
+});
+
+describe('resolveTemperature ([0, 2] validation)', () => {
+  it('returns undefined for absent / empty input', () => {
+    expect(resolveTemperature(undefined)).toBeUndefined();
+    expect(resolveTemperature(null)).toBeUndefined();
+    expect(resolveTemperature('')).toBeUndefined();
+  });
+
+  it('accepts boundary values 0 and 2', () => {
+    expect(resolveTemperature(0)).toBe(0);
+    expect(resolveTemperature(2)).toBe(2);
+  });
+
+  it('accepts the documented default 1', () => {
+    expect(resolveTemperature(1)).toBe(1);
+  });
+
+  it('accepts fractional values within range', () => {
+    expect(resolveTemperature(0.7)).toBe(0.7);
+    expect(resolveTemperature(1.5)).toBe(1.5);
+  });
+
+  it('coerces numeric strings', () => {
+    expect(resolveTemperature('0.5')).toBe(0.5);
+  });
+
+  it('throws on values below 0', () => {
+    expect(() => resolveTemperature(-0.01)).toThrow(/Must be in \[0, 2\]/);
+  });
+
+  it('throws on values above 2', () => {
+    expect(() => resolveTemperature(2.01)).toThrow(/Must be in \[0, 2\]/);
+  });
+
+  it('throws on non-numeric strings', () => {
+    expect(() => resolveTemperature('hot')).toThrow(/Must be a number/);
+  });
+
+  it('exposes the contract bounds as constants', () => {
+    expect(TEMPERATURE_MIN).toBe(0);
+    expect(TEMPERATURE_MAX).toBe(2);
+  });
+
+  it('exposes the documented top_p default', () => {
+    expect(TOP_P_DEFAULT).toBe(0.95);
   });
 });
