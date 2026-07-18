@@ -17,6 +17,7 @@ import type {
 import { readFileSync } from 'fs';
 import { isInteractive } from '../../utils/env';
 import { promptText, failIfMissing } from '../../utils/prompt';
+import { resolveMaxTokens, resolveThinkingMode } from '../../utils/model-defaults';
 
 // ---------------------------------------------------------------------------
 // Thinking indicator — dynamic spinner + color-cycling label
@@ -163,10 +164,11 @@ export default defineCommand({
     { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
-    { flag: '--max-tokens <n>',        description: 'Maximum tokens to generate (default: 4096)', type: 'number' },
+    { flag: '--max-tokens <n>',        description: 'Maximum tokens to generate (default: 131072 for M3, 65536 for other models)', type: 'number' },
     { flag: '--temperature <n>',       description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
     { flag: '--top-p <n>',             description: 'Nucleus sampling threshold', type: 'number' },
     { flag: '--stream',                description: 'Stream response tokens (default: on in TTY)' },
+    { flag: '--thinking <mode>',       description: 'Thinking mode for M3: enabled | disabled | adaptive (default: omitted — thinking disabled per Messages API contract)' },
     { flag: '--tool <json-or-path>',   description: 'Tool definition as JSON or file path (repeatable)', type: 'array' },
   ],
   examples: [
@@ -205,16 +207,29 @@ export default defineCommand({
       && process.stdout.isTTY
     );
 
+    // Validate --thinking flag before any side effects. Unknown mode is a
+    // user error; surface it cleanly with CLIError (exit 2 = USAGE).
+    let thinkingMode: ReturnType<typeof resolveThinkingMode>;
+    try {
+      thinkingMode = resolveThinkingMode(flags.thinking);
+    } catch (err) {
+      throw new CLIError(
+        err instanceof Error ? err.message : String(err),
+        ExitCode.USAGE,
+      );
+    }
+
     const body: ChatRequest = {
       model,
       messages,
-      max_tokens: (flags.maxTokens as number) ?? 4096,
+      max_tokens: resolveMaxTokens(model, flags.maxTokens as number | undefined),
       stream: shouldStream,
     };
 
     if (system) body.system = system;
     if (flags.temperature !== undefined) body.temperature = flags.temperature as number;
     if (flags.topP !== undefined) body.top_p = flags.topP as number;
+    if (thinkingMode !== undefined) body.thinking = { type: thinkingMode };
 
     if (flags.tool) {
       const tools = (flags.tool as string[]).map(t => {
