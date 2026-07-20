@@ -16,6 +16,7 @@ import type {
 } from '../../types/api';
 import { readFileSync } from 'fs';
 import { isInteractive } from '../../utils/env';
+import { readTextFromPathOrStdin } from '../../utils/fs';
 import { promptText, failIfMissing } from '../../utils/prompt';
 
 // ---------------------------------------------------------------------------
@@ -104,9 +105,7 @@ function parseMessages(flags: GlobalFlags): ParsedMessages {
 
   if (flags.messagesFile) {
     const filePath = flags.messagesFile as string;
-    const raw = filePath === '-'
-      ? readFileSync('/dev/stdin', 'utf-8')
-      : readFileSync(filePath, 'utf-8');
+    const raw = readTextFromPathOrStdin(filePath);
     const parsed = JSON.parse(raw) as Array<{ role: string; content: string | ContentBlock[] }>;
     for (const m of parsed) {
       if (m.role === 'system') {
