@@ -28,7 +28,9 @@ export default defineCommand({
     const url = quotaEndpoint(config.baseUrl);
     const response = await requestJson<QuotaApiResponse>(config, { url });
     const models = response.model_remains || [];
-    const format = detectOutputFormat(flags.output as string | undefined);
+    // `loadConfig()` has already resolved --output, MINIMAX_OUTPUT, and the
+    // saved config value. Reading flags again drops the latter two sources.
+    const format = detectOutputFormat(config.output);
 
     if (format !== 'text') {
       console.log(formatOutput(response, format));

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'bun:test';
+import { afterEach, describe, it, expect } from 'bun:test';
 import { default as showCommand } from '../../../src/commands/quota/show';
+import { createMockServer, jsonResponse, type MockServer } from '../../helpers/mock-server';
 
 const baseConfig = {
   apiKey: 'test-key',
@@ -28,6 +29,12 @@ const baseFlags = {
 };
 
 describe('quota show command', () => {
+  let server: MockServer;
+
+  afterEach(() => {
+    server?.close();
+  });
+
   it('has correct name', () => {
     expect(showCommand.name).toBe('quota show');
   });
@@ -44,6 +51,35 @@ describe('quota show command', () => {
       expect(captured).toContain('Would fetch quota');
     } finally {
       console.log = origLog;
+    }
+  });
+
+  it('honors JSON output resolved from config when no output flag is present', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/token_plan/remains': () => jsonResponse({
+          model_remains: [],
+          base_resp: { status_code: 0, status_msg: 'ok' },
+        }),
+      },
+    });
+
+    const originalIsTTY = process.stdout.isTTY;
+    const originalLog = console.log;
+    let captured = '';
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    console.log = (message: string) => { captured += message; };
+
+    try {
+      await showCommand.execute(
+        { ...baseConfig, baseUrl: server.url, output: 'json' },
+        baseFlags,
+      );
+
+      expect(JSON.parse(captured)).toMatchObject({ model_remains: [] });
+    } finally {
+      console.log = originalLog;
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
     }
   });
 
