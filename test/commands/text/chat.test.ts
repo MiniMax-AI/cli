@@ -302,4 +302,38 @@ describe('text chat command', () => {
       console.log = originalLog;
     }
   });
+
+  it('rejects an unregistered --model with a usage error', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    await expect(
+      chatCommand.execute(config, {
+        message: ['Hello'],
+        model: 'not-a-real-model',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      }),
+    ).rejects.toThrow('Invalid model "not-a-real-model"');
+  });
 });

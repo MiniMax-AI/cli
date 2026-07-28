@@ -17,6 +17,7 @@ import type {
 import { readFileSync } from 'fs';
 import { isInteractive } from '../../utils/env';
 import { promptText, failIfMissing } from '../../utils/prompt';
+import { TEXT_MODELS, textModel } from './models';
 
 // ---------------------------------------------------------------------------
 // Thinking indicator — dynamic spinner + color-cycling label
@@ -159,7 +160,7 @@ export default defineCommand({
   apiDocs: '/docs/api-reference/text-post',
   usage: 'mmx text chat --message <text> [flags]',
   options: [
-    { flag: '--model <model>', description: 'Model ID (default: MiniMax-M3)' },
+    { flag: '--model <model>', description: `Model ID (default: ${TEXT_MODELS[0]}; supported: ${TEXT_MODELS.join(', ')})` },
     { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
@@ -195,9 +196,14 @@ export default defineCommand({
       }
     }
 
-    const model = (flags.model as string)
-      || config.defaultTextModel
-      || 'MiniMax-M3';
+    const model = textModel(config, flags.model as string | undefined);
+    if (flags.model && !TEXT_MODELS.includes(model as typeof TEXT_MODELS[number])) {
+      throw new CLIError(
+        `Invalid model "${model}". Valid models: ${TEXT_MODELS.join(', ')}`,
+        ExitCode.USAGE,
+        `mmx text chat --model ${TEXT_MODELS[0]}`,
+      );
+    }
     const format = detectOutputFormat(config.output);
     const shouldStream = flags.stream === true || (
       flags.stream === undefined

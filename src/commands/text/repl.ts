@@ -9,6 +9,7 @@ import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { ChatMessage, ChatRequest, StreamEvent } from '../../types/api';
 import { writeFileSync } from 'node:fs';
+import { TEXT_MODELS, textModel } from './models';
 
 // ---------------------------------------------------------------------------
 // ANSI helpers
@@ -294,7 +295,7 @@ export default defineCommand({
   description: 'Start an interactive multi-turn chat session',
   usage: 'mmx text repl [flags]',
   options: [
-    { flag: '--model <model>',     description: 'Model ID (default: MiniMax-M3)' },
+    { flag: '--model <model>',     description: `Model ID (default: ${TEXT_MODELS[0]}; supported: ${TEXT_MODELS.join(', ')})` },
     { flag: '--system <text>',     description: 'System prompt' },
     { flag: '--max-tokens <n>',    description: 'Maximum tokens per response (default: 4096)', type: 'number' },
     { flag: '--temperature <n>',   description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
@@ -321,11 +322,21 @@ export default defineCommand({
     const dim  = config.noColor ? '' : '\x1b[2m';
     const reset = config.noColor ? '' : '\x1b[0m';
 
+    // ---- Validate --model up-front (same surface as chat) ----
+    const model = textModel(config, flags.model as string | undefined);
+    if (flags.model && !TEXT_MODELS.includes(model as typeof TEXT_MODELS[number])) {
+      throw new CLIError(
+        `Invalid model "${model}". Valid models: ${TEXT_MODELS.join(', ')}`,
+        ExitCode.USAGE,
+        `mmx text repl --model ${TEXT_MODELS[0]}`,
+      );
+    }
+
     // ---- Initialize state ----
     const state: ReplState = {
       messages: [],
       system: flags.system as string | undefined,
-      model: (flags.model as string) || config.defaultTextModel || 'MiniMax-M3',
+      model,
       maxTokens: (flags.maxTokens as number) ?? 4096,
       temperature: flags.temperature !== undefined ? flags.temperature as number : undefined,
       topP: flags.topP !== undefined ? flags.topP as number : undefined,

@@ -3,6 +3,7 @@ import { chatEndpoint } from "../../client/endpoints";
 import { ChatRequest, ChatResponse, StreamEvent } from "../../types/api";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
+import { TEXT_MODELS, textModel } from "../../commands/text/models";
 
 export class TextSDK extends Client {
   private async *chatStream(body: Partial<ChatRequest>): AsyncGenerator<StreamEvent> {
@@ -54,9 +55,17 @@ export class TextSDK extends Client {
       );
     }
 
+    const model = textModel(this.config, params.model);
+    if (params.model && !TEXT_MODELS.includes(model as typeof TEXT_MODELS[number])) {
+      throw new SDKError(
+        `Invalid model "${model}". Valid models: ${TEXT_MODELS.join(', ')}`,
+        ExitCode.USAGE,
+      );
+    }
+
     return {
       ...params,
-      model: params.model ?? 'MiniMax-M3',
+      model,
       max_tokens: params.max_tokens ?? 4096,
     } as ChatRequest;
   }

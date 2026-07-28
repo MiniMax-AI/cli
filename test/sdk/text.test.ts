@@ -87,4 +87,10 @@ describe('TextSDK.validateParams', () => {
       sdk.chat({ messages: [{ role: 'user', content: 'Hi' }] }),
     ).rejects.not.toThrow('At least one message');
   });
+
+  it('rejects an unregistered model', async () => {
+    await expect(
+      sdk.chat({ messages: [{ role: 'user', content: 'Hi' }], model: 'not-a-real-model' }),
+    ).rejects.toThrow('Invalid model "not-a-real-model"');
+  });
 });

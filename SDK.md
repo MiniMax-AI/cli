@@ -44,6 +44,9 @@ for await (const event of stream) {
 }
 ```
 
+Supported text models: `MiniMax-M3` (default) and `MiniMax-M2.7`. Pass either
+as the `model` field; omit it to use the default.
+
 ### Image
 
 ```typescript
