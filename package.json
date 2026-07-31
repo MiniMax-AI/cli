@@ -1,8 +1,16 @@
 {
   "name": "mmx-cli",
-  "version": "1.0.16",
+  "version": "1.0.18",
   "description": "CLI for the MiniMax AI Platform",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MiniMax-AI/cli.git"
+  },
+  "homepage": "https://github.com/MiniMax-AI/cli#readme",
+  "bugs": {
+    "url": "https://github.com/MiniMax-AI/cli/issues"
+  },
   "engines": {
     "node": ">=18"
   },

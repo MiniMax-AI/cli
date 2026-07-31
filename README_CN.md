@@ -68,7 +68,7 @@ mmx quota
 
 ```bash
 mmx text chat --message "写一首诗"
-mmx text chat --model MiniMax-M2.7-highspeed --message "你好" --stream
+mmx text chat --model MiniMax-M3 --message "你好" --stream
 mmx text chat --system "你是编程助手" --message "用 Go 写 Fizzbuzz"
 mmx text chat --message "user:你好" --message "assistant:嗨！" --message "你叫什么名字？"
 cat messages.json | mmx text chat --messages-file - --output json
@@ -156,7 +156,7 @@ Global 与中国两个 region，选用能通过的那个。
 mmx quota
 mmx config show
 mmx config set --key region --value cn
-mmx config set --key default-text-model --value MiniMax-M2.7-highspeed
+mmx config set --key default-text-model --value MiniMax-M3
 mmx config export-schema | jq .
 ```
 

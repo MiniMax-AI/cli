@@ -105,7 +105,7 @@ export interface SpeechRequest {
     channel?: number;
   };
   language_boost?: string;
-  pronunciation_dict?: Array<{ tone: string; text: string }>;
+  pronunciation_dict?: { tone: string[] };
   output_format?: 'url' | 'hex';
   stream?: boolean;
   subtitle_enable?: boolean;  // Correct API parameter name (not 'subtitle')
@@ -212,6 +212,7 @@ export interface MusicRequest {
   lyrics_optimizer?: boolean;
   audio_url?: string;
   audio_base64?: string;
+  cover_feature_id?: string;
   seed?: number;
   audio_setting?: {
     format?: string;
@@ -250,6 +251,21 @@ export interface LyricsGenerationResponse {
   song_title?: string;
   style_tags?: string;
   lyrics: string;
+  base_resp: BaseResp;
+}
+
+export interface CoverPreprocessRequest {
+  model: 'music-cover';
+  audio_url?: string;
+  audio_base64?: string;
+}
+
+export interface CoverPreprocessResponse {
+  cover_feature_id: string;
+  formatted_lyrics?: string;
+  structure_result?: string;
+  audio_duration?: number;
+  trace_id?: string;
   base_resp: BaseResp;
 }
 

@@ -34,6 +34,10 @@ export function lyricsGenerationEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/lyrics_generation`;
 }
 
+export function musicCoverPreprocessEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/music_cover_preprocess`;
+}
+
 export function searchEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/coding_plan/search`;
 }
@@ -47,7 +51,7 @@ export function quotaEndpoint(baseUrl: string): string {
 }
 
 export function fileUploadEndpoint(baseUrl: string): string {
-  return `${baseUrl}/v1/files`;
+  return `${baseUrl}/v1/files/upload`;
 }
 
 export function fileListEndpoint(baseUrl: string): string {

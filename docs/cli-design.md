@@ -18,7 +18,7 @@ mmx
 │   ├── refresh            Manually refresh OAuth token
 │   └── logout             Revoke tokens and clear stored credentials
 ├── text
-│   └── chat               Send a chat completion (M2.7 / M2.7-highspeed)
+│   └── chat               Send a chat completion (M3)
 ├── speech
 │   └── synthesize         Synchronous TTS, ≤10k chars
 ├── image
@@ -29,7 +29,7 @@ mmx
 │   │   └── get            Query video task status
 │   └── download           Download a completed video by file ID
 ├── music
-│   └── generate           Generate a song (music-2.5)
+│   └── generate           Generate a song (music-3.0)
 ├── quota
 │   └── show               Display Token Plan usage and remaining quotas
 └── config

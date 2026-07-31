@@ -3,6 +3,7 @@ import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { readConfigFile, writeConfigFile } from '../../config/loader';
+import { maskToken } from '../../utils/token';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 
@@ -15,6 +16,10 @@ const KEY_ALIASES: Record<string, string> = {
   'default-video-model': 'default_video_model',
   'default-music-model': 'default_music_model',
 };
+
+function valueForOutput(key: string, value: unknown): unknown {
+  return key === 'api_key' ? maskToken(String(value)) : value;
+}
 
 export default defineCommand({
   name: 'config set',
@@ -49,6 +54,14 @@ export default defineCommand({
     if (!VALID_KEYS.includes(resolvedKey)) {
       throw new CLIError(
         `Invalid config key "${key}". Valid keys: ${VALID_KEYS.join(', ')}`,
+        ExitCode.USAGE,
+      );
+    }
+
+    const valueToSet = resolvedKey === 'api_key' ? value.trim() : value;
+    if (resolvedKey === 'api_key' && valueToSet.length === 0) {
+      throw new CLIError(
+        'Invalid api_key. The value must not be empty.',
         ExitCode.USAGE,
       );
     }
@@ -95,22 +108,28 @@ export default defineCommand({
     const format = detectOutputFormat(config.output);
 
     if (config.dryRun) {
-      console.log(formatOutput({ would_set: { [resolvedKey]: value } }, format));
+      console.log(formatOutput({
+        would_set: { [resolvedKey]: valueForOutput(resolvedKey, valueToSet) },
+      }, format));
       return;
     }
 
     const existing = readConfigFile() as Record<string, unknown>;
-    existing[resolvedKey] = resolvedKey === 'timeout' ? Number(value) : value;
+    existing[resolvedKey] = resolvedKey === 'timeout' ? Number(valueToSet) : valueToSet;
 
-    // When API key changes, clear cached region so it gets re-detected
+    // API key and OAuth are mutually exclusive. Clear OAuth and the cached
+    // region so subsequent requests resolve the new key and re-detect its host.
     if (resolvedKey === 'api_key') {
+      delete existing.oauth;
       delete existing.region;
     }
 
     await writeConfigFile(existing);
 
     if (!config.quiet) {
-      console.log(formatOutput({ [resolvedKey]: existing[resolvedKey] }, format));
+      console.log(formatOutput({
+        [resolvedKey]: valueForOutput(resolvedKey, existing[resolvedKey]),
+      }, format));
     }
   },
 });

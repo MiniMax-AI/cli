@@ -20,6 +20,37 @@ interface QuotaApiResponse {
   model_remains: QuotaModelRemain[];
 }
 
+function isNetworkUnavailable(error: unknown): boolean {
+  if (error instanceof CLIError) {
+    return error.exitCode === ExitCode.NETWORK || error.exitCode === ExitCode.TIMEOUT;
+  }
+
+  if (!(error instanceof Error)) return false;
+
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') return true;
+
+  const message = error.message.toLowerCase();
+  const code = 'code' in error ? String(error.code).toLowerCase() : '';
+  return (error instanceof TypeError && message === 'fetch failed')
+    || message.includes('failed to fetch')
+    || message.includes('unable to connect')
+    || message.includes('connection refused')
+    || message.includes('econnrefused')
+    || message.includes('connection reset')
+    || message.includes('econnreset')
+    || message.includes('network error')
+    || message.includes('enotfound')
+    || message.includes('getaddrinfo')
+    || message.includes('proxy')
+    || message.includes('socket')
+    || message.includes('etimedout')
+    || code === 'connectionrefused'
+    || code === 'econnrefused'
+    || code === 'econnreset'
+    || code === 'enotfound'
+    || code === 'etimedout';
+}
+
 async function showQuotaAfterLogin(config: Config): Promise<void> {
   try {
     const url = quotaEndpoint(config.baseUrl);
@@ -76,7 +107,7 @@ export default defineCommand({
     }
 
     if (flags.apiKey) {
-      await loginWithApiKey(config, flags.apiKey as string);
+      await loginWithApiKey(config, flags.apiKey as string, flags.region as Region | undefined);
       return;
     }
 
@@ -109,7 +140,7 @@ export default defineCommand({
         validate: (v) => (v && v.length > 0 ? undefined : 'API key cannot be empty.'),
       });
       if (isCancel(key)) throw new CLIError('Authentication cancelled.', ExitCode.AUTH);
-      await loginWithApiKey(config, key as string);
+      await loginWithApiKey(config, key as string, flags.region as Region | undefined);
       return;
     }
 
@@ -131,26 +162,41 @@ async function completeOAuthLogin(config: Config, region: Region): Promise<void>
   await showDashboardAfterLogin(cfg);
 }
 
-async function loginWithApiKey(config: Config, key: string): Promise<void> {
+async function loginWithApiKey(
+  config: Config,
+  key: string,
+  explicitRegion?: Region,
+): Promise<void> {
   if (config.dryRun) {
     console.log('Would validate and save API key.');
     return;
   }
 
-  // Probe both regions and pick the one the key actually authenticates against.
-  // This doubles as key validation — if neither region accepts it, the key is bad.
-  const detected = await detectRegion(key);
+  // An explicit region is authoritative. Otherwise probe both regions and fail
+  // closed if neither can be confirmed; never persist a guessed fallback.
+  const detected = explicitRegion ?? await detectRegion(key);
   const cfg: Config = { ...config, region: detected, baseUrl: REGIONS[detected], apiKey: key };
 
-  // Verify the detection actually authorizes the quota endpoint (defends against
-  // detectRegion's graceful 'global' fallback when the network is unreachable).
+  // Verify the selected region actually authorizes the quota endpoint.
   try {
     await requestJson<QuotaApiResponse>(cfg, { url: quotaEndpoint(cfg.baseUrl) });
-  } catch {
-    throw new CLIError(
-      'API key validation failed.',
-      ExitCode.AUTH,
-      'Check that your key is valid and belongs to a Token Plan.',
+  } catch (error) {
+    if (error instanceof CLIError && error.exitCode === ExitCode.AUTH) {
+      throw new CLIError(
+        'API key validation failed.',
+        ExitCode.AUTH,
+        'Check that your key is valid and belongs to a Token Plan.',
+      );
+    }
+
+    if (!explicitRegion) throw error;
+
+    const validationFailure = isNetworkUnavailable(error)
+      ? `the ${detected} API endpoint is unreachable`
+      : `the ${detected} API endpoint returned an inconclusive response`;
+    process.stderr.write(
+      `Warning: Could not validate the API key because ${validationFailure}.\n` +
+      `Saving the explicitly selected region "${detected}". Requests may fail until validation succeeds.\n`,
     );
   }
 

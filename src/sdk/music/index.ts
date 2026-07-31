@@ -7,7 +7,12 @@ import { ModelPartial } from "../types";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
-import { musicGenerateModel } from "../../commands/music/models";
+import {
+  MUSIC_COVER_MODELS,
+  MUSIC_GENERATE_MODELS,
+  musicGenerateModel,
+} from "../../commands/music/models";
+import { decodeAudioStream } from "../../utils/audio-stream";
 
 function hexToBuffer(hex: string): Buffer {
   if (!/^[0-9a-fA-F]*$/.test(hex)) {
@@ -64,20 +69,11 @@ export class MusicSDK extends Client {
       stream: true,
     });
 
-    const reader = res.body?.getReader();
-    if (!reader) {
+    if (!res.body) {
       throw new SDKError('No response body', ExitCode.GENERAL);
-    };
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        yield value;
-      }
-    } finally {
-      reader.releaseLock();
     }
+
+    yield* decodeAudioStream(res);
   }
 
   async generate(request: ModelPartial<MusicGenerateRequest> & { stream: true }): Promise<AsyncGenerator<Uint8Array<ArrayBuffer>>>;
@@ -140,16 +136,15 @@ export class MusicSDK extends Client {
     if (request.bpm)         structuredParts.push(`BPM: ${request.bpm as number}`);
     if (request.key)         structuredParts.push(`Key: ${request.key as string}`);
     if (request.avoid)       structuredParts.push(`Avoid: ${request.avoid as string}`);
-    if (request.useCase)     structuredParts.push(`Use case: ${request.useCase as string}`);
+    const useCase = request.useCase || request.use_case;
+    if (useCase)             structuredParts.push(`Use case: ${useCase}`);
     if (request.structure)   structuredParts.push(`Structure: ${request.structure as string}`);
     if (request.references)  structuredParts.push(`References: ${request.references as string}`);
     if (request.extra)       structuredParts.push(`Extra: ${request.extra as string}`);
 
-    let lyrics = request.lyrics;
     let prompt = request.prompt;
 
-    if (request.instrumental || !lyrics || lyrics === '无歌词' || lyrics === 'no lyrics') {
-      lyrics = '[intro] [outro]';
+    if (request.is_instrumental || request.instrumental) {
       structuredParts.push('Style: instrumental, no vocals, pure music');
     }
 
@@ -161,29 +156,56 @@ export class MusicSDK extends Client {
   }
 
   private validateParams(params: ModelPartial<MusicGenerateRequest>) {
+    const instrumental = params.instrumental;
+    const apiParams = { ...params };
+    const sdkOnlyFields: Array<keyof MusicGenerateRequest> = [
+      'instrumental',
+      'vocals',
+      'genre',
+      'mood',
+      'instruments',
+      'tempo',
+      'bpm',
+      'key',
+      'avoid',
+      'use_case',
+      'useCase',
+      'structure',
+      'references',
+      'extra',
+    ];
+    for (const field of sdkOnlyFields) delete apiParams[field];
+    if (
+      instrumental !== undefined
+      && params.is_instrumental !== undefined
+      && instrumental !== params.is_instrumental
+    ) {
+      throw new SDKError(
+        'instrumental and is_instrumental must not conflict',
+        ExitCode.USAGE,
+      );
+    }
+
+    const normalized: ModelPartial<MusicGenerateRequest> = {
+      ...apiParams,
+      is_instrumental: params.is_instrumental ?? instrumental,
+    };
     const {
       model, output_format, stream, prompt, lyrics, is_instrumental, lyrics_optimizer,
-    } = params;
-    if (is_instrumental && lyrics) {
-      throw new SDKError('Cannot use is_instrumental with lyrics', ExitCode.USAGE);
-    }
-
-    if (lyrics_optimizer && (lyrics || is_instrumental)) {
-      throw new SDKError('Cannot use lyrics_optimizer with lyrics or is_instrumental', ExitCode.USAGE);
-    }
-
-    if (!prompt && !lyrics && !is_instrumental && !lyrics_optimizer) {
-      throw new SDKError('At least one of prompt or lyrics or is_instrumental or lyrics_optimizer is required', ExitCode.USAGE);
-    }
-
-    if (!is_instrumental && !lyrics_optimizer && !lyrics?.trim()) {
-      throw new SDKError('lyrics is required', ExitCode.USAGE);
-    }
-
-    const VALID_MODELS = ['music-2.6', 'music-2.5+', 'music-2.5'];
-    if (model && !VALID_MODELS.includes(model)) {
+    } = normalized;
+    const effectiveModel = model ?? musicGenerateModel(this.config);
+    const isGenerateModel = MUSIC_GENERATE_MODELS.includes(
+      effectiveModel as typeof MUSIC_GENERATE_MODELS[number],
+    );
+    const isCoverModel = MUSIC_COVER_MODELS.includes(
+      effectiveModel as typeof MUSIC_COVER_MODELS[number],
+    );
+    if (!isGenerateModel && !isCoverModel) {
       throw new SDKError(
-        `Invalid model: ${model}. Valid models are ${VALID_MODELS.join(', ')}.`, 
+        `Invalid model: ${effectiveModel}. Valid models are ${[
+          ...MUSIC_GENERATE_MODELS,
+          ...MUSIC_COVER_MODELS,
+        ].join(', ')}.`,
         ExitCode.USAGE,
       );
     }
@@ -202,10 +224,102 @@ export class MusicSDK extends Client {
       );
     }
 
-    const targetPrompt = this.buildPrompt(params);
+    let targetPrompt = this.buildPrompt({
+      ...params,
+      is_instrumental,
+    });
+
+    if (isCoverModel) {
+      if (is_instrumental) {
+        throw new SDKError(
+          'is_instrumental is only supported by music generation models',
+          ExitCode.USAGE,
+        );
+      }
+      if (lyrics_optimizer) {
+        throw new SDKError(
+          'lyrics_optimizer is only supported by music generation models',
+          ExitCode.USAGE,
+        );
+      }
+      delete normalized.is_instrumental;
+      delete normalized.lyrics_optimizer;
+
+      targetPrompt = targetPrompt?.trim();
+      const coverPromptLength = targetPrompt?.length ?? 0;
+      if (coverPromptLength < 10 || coverPromptLength > 300) {
+        throw new SDKError(
+          'prompt must be between 10 and 300 characters for music cover models',
+          ExitCode.USAGE,
+        );
+      }
+
+      const hasAudioUrl = Boolean(normalized.audio_url?.trim());
+      const hasAudioBase64 = Boolean(normalized.audio_base64?.trim());
+      const hasCoverFeatureId = Boolean(normalized.cover_feature_id?.trim());
+      const sourceCount = [hasAudioUrl, hasAudioBase64, hasCoverFeatureId]
+        .filter(Boolean).length;
+      if (sourceCount !== 1) {
+        throw new SDKError(
+          'Exactly one of audio_url, audio_base64, or cover_feature_id is required for music cover models',
+          ExitCode.USAGE,
+        );
+      }
+      if (hasAudioUrl) normalized.audio_url = normalized.audio_url?.trim();
+      else delete normalized.audio_url;
+      if (hasAudioBase64) normalized.audio_base64 = normalized.audio_base64?.trim();
+      else delete normalized.audio_base64;
+      if (hasCoverFeatureId) {
+        normalized.cover_feature_id = normalized.cover_feature_id?.trim();
+      } else {
+        delete normalized.cover_feature_id;
+      }
+
+      const coverLyrics = lyrics?.trim();
+      const lyricsLength = coverLyrics?.length ?? 0;
+      if (hasCoverFeatureId && lyricsLength === 0) {
+        throw new SDKError(
+          'lyrics is required with cover_feature_id',
+          ExitCode.USAGE,
+        );
+      }
+      if (coverLyrics) normalized.lyrics = coverLyrics;
+      else delete normalized.lyrics;
+      if (lyricsLength > 0 && (lyricsLength < 10 || lyricsLength > 1000)) {
+        throw new SDKError(
+          'lyrics must be between 10 and 1000 characters for music cover models',
+          ExitCode.USAGE,
+        );
+      }
+    } else {
+      if (normalized.audio_url || normalized.audio_base64 || normalized.cover_feature_id) {
+        throw new SDKError(
+          'audio_url, audio_base64, and cover_feature_id are only supported by music cover models',
+          ExitCode.USAGE,
+        );
+      }
+      if (is_instrumental && lyrics) {
+        throw new SDKError('Cannot use is_instrumental with lyrics', ExitCode.USAGE);
+      }
+      if (lyrics_optimizer && (lyrics || is_instrumental)) {
+        throw new SDKError('Cannot use lyrics_optimizer with lyrics or is_instrumental', ExitCode.USAGE);
+      }
+      if (!prompt && !lyrics && !is_instrumental && !lyrics_optimizer) {
+        throw new SDKError('At least one of prompt or lyrics or is_instrumental or lyrics_optimizer is required', ExitCode.USAGE);
+      }
+      if ((is_instrumental || lyrics_optimizer) && !prompt?.trim()) {
+        throw new SDKError(
+          'prompt is required with is_instrumental or lyrics_optimizer',
+          ExitCode.USAGE,
+        );
+      }
+      if (!is_instrumental && !lyrics_optimizer && !lyrics?.trim()) {
+        throw new SDKError('lyrics is required', ExitCode.USAGE);
+      }
+    }
 
     return toMerged({
-      model: musicGenerateModel(this.config),
+      model: effectiveModel,
       audio_setting: {
         format: 'mp3',
         sample_rate: 44100,
@@ -213,7 +327,7 @@ export class MusicSDK extends Client {
       },
       output_format: 'hex',
     }, {
-      ...params,
+      ...normalized,
       prompt: targetPrompt,
     });
   }

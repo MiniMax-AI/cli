@@ -101,7 +101,9 @@ async function verifySha256(filePath: string, expected: string): Promise<void> {
   }
 }
 
-async function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void): Promise<void> {
+// Exported for unit tests (see test/update/self-update.test.ts). Not part of
+// the public CLI surface; callers go through `applySelfUpdate`.
+export async function downloadFile(url: string, dest: string, onProgress?: (pct: number) => void): Promise<void> {
   const res = await fetch(url, { signal: AbortSignal.timeout(120_000) });
   if (!res.ok) throw new CLIError(`Download failed: ${res.status} ${res.statusText}`, ExitCode.GENERAL);
 
@@ -111,22 +113,50 @@ async function downloadFile(url: string, dest: string, onProgress?: (pct: number
   const writer = createWriteStream(dest);
   const reader = res.body!.getReader();
 
-  await new Promise<void>((resolve, reject) => {
-    writer.on('error', reject);
-    const pump = async () => {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) { writer.end(); break; }
-          writer.write(value);
-          received += value.length;
-          if (onProgress && total > 0) onProgress(Math.round(received / total * 100));
-        }
-        resolve();
-      } catch (e) { reject(e); }
-    };
-    pump();
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      writer.on('error', reject);
+      // Resolve only after the writer has actually flushed and closed —
+      // otherwise verifySha256() can race the kernel's pagecache flush and
+      // produce spurious checksum mismatches on slow disks.
+      writer.on('finish', () => resolve());
+      const pump = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) { writer.end(); break; }
+            // Honour backpressure so we don't grow the writer's internal buffer
+            // unboundedly on large binaries / slow disks.
+            if (!writer.write(value)) {
+              await new Promise<void>(r => writer.once('drain', r));
+            }
+            received += value.length;
+            if (onProgress && total > 0) onProgress(Math.round(received / total * 100));
+          }
+        } catch (e) { reject(e); }
+      };
+      pump();
+    });
+  } catch (err) {
+    // Tear down the writer BEFORE unlinking dest so any buffered bytes
+    // can't race the unlink and leave a partial file in the pagecache, and
+    // so a slow flush doesn't race the next process opening the same path.
+    // Wait for `close` (fires after destroy on Node streams) unless the
+    // writer has already torn down.
+    if (!writer.destroyed) {
+      await new Promise<void>(r => {
+        writer.once('close', () => r());
+        writer.destroy();
+      });
+    }
+    // Don't leave a half-downloaded binary in /tmp on failure.
+    try { (await import('fs')).unlinkSync(dest); } catch { /* best-effort — race with concurrent cleanup is fine */ }
+    throw err;
+  } finally {
+    // Always release the Web Streams reader lock — the API contract requires
+    // a paired acquire/release, and not doing so traps the underlying body.
+    reader.releaseLock();
+  }
 }
 
 export async function resolveUpdateTarget(channel: Channel): Promise<UpdateTarget> {

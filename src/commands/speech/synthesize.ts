@@ -92,10 +92,9 @@ export default defineCommand({
     if (flags.subtitles) body.subtitle_enable = true;  // Correct API parameter name
 
     if (flags.pronunciation) {
-      body.pronunciation_dict = (flags.pronunciation as string[]).map(p => {
-        const [from, to] = p.split('/');
-        return { tone: to || from!, text: from! };
-      });
+      body.pronunciation_dict = {
+        tone: flags.pronunciation as string[],
+      };
     }
 
     if (dryRun(config, body)) return;

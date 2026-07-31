@@ -68,7 +68,7 @@ mmx quota
 
 ```bash
 mmx text chat --message "Write a poem"
-mmx text chat --model MiniMax-M2.7-highspeed --message "Hello" --stream
+mmx text chat --model MiniMax-M3 --message "Hello" --stream
 mmx text chat --system "You are a coding assistant" --message "Fizzbuzz in Go"
 mmx text chat --message "user:Hi" --message "assistant:Hey!" --message "How are you?"
 cat messages.json | mmx text chat --messages-file - --output json
@@ -160,13 +160,24 @@ Useful for CI/CD (`mmx auth login --api-key sk-xxxxx`), or pass per-command via 
 OAuth and API key are mutually exclusive — logging in with one clears the other.
 Credential priority: `--api-key` flag > OAuth (config) > `api_key` (config).
 
+### Environment variables
+
+| Variable | Description |
+|---|---|
+| `MINIMAX_REGION` | `global` or `cn`. |
+| `MINIMAX_BASE_URL` | Override the API base URL. |
+| `MINIMAX_OUTPUT` | `text` or `json`. |
+| `MINIMAX_TIMEOUT` | Request timeout in seconds. |
+| `MINIMAX_VERBOSE` | `1` to enable verbose HTTP logging. |
+| `MMX_CONFIG_DIR` | Directory containing the `config.json` file (default: `~/.mmx`). Set this when `mmx` runs from a subprocess, service, or CI job whose home directory differs from where you logged in. |
+
 ### `mmx config` · `mmx quota`
 
 ```bash
 mmx quota
 mmx config show
 mmx config set --key region --value cn
-mmx config set --key default-text-model --value MiniMax-M2.7-highspeed
+mmx config set --key default-text-model --value MiniMax-M3
 mmx config export-schema | jq .
 ```
 

@@ -1,10 +1,40 @@
-import { readFileSync, writeFileSync, renameSync, existsSync } from 'fs';
+import { copyFileSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { parseConfigFile, REGIONS, type Config, type ConfigFile, type Region } from './schema';
 import { ensureConfigDir, getConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
 import type { GlobalFlags } from '../types/flags';
+
+interface RenameWithFallbackOps {
+  rename: (from: string, to: string) => void;
+  copy: (from: string, to: string) => void;
+  unlink: (path: string) => void;
+}
+
+function isCrossDeviceError(err: unknown): err is Error & { code: 'EXDEV' } {
+  return err instanceof Error
+    && 'code' in err
+    && (err as { code?: string }).code === 'EXDEV';
+}
+
+export function renameWithCrossDeviceFallback(
+  from: string,
+  to: string,
+  ops: RenameWithFallbackOps = {
+    rename: renameSync,
+    copy: copyFileSync,
+    unlink: unlinkSync,
+  },
+): void {
+  try {
+    ops.rename(from, to);
+  } catch (err) {
+    if (!isCrossDeviceError(err)) throw err;
+    ops.copy(from, to);
+    ops.unlink(from);
+  }
+}
 
 export function readConfigFile(): ConfigFile {
   const path = getConfigPath();
@@ -20,12 +50,15 @@ export function readConfigFile(): ConfigFile {
   }
 }
 
-export async function writeConfigFile(data: Record<string, unknown>): Promise<void> {
+export async function writeConfigFile(
+  data: Record<string, unknown>,
+  renameOps?: RenameWithFallbackOps,
+): Promise<void> {
   await ensureConfigDir();
   const path = getConfigPath();
   const tmp = path + '.tmp';
   writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
-  renameSync(tmp, path);
+  renameWithCrossDeviceFallback(tmp, path, renameOps);
 }
 
 export function loadConfig(flags: GlobalFlags): Config {

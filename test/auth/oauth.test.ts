@@ -19,8 +19,6 @@ beforeEach(async () => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-type FetchMock = (url: string, opts?: RequestInit) => Promise<Response>;
-
 let capturedState: string | null = null;
 let capturedCodeVerifier: string | null = null;
 
@@ -69,28 +67,6 @@ function errorResponse(status: number, body?: string) {
     text: async () => body || '{}',
     json: async () => JSON.parse(body || '{}'),
   } as Response;
-}
-
-/**
- * Convenience: create a two-phase mock (device/code → token polling).
- * The first matching request returns a device-code response; all subsequent
- * requests return token responses.
- */
-function mockDeviceCodeFlow(
-  deviceOverrides?: Record<string, unknown>,
-  tokenOverrides?: Record<string, unknown>,
-): FetchMock {
-  let first = true;
-  return (_url: string, opts?: RequestInit) => {
-    if (first) {
-      first = false;
-      const body = opts?.body instanceof URLSearchParams
-        ? opts.body
-        : new URLSearchParams(String(opts?.body ?? ''));
-      return Promise.resolve(deviceCodeResponse(body, deviceOverrides));
-    }
-    return Promise.resolve(tokenResponse(tokenOverrides));
-  };
 }
 
 const originalFetch = globalThis.fetch;

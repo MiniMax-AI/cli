@@ -13,7 +13,7 @@ import { pipeAudioStream } from '../../utils/audio-stream';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { LyricsGenerationRequest, LyricsGenerationResponse, MusicRequest, MusicResponse } from '../../types/api';
-import { musicGenerateModel } from './models';
+import { MUSIC_GENERATE_MODELS, musicGenerateModel } from './models';
 
 function defaultLyricsFilename(audioOutPath: string): string {
   return `${basename(audioOutPath, extname(audioOutPath))}.lyrics.txt`;
@@ -47,7 +47,7 @@ function saveLyricsOutput(lyrics: string, lyricsOut: string | undefined, audioOu
 
 export default defineCommand({
   name: 'music generate',
-  description: 'Generate a song (music-2.6 / music-2.5+ / music-2.5)',
+  description: 'Generate a song (music-3.0)',
   apiDocs: '/docs/api-reference/music-generation',
   usage: 'mmx music generate --prompt <text> (--lyrics <text> | --instrumental | --lyrics-optimizer) [--out <path>] [--lyrics-out <path>] [flags]',
   options: [
@@ -69,7 +69,7 @@ export default defineCommand({
     { flag: '--structure <text>', description: 'Song structure, e.g. "verse-chorus-verse-bridge-chorus"' },
     { flag: '--references <text>', description: 'Reference tracks or artists, e.g. "similar to Ed Sheeran"' },
     { flag: '--extra <text>', description: 'Additional fine-grained requirements not covered above' },
-    { flag: '--model <model>', description: 'Model: music-2.6 (default), music-2.5+, or music-2.5.' },
+    { flag: '--model <model>', description: 'Model: music-3.0 (default), music-2.6, music-2.6-free, music-2.5+, or music-2.5.' },
     { flag: '--output-format <fmt>', description: 'Return format: hex (default, saved to file) or url (24h expiry, download promptly). When --stream, only hex.' },
     { flag: '--aigc-watermark', description: 'Embed AI-generated content watermark in audio for content provenance' },
     { flag: '--format <fmt>', description: `Audio format: ${formatList(MUSIC_FORMATS)} (default: mp3)` },
@@ -88,8 +88,8 @@ export default defineCommand({
     'mmx music generate --prompt "Cinematic orchestral, building tension" --instrumental --out bgm.mp3',
     '# URL output (24h expiry — download promptly):',
     'mmx music generate --prompt "Upbeat pop" --lyrics "La la la..." --output-format url',
-    '# Instrumental with music-2.5+:',
-    'mmx music generate --prompt "Cinematic orchestral" --model "music-2.5+" --instrumental --out bgm.mp3',
+    '# Instrumental with music-3.0:',
+    'mmx music generate --prompt "Cinematic orchestral" --model "music-3.0" --instrumental --out bgm.mp3',
     '# Detailed prompt with vocal characteristics:',
     'mmx music generate --prompt "Warm morning folk" --vocals "male and female duet, harmonies in chorus" --instruments "acoustic guitar, piano" --bpm 95 --lyrics-file song.txt --out duet.mp3',
   ],
@@ -127,6 +127,14 @@ export default defineCommand({
       );
     }
 
+    if ((isInstrumental || lyricsOptimizer) && !prompt?.trim()) {
+      throw new CLIError(
+        '--prompt is required with --instrumental or --lyrics-optimizer.',
+        ExitCode.USAGE,
+        'mmx music generate --prompt <text> --instrumental',
+      );
+    }
+
     if (!isInstrumental && !lyricsOptimizer && !lyrics?.trim()) {
       throw new CLIError(
         'Lyrics are required. Add --lyrics or --lyrics-file, or use --instrumental for pure music, or --lyrics-optimizer to auto-generate.',
@@ -135,7 +143,7 @@ export default defineCommand({
       );
     }
 
-    // Build structured prompt from optional music characteristic flags.
+    // Build structured prompt from optional music characteristic flags before request assembly.
     const structuredParts: string[] = [];
     if (flags.vocals)      structuredParts.push(`Vocals: ${flags.vocals as string}`);
     if (flags.genre)       structuredParts.push(`Genre: ${flags.genre as string}`);
@@ -161,12 +169,11 @@ export default defineCommand({
     const outPath = (flags.out as string | undefined) ?? `music_${ts}.${ext}`;
 
     const model = (flags.model as string) || musicGenerateModel(config);
-    const VALID_MODELS = ['music-2.6', 'music-2.5+', 'music-2.5'];
-    if (flags.model && !VALID_MODELS.includes(model)) {
+    if (flags.model && !MUSIC_GENERATE_MODELS.includes(model as typeof MUSIC_GENERATE_MODELS[number])) {
       throw new CLIError(
-        `Invalid model "${model}". Valid models: ${VALID_MODELS.join(', ')}`,
+        `Invalid model "${model}". Valid models: ${MUSIC_GENERATE_MODELS.join(', ')}`,
         ExitCode.USAGE,
-        'mmx music generate --model music-2.6',
+        'mmx music generate --model music-3.0',
       );
     }
     const outFormat = (flags.outputFormat as string) || 'hex';

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { default as generateCommand } from '../../../src/commands/music/generate';
@@ -119,12 +119,20 @@ describe('music generate command', () => {
   });
 
   it('rejects --instrumental with --lyrics-file', async () => {
-    await expect(
-      generateCommand.execute(
-        { ...baseConfig, dryRun: true },
-        { ...baseFlags, prompt: 'Folk', instrumental: true, lyricsFile: '/dev/null' },
-      ),
-    ).rejects.toThrow('Cannot use --instrumental with --lyrics');
+    const tempDir = mkdtempSync(join(tmpdir(), 'mmx-lyrics-test-'));
+    const lyricsFile = join(tempDir, 'lyrics.txt');
+    writeFileSync(lyricsFile, 'Hello');
+
+    try {
+      await expect(
+        generateCommand.execute(
+          { ...baseConfig, dryRun: true },
+          { ...baseFlags, prompt: 'Folk', instrumental: true, lyricsFile },
+        ),
+      ).rejects.toThrow('Cannot use --instrumental with --lyrics');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('handles "无歌词" as instrumental', async () => {
@@ -162,7 +170,7 @@ describe('music generate command', () => {
 
     try {
       await generateCommand.execute(
-        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-2.6' },
+        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-3.0' },
         { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: 'no lyrics' },
       );
     } catch {
@@ -171,7 +179,7 @@ describe('music generate command', () => {
 
     console.log = origLog;
     const parsed = JSON.parse(captured);
-    expect(parsed.request.model).toBe('music-2.6');
+    expect(parsed.request.model).toBe('music-3.0');
   });
 
   it('--model flag overrides defaultMusicModel', async () => {
@@ -181,7 +189,7 @@ describe('music generate command', () => {
 
     try {
       await generateCommand.execute(
-        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-2.6' },
+        { ...baseConfig, dryRun: true, output: 'json' as const, defaultMusicModel: 'music-3.0' },
         { ...baseFlags, dryRun: true, prompt: 'Folk', lyrics: 'no lyrics', model: 'music-2.5' },
       );
     } catch {
@@ -191,6 +199,38 @@ describe('music generate command', () => {
     console.log = origLog;
     const parsed = JSON.parse(captured);
     expect(parsed.request.model).toBe('music-2.5');
+  });
+
+  it('accepts the official music-3.0 model', async () => {
+    let captured = '';
+    const origLog = console.log;
+    console.log = (msg: string) => { captured += msg; };
+
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' as const },
+        {
+          ...baseFlags,
+          dryRun: true,
+          prompt: 'Folk',
+          lyrics: 'la la',
+          model: 'music-3.0',
+        },
+      );
+    } finally {
+      console.log = origLog;
+    }
+
+    expect(JSON.parse(captured).request.model).toBe('music-3.0');
+  });
+
+  it('requires prompt for instrumental generation', async () => {
+    await expect(
+      generateCommand.execute(
+        { ...baseConfig, dryRun: true },
+        { ...baseFlags, dryRun: true, instrumental: true },
+      ),
+    ).rejects.toThrow('--prompt is required with --instrumental');
   });
 
   it('rejects invalid audio format', async () => {
