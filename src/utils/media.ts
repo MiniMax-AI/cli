@@ -6,6 +6,7 @@ import { ExitCode } from '../errors/codes';
 const MEDIA_MIME_TYPES = {
   video: {
     '.mp4': 'video/mp4',
+    '.mov': 'video/quicktime',
   },
   audio: {
     '.mp3': 'audio/mp3',

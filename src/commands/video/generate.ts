@@ -28,6 +28,7 @@ import { resolveMediaInput, VIDEO_V2_MEDIA_SIZE_LIMITS } from '../../utils/media
 import { promptOrFail } from '../../utils/prompt';
 import {
   buildVideoV2Request,
+  getVideoV2FailureReason,
   isVideoV2Model,
   isVideoV2Request,
   VIDEO_V2_MODEL,
@@ -47,7 +48,7 @@ export default defineCommand({
     { flag: '--last-frame <path-or-url>', description: 'Optional ending image. Legacy SEF also requires --image; MiniMax-H3 supports a last frame alone.' },
     { flag: '--subject-image <path-or-url>', description: 'Subject reference image for character consistency (local path or URL). Switches to S2V-01 model.' },
     { flag: '--reference-image <path-or-url>', description: 'H3 reference image (repeatable).', type: 'array' },
-    { flag: '--reference-video <path-or-url>', description: 'H3 reference video (repeatable; local MP4, URL, data URI, or mm_file:// ID).', type: 'array' },
+    { flag: '--reference-video <path-or-url>', description: 'H3 reference video (repeatable; local MP4/MOV, URL, data URI, or mm_file:// ID).', type: 'array' },
     { flag: '--reference-audio <path-or-url>', description: 'H3 reference audio (repeatable; requires a reference image or video).', type: 'array' },
     { flag: '--duration <seconds>', description: 'Output duration. H3 supports integer values from 4 to 15 (default: 5).', type: 'number' },
     { flag: '--ratio <ratio>', description: 'H3 aspect ratio: adaptive, 21:9, 16:9, 4:3, 1:1, 3:4, or 9:16.' },
@@ -260,6 +261,7 @@ export default defineCommand({
         isComplete: (d) => (d as VideoV2TaskResponse).task.status === 'succeeded',
         isFailed: (d) => ['failed', 'cancelled', 'expired'].includes((d as VideoV2TaskResponse).task.status),
         getStatus: (d) => (d as VideoV2TaskResponse).task.status,
+        getFailureReason: (d) => getVideoV2FailureReason((d as VideoV2TaskResponse).task),
       });
       status = result.task.status;
       downloadUrl = result.task.content?.url;

@@ -10,6 +10,7 @@ export interface ApiErrorBody {
     message?: string;
     type?: string;
     code?: number;
+    http_code?: string | number;
   };
 }
 
@@ -35,6 +36,7 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     `HTTP ${status}`;
 
   const apiCode = body.base_resp?.status_code || body.error?.code;
+  const errorType = body.error?.type;
 
   if (status === 401 || status === 403) {
     return new CLIError(
@@ -52,6 +54,14 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     );
   }
 
+  if (status === 402 || errorType === 'insufficient_balance_error') {
+    return new CLIError(
+      `Quota or balance exhausted. ${apiMsg}`,
+      ExitCode.QUOTA,
+      'Check your MiniMax account balance and billing settings.',
+    );
+  }
+
   if (status === 408 || status === 504) {
     return new CLIError(
       `Request timed out (HTTP ${status}).`,
@@ -60,9 +70,17 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     );
   }
 
+  const isV2ContentFilter =
+    status === 422 &&
+    errorType === 'unprocessable_entity_error' &&
+    (/sensitive content/i.test(apiMsg) || /(?:^|\D)1026(?:\D|$)/.test(apiMsg));
+
   // MiniMax content sensitivity filter
-  if (apiCode === 1002 || apiCode === 1039) {
-    const filterType = body.base_resp?.status_msg || 'content sensitivity';
+  if (apiCode === 1002 || apiCode === 1039 || isV2ContentFilter) {
+    const filterType =
+      body.base_resp?.status_msg ||
+      body.error?.message ||
+      'content sensitivity';
     return new CLIError(
       `Input content flagged by sensitivity filter (${filterType}).`,
       ExitCode.CONTENT_FILTER,

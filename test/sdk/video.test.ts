@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'bun:test';
 import { createMockServer, jsonResponse, type MockServer } from '../helpers/mock-server';
 import { MiniMaxSDK } from '../../src/sdk';
-import { VideoSDK } from '../../src/sdk/video';
+import { VideoSDK, type VideoAsyncGenerateRequest } from '../../src/sdk/video';
 
 describe('MiniMaxSDK.video', () => {
   let server: MockServer;
@@ -184,13 +184,70 @@ describe('MiniMaxSDK.video', () => {
       content: { url: 'https://example.com/h3-sync.mp4' },
     });
   });
+
+  it('surfaces MiniMax-H3 task failure details while polling', async () => {
+    server = createMockServer({
+      routes: {
+        '/v2/video_generation': () => jsonResponse({ task_id: 'h3-failed' }),
+        '/v2/query/video_generation/h3-failed': () => jsonResponse({
+          task: {
+            id: 'h3-failed',
+            model: 'MiniMax-H3',
+            status: 'failed',
+            error: {
+              code: 'H3_FAILED',
+              message: 'Reference video could not be decoded',
+            },
+          },
+        }),
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    await expect(
+      sdk.video.generate({
+        model: 'MiniMax-H3',
+        content: [{ type: 'text', text: 'Ocean waves' }],
+        pollInterval: 0,
+      }),
+    ).rejects.toThrow('H3_FAILED: Reference video could not be decoded');
+  });
 });
 
 describe('VideoSDK.validateParams', () => {
   const sdk = new VideoSDK({ apiKey: 'sk-test', region: 'global' });
 
   it('throws when prompt is missing', async () => {
-    await expect(sdk.generate({} as any)).rejects.toThrow('prompt is required');
+    await expect(
+      sdk.generate({} as VideoAsyncGenerateRequest),
+    ).rejects.toThrow('prompt is required');
+  });
+
+  it('rejects legacy subject_reference for MiniMax-H3 instead of dropping it', async () => {
+    await expect(
+      sdk.generate({
+        model: 'MiniMax-H3',
+        prompt: 'Keep the same character',
+        subject_reference: [{
+          type: 'character',
+          image: ['https://example.com/character.png'],
+        }],
+      }),
+    ).rejects.toThrow('Use content with role reference_image');
+  });
+
+  it('rejects raw H3 content mixed with legacy request fields', async () => {
+    await expect(
+      sdk.generate({
+        model: 'MiniMax-H3',
+        prompt: 'Legacy prompt',
+        content: [{ type: 'text', text: 'H3 prompt' }],
+      } as never),
+    ).rejects.toThrow('content cannot be combined with legacy video fields: prompt');
   });
 
   it('throws when last_frame_image is provided without first_frame_image', async () => {

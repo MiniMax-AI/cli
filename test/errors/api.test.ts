@@ -19,6 +19,20 @@ describe('mapApiError', () => {
     expect(err.exitCode).toBe(ExitCode.QUOTA);
   });
 
+  it('maps Video V2 insufficient balance errors to QUOTA', () => {
+    const err = mapApiError(402, {
+      error: {
+        type: 'insufficient_balance_error',
+        message: 'insufficient balance (1008)',
+        http_code: '402',
+      },
+    });
+
+    expect(err.exitCode).toBe(ExitCode.QUOTA);
+    expect(err.message).toContain('insufficient balance');
+    expect(err.hint).toContain('account balance');
+  });
+
   it('maps 408 to TIMEOUT exit code', () => {
     const err = mapApiError(408, {});
     expect(err.exitCode).toBe(ExitCode.TIMEOUT);
@@ -27,6 +41,31 @@ describe('mapApiError', () => {
   it('maps MiniMax content filter code 1002', () => {
     const err = mapApiError(400, { base_resp: { status_code: 1002, status_msg: 'content filtered' } });
     expect(err.exitCode).toBe(ExitCode.CONTENT_FILTER);
+  });
+
+  it('maps Video V2 sensitive-content errors to CONTENT_FILTER', () => {
+    const err = mapApiError(422, {
+      error: {
+        type: 'unprocessable_entity_error',
+        message: '视频描述包含敏感内容 (1026)',
+        http_code: '422',
+      },
+    });
+
+    expect(err.exitCode).toBe(ExitCode.CONTENT_FILTER);
+    expect(err.message).toContain('视频描述包含敏感内容');
+  });
+
+  it('keeps unrelated Video V2 validation errors as GENERAL', () => {
+    const err = mapApiError(422, {
+      error: {
+        type: 'unprocessable_entity_error',
+        message: 'invalid media dimensions',
+        http_code: '422',
+      },
+    });
+
+    expect(err.exitCode).toBe(ExitCode.GENERAL);
   });
 
   it('maps MiniMax quota code 1028', () => {

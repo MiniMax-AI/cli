@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { VideoV2ImageRole, VideoV2Request } from '../../src/types/api';
 import {
   buildVideoV2Request,
+  getVideoV2FailureReason,
   validateVideoV2Request,
 } from '../../src/video/v2';
 import {
@@ -195,5 +196,20 @@ describe('Video Generation V2 raw request validation', () => {
     } satisfies VideoV2Request;
 
     expect(() => validateVideoV2Request(request)).toThrow('requires a non-empty text content item');
+  });
+
+  it('formats structured task failures without empty placeholders', () => {
+    const task = {
+      id: 'h3-failed',
+      model: 'MiniMax-H3',
+      status: 'failed',
+      error: { code: 'H3_FAILED', message: 'Reference video could not be decoded' },
+    } as const;
+
+    expect(getVideoV2FailureReason(task))
+      .toBe('H3_FAILED: Reference video could not be decoded');
+    expect(getVideoV2FailureReason({ ...task, error: { message: 'Rejected' } }))
+      .toBe('Rejected');
+    expect(getVideoV2FailureReason({ ...task, error: undefined })).toBeUndefined();
   });
 });

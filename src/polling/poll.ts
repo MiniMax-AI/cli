@@ -11,6 +11,7 @@ export interface PollOptions {
   isComplete: (data: unknown) => boolean;
   isFailed: (data: unknown) => boolean;
   getStatus?: (data: unknown) => string;
+  getFailureReason?: (data: unknown) => string | undefined;
 }
 
 export async function poll<T>(config: Config, opts: PollOptions): Promise<T> {
@@ -36,9 +37,11 @@ export async function poll<T>(config: Config, opts: PollOptions): Promise<T> {
         spinner.stop('Failed.');
         // Include API status context to help users diagnose failures
         const status = opts.getStatus ? opts.getStatus(data) : 'failed';
-        const extra = (data as Record<string, unknown>)?.base_resp
-          ? ` (${(data as { base_resp: { status_code?: number; status_msg?: string } }).base_resp.status_msg})`
-          : '';
+        const baseResponseMessage = (
+          data as { base_resp?: { status_msg?: string } }
+        ).base_resp?.status_msg;
+        const failureReason = opts.getFailureReason?.(data) ?? baseResponseMessage;
+        const extra = failureReason ? ` (${failureReason})` : '';
         throw new CLIError(
           `Task ${status}.${extra}`,
           ExitCode.GENERAL,
