@@ -30,6 +30,14 @@ export function videoTaskV2Endpoint(baseUrl: string, taskId: string): string {
   return `${baseUrl}/v2/query/video_generation/${taskId}`;
 }
 
+export function videoTaskV2ListEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v2/query/video_generation`;
+}
+
+export function videoTaskV2DeleteEndpoint(baseUrl: string, taskId: string): string {
+  return `${baseUrl}/v2/video_generation/${taskId}`;
+}
+
 export function fileRetrieveEndpoint(baseUrl: string, fileId: string): string {
   return `${baseUrl}/v1/files/retrieve?file_id=${fileId}`;
 }

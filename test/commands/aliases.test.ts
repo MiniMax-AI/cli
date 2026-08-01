@@ -26,6 +26,12 @@ describe('command aliases', () => {
     expect(registry.resolve(['file', 'list']).command.name).toBe('file list');
     expect(registry.resolve(['file', 'delete']).command.name).toBe('file delete');
   });
+
+  it('resolves video task management commands', () => {
+    expect(registry.resolve(['video', 'task', 'get']).command.name).toBe('video task get');
+    expect(registry.resolve(['video', 'task', 'list']).command.name).toBe('video task list');
+    expect(registry.resolve(['video', 'task', 'delete']).command.name).toBe('video task delete');
+  });
 });
 
 describe('text chat --prompt alias', () => {

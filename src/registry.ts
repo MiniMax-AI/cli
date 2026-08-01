@@ -14,6 +14,8 @@ import speechVoices from './commands/speech/voices';
 import imageGenerate from './commands/image/generate';
 import videoGenerate from './commands/video/generate';
 import videoTaskGet from './commands/video/task-get';
+import videoTaskList from './commands/video/task-list';
+import videoTaskDelete from './commands/video/task-delete';
 import videoDownload from './commands/video/download';
 import musicGenerate from './commands/music/generate';
 import musicCover from './commands/music/cover';
@@ -293,6 +295,8 @@ export const registry = new CommandRegistry({
   'image generate':    imageGenerate,
   'video generate':    videoGenerate,
   'video task get':    videoTaskGet,
+  'video task list':   videoTaskList,
+  'video task delete': videoTaskDelete,
   'video download':    videoDownload,
   'music generate':    musicGenerate,
   'music cover':       musicCover,
