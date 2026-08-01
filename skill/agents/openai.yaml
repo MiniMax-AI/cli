@@ -1,0 +1,4 @@
+interface:
+  display_name: "MiniMax H3 Video"
+  short_description: "Generate MiniMax-H3 video with the MMX CLI"
+  default_prompt: "Use $mmx-h3-video to generate this MiniMax-H3 video with one direct MMX command, reuse the saved API key without exposing it, and wait on the same terminal session."
