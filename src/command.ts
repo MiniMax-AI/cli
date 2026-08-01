@@ -6,6 +6,7 @@ export interface OptionDef {
   description: string;
   type?: 'string' | 'number' | 'boolean' | 'array';
   required?: boolean;
+  hidden?: boolean;
 }
 
 export interface Command {

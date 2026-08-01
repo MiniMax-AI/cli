@@ -85,11 +85,23 @@ mmx image generate --prompt "山水画" --out-dir ./output/
 ### `mmx video`
 
 ```bash
+# Hailuo-2.3（视频生成 V1）
 mmx video generate --prompt "海浪拍打礁石" --download sunset.mp4
 mmx video generate --prompt "机器人作画" --async
+
+# MiniMax-H3（视频生成 V2）
+mmx video generate --api-key "$MINIMAX_API_KEY" --model MiniMax-H3 --prompt "夕阳下的海浪"
+mmx video generate --api-key "$MINIMAX_API_KEY" --model MiniMax-H3 --prompt "主体向前行走" --image start.jpg
+mmx video generate --api-key "$MINIMAX_API_KEY" --model MiniMax-H3 --prompt "保持相同角色和动作" --reference-image character.png --reference-video motion.mp4
+
 mmx video task get --task-id 123456
+mmx video task get --task-id 424010985738629 --model MiniMax-H3
 mmx video download --file-id 176844028768320 --out video.mp4
 ```
+
+MiniMax-H3 会在发送前检查本地文件和 Base64 数据：图片不超过 30 MB、参考视频不超过 50 MB、参考音频不超过 15 MB、JSON 请求体总计不超过 64 MB。所有素材的尺寸、宽高比、时长、帧率和编码格式仍由 API 服务端校验。
+
+`--region` 是 CLI 原有的全局选项，不是 H3 参数。正常生成视频无需填写，CLI 会使用已保存或自动识别的区域。H3 默认使用 2K、5 秒，文生视频默认比例为 16:9。
 
 ### `mmx speech`
 

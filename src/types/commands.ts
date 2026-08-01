@@ -43,7 +43,15 @@ export interface ImageGenerateFlags {
 export interface VideoGenerateFlags {
   model?: string;
   prompt?: string;
+  image?: string;
   firstFrame?: string;
+  lastFrame?: string;
+  subjectImage?: string;
+  referenceImage?: string[];
+  referenceVideo?: string[];
+  referenceAudio?: string[];
+  duration?: number;
+  ratio?: string;
   callbackUrl?: string;
   wait?: boolean;
   pollInterval?: number;
@@ -52,6 +60,7 @@ export interface VideoGenerateFlags {
 
 export interface VideoTaskGetFlags {
   taskId?: string;
+  model?: string;
 }
 
 export interface VideoDownloadFlags {

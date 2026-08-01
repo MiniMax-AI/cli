@@ -65,6 +65,14 @@ describe('generateToolSchema', () => {
 
     expect(schema.name).toBe('mmx_speech_synthesize');
   });
+
+  it('excludes hidden compatibility aliases', () => {
+    const schema = getSchema('video generate');
+    const props = is(schema.input_schema.properties);
+
+    expect(props.image).toBeDefined();
+    expect(props.firstFrame).toBeUndefined();
+  });
 });
 
 describe('registry getAllCommands filtering', () => {

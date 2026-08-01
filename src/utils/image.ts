@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, statSync } from 'fs';
 import { extname } from 'path';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
@@ -8,17 +8,31 @@ export const IMAGE_MIME_TYPES: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
 };
 
-export function localFileToDataUri(filePath: string): string {
+export function localFileToDataUri(filePath: string, maxBytes?: number): string {
+  if (maxBytes !== undefined) {
+    const size = statSync(filePath).size;
+    if (size > maxBytes) {
+      throw new CLIError(
+        `Image file is ${(size / 1024 / 1024).toFixed(1)} MB; MiniMax-H3 allows at most ${maxBytes / 1024 / 1024} MB.`,
+        ExitCode.USAGE,
+        'Use a public URL or mm_file:// file ID for large images.',
+      );
+    }
+  }
   const ext = extname(filePath).toLowerCase();
   const mime = IMAGE_MIME_TYPES[ext] || 'image/jpeg';
   const data = readFileSync(filePath);
   return `data:${mime};base64,${data.toString('base64')}`;
 }
 
-export function resolveImageInput(input: string): string {
-  return input.startsWith('http') ? input : localFileToDataUri(input);
+export function resolveImageInput(input: string, maxBytes?: number): string {
+  return input.startsWith('http') || input.startsWith('data:') || input.startsWith('mm_file://')
+    ? input
+    : localFileToDataUri(input, maxBytes);
 }
 
 const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;

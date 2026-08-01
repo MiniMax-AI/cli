@@ -243,10 +243,11 @@ ${b('Getting Help:')}
 
     out.write(`\n${cmd.description}\n`);
     if (cmd.usage) out.write(`${b('Usage:')} ${cmd.usage}\n`);
-    if (cmd.options && cmd.options.length > 0) {
-      const maxLen = Math.max(...cmd.options.map(o => o.flag.length));
+    const visibleOptions = cmd.options?.filter(option => !option.hidden) ?? [];
+    if (visibleOptions.length > 0) {
+      const maxLen = Math.max(...visibleOptions.map(o => o.flag.length));
       out.write(`\n${b('Options:')}\n`);
-      for (const opt of cmd.options) {
+      for (const opt of visibleOptions) {
         out.write(`  ${a(opt.flag.padEnd(maxLen + 2))} ${d(opt.description)}\n`);
       }
     }
