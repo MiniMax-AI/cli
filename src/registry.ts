@@ -218,8 +218,7 @@ ${b('Resources:')}
 
 ${b('Global Flags:')}
   ${a('--api-key <key>')}        ${d('API key (overrides all other auth)')}
-  ${a('--region <region>')}      ${d('API region: global (default), cn')}
-  ${a('--base-url <url>')}       ${d('API base URL (overrides region)')}
+  ${a('--region <region>')}      ${d('API region: global (default), cn)')}
   ${a('--output <format>')}      ${d('Output format: text, json')}
   ${a('--quiet')}                ${d('Suppress non-essential output')}
   ${a('--verbose')}              ${d('Print HTTP request/response details')}

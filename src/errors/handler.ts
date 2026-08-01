@@ -35,7 +35,7 @@ export function handleError(err: unknown): never {
       return handleError(timeout);
     }
 
-    // Detect TypeError from fetch with invalid URL (e.g., malformed MINIMAX_BASE_URL)
+    // Detect TypeError from fetch with invalid URL (e.g., malformed base_url in config.json)
     if (err instanceof TypeError && err.message === "fetch failed") {
       const networkErr = new CLIError(
         "Network request failed.",

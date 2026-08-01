@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'bun:test';
 import { parseFlags } from '../src/args';
 import type { OptionDef } from '../src/command';
+import { GLOBAL_OPTIONS } from '../src/command';
+import { CLIError } from '../src/errors/base';
 
 const OPTIONS: OptionDef[] = [
   { flag: '--timeout <seconds>', description: 'Request timeout', type: 'number' },
@@ -51,5 +53,31 @@ describe('parseFlags', () => {
     expect(() => parseFlags(['--verbose='], OPTIONS)).toThrow(
       'Flag --verbose requires a boolean value',
     );
+  });
+});
+
+describe('parseFlags — removed flags', () => {
+  it('rejects --base-url (space form) as a CLIError with a migration hint', () => {
+    let caught: unknown;
+    try {
+      parseFlags(['--base-url', 'https://api.example', 'search', 'query'], GLOBAL_OPTIONS);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(CLIError);
+    expect((caught as CLIError).message).toBe('Flag --base-url was removed.');
+    expect((caught as CLIError).hint).toMatch(/mmx config set.*base_url/);
+  });
+
+  it('rejects --base-url=... (= form) as a CLIError', () => {
+    expect(() =>
+      parseFlags(['--base-url=https://api.example', 'search', 'query'], GLOBAL_OPTIONS),
+    ).toThrow(/--base-url was removed/);
+  });
+
+  it('still parses unrelated flags normally', () => {
+    const flags = parseFlags(['--region', 'cn', '--quiet'], GLOBAL_OPTIONS);
+    expect(flags.region).toBe('cn');
+    expect(flags.quiet).toBe(true);
   });
 });

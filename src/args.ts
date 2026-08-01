@@ -1,5 +1,7 @@
 import type { GlobalFlags } from './types/flags';
 import type { OptionDef } from './command';
+import { CLIError } from './errors/base';
+import { ExitCode } from './errors/codes';
 
 /** Recognised spellings for an explicit boolean flag value, e.g. `--flag=false`. */
 const BOOLEAN_TRUE_VALUES = new Set(['true', '1', 'yes', 'on']);
@@ -116,6 +118,17 @@ export function parseFlags(argv: string[], options: OptionDef[]): GlobalFlags {
       }
 
       const camelKey = kebabToCamel(key);
+
+      // Flags removed in newer versions — give users a clear pointer to the
+      // current way of doing the same thing instead of silently dropping
+      // their input.
+      if (key === 'base-url') {
+        throw new CLIError(
+          'Flag --base-url was removed.',
+          ExitCode.USAGE,
+          'Set base_url via `mmx config set --key base_url --value <url>`.',
+        );
+      }
 
       if (schema.booleans.has(camelKey)) {
         // A bare boolean flag (`--flag`) is true. Honour an explicit value

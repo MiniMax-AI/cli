@@ -82,9 +82,8 @@ export function loadConfig(flags: GlobalFlags): Config {
   const needsRegionDetection = !explicitRegion
     && (!cachedRegion || (activeKey !== undefined && activeKey !== file.api_key));
 
-  const baseUrl = flags.baseUrl
-    || process.env.MINIMAX_BASE_URL
-    || file.base_url
+  // env/flag removed intentionally — see PR for context.
+  const baseUrl = file.base_url
     || file.oauth?.resource_url
     || REGIONS[region]
     || REGIONS.global;

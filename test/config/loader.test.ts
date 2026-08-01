@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { copyFileSync, mkdirSync, readFileSync, rmSync, unlinkSync } from 'fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { loadConfig, renameWithCrossDeviceFallback, writeConfigFile } from '../../src/config/loader';
@@ -154,5 +154,73 @@ describe('writeConfigFile', () => {
 
     const configPath = join(testDir, 'config.json');
     expect(JSON.parse(readFileSync(configPath, 'utf-8')).output).toBe('json');
+  });
+});
+
+describe('loadConfig — baseUrl source chain', () => {
+  const testDir = join(tmpdir(), `mmx-baseurl-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const configPath = join(testDir, 'config.json');
+  const originalConfigDir = process.env.MMX_CONFIG_DIR;
+
+  beforeEach(() => {
+    process.env.MMX_CONFIG_DIR = testDir;
+    delete process.env.MINIMAX_BASE_URL;
+    delete process.env.MINIMAX_REGION;
+  });
+
+  afterEach(() => {
+    if (originalConfigDir === undefined) delete process.env.MMX_CONFIG_DIR;
+    else process.env.MMX_CONFIG_DIR = originalConfigDir;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  function writeConfig(body: object): void {
+    mkdirSync(testDir, { recursive: true });
+    writeFileSync(configPath, JSON.stringify(body));
+  }
+
+  it('uses file.base_url when set, with no flag or env', () => {
+    writeConfig({ base_url: 'https://api.from-file.example' });
+    const cfg = loadConfig(baseFlags);
+    expect(cfg.baseUrl).toBe('https://api.from-file.example');
+  });
+
+  it('falls back to REGIONS.global when nothing is set', () => {
+    writeConfig({});
+    const cfg = loadConfig(baseFlags);
+    expect(cfg.baseUrl).toBe('https://api.minimax.io');
+  });
+
+  it('falls back to REGIONS[region] when region is set in config file', () => {
+    writeConfig({ region: 'cn' });
+    const cfg = loadConfig(baseFlags);
+    expect(cfg.baseUrl).toBe('https://api.minimaxi.com');
+  });
+
+  it('ignores MINIMAX_BASE_URL env even when file.base_url is missing', () => {
+    writeConfig({});
+    process.env.MINIMAX_BASE_URL = 'https://api.from-env.example';
+    const cfg = loadConfig(baseFlags);
+    expect(cfg.baseUrl).toBe('https://api.minimax.io');
+  });
+
+  it('file.base_url wins over MINIMAX_BASE_URL env', () => {
+    writeConfig({ base_url: 'https://api.from-file.example' });
+    process.env.MINIMAX_BASE_URL = 'https://api.from-env.example';
+    const cfg = loadConfig(baseFlags);
+    expect(cfg.baseUrl).toBe('https://api.from-file.example');
+  });
+
+  it('falls back to REGIONS[region] when region is set via env', () => {
+    writeConfig({});
+    process.env.MINIMAX_REGION = 'cn';
+    const cfg = loadConfig(baseFlags);
+    expect(cfg.baseUrl).toBe('https://api.minimaxi.com');
+  });
+
+  it('ignores malformed file.base_url (not starting with http) and falls back to regions', () => {
+    writeConfig({ base_url: 'not-a-url' });
+    const cfg = loadConfig(baseFlags);
+    expect(cfg.baseUrl).toBe('https://api.minimax.io');
   });
 });
