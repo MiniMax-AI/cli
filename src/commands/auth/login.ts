@@ -3,8 +3,8 @@ import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { pickAuthMethod, pickOAuthRegion, runOAuthLogin } from '../../auth/setup';
 import { requestJson } from '../../client/http';
-import { quotaEndpoint } from '../../client/endpoints';
-import { renderQuotaTable } from '../../output/quota-table';
+import { quotaEndpoint, usageEndpoint } from '../../client/endpoints';
+import { renderUsage } from '../../output/usage';
 import { detectRegion } from '../../config/detect-region';
 
 import { getConfigPath } from '../../config/paths';
@@ -14,7 +14,7 @@ import { maskToken } from '../../utils/token';
 import type { Config, Region } from '../../config/schema';
 import { REGIONS } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { QuotaModelRemain } from '../../types/api';
+import type { AccountBalanceResponse, QuotaModelRemain } from '../../types/api';
 
 interface QuotaApiResponse {
   model_remains: QuotaModelRemain[];
@@ -53,9 +53,17 @@ function isNetworkUnavailable(error: unknown): boolean {
 
 async function showQuotaAfterLogin(config: Config): Promise<void> {
   try {
+    const apiKey = config.apiKey || config.fileApiKey;
+    if (apiKey && apiKey.startsWith('sk-api-')) {
+      const url = usageEndpoint(config.baseUrl, apiKey);
+      const response = await requestJson<AccountBalanceResponse>(config, { url });
+      renderUsage(response, config, apiKey);
+      return;
+    }
+
     const url = quotaEndpoint(config.baseUrl);
     const response = await requestJson<QuotaApiResponse>(config, { url });
-    renderQuotaTable(response.model_remains || [], config);
+    renderUsage(response, config);
   } catch {
     // Non-fatal — login succeeded, quota display is best-effort
   }
@@ -176,16 +184,20 @@ async function loginWithApiKey(
   // closed if neither can be confirmed; never persist a guessed fallback.
   const detected = explicitRegion ?? await detectRegion(key);
   const cfg: Config = { ...config, region: detected, baseUrl: REGIONS[detected], apiKey: key };
+  const url = usageEndpoint(cfg.baseUrl, key);
 
-  // Verify the selected region actually authorizes the quota endpoint.
+  // Verify the selected region actually authorizes the appropriate usage endpoint.
   try {
-    await requestJson<QuotaApiResponse>(cfg, { url: quotaEndpoint(cfg.baseUrl) });
+    await requestJson<QuotaApiResponse | AccountBalanceResponse>(cfg, { url });
   } catch (error) {
     if (error instanceof CLIError && error.exitCode === ExitCode.AUTH) {
+      const validationHint = key.startsWith('sk-api-')
+        ? 'Check that your key is valid and belongs to an API secret key.'
+        : 'Check that your key is valid and belongs to a Token Plan.';
       throw new CLIError(
         'API key validation failed.',
         ExitCode.AUTH,
-        'Check that your key is valid and belongs to a Token Plan.',
+        validationHint,
       );
     }
 

@@ -3,12 +3,12 @@ import { resolveCredential } from '../../auth/resolver';
 import { loadCredentials } from '../../auth/credentials';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { requestJson } from '../../client/http';
-import { quotaEndpoint } from '../../client/endpoints';
-import { renderQuotaTable } from '../../output/quota-table';
+import { quotaEndpoint, usageEndpoint } from '../../client/endpoints';
+import { renderUsage } from '../../output/usage';
 import { maskToken } from '../../utils/token';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { QuotaResponse } from '../../types/api';
+import type { AccountBalanceResponse, QuotaResponse } from '../../types/api';
 
 export default defineCommand({
   name: 'auth status',
@@ -36,6 +36,9 @@ export default defineCommand({
           }
         } else {
           result.key = maskToken(credential.token);
+          const url = usageEndpoint(config.baseUrl, credential.token);
+          const usage = await requestJson<AccountBalanceResponse | QuotaResponse>(config, { url });
+          result.usage = usage;
         }
         console.log(formatOutput(result, format));
         return;
@@ -57,6 +60,15 @@ export default defineCommand({
           const minutesLeft = Math.round((expiresAt.getTime() - Date.now()) / 60000);
           console.log(`  Expires in: ${minutesLeft} minutes`);
         }
+      } else {
+        const url = usageEndpoint(config.baseUrl, token);
+        try {
+          const response = await requestJson<AccountBalanceResponse | QuotaResponse>(config, { url });
+          renderUsage(response, config, token);
+        } catch (e) {
+          console.log(`  Quota fetch failed: ${(e as Error).message}`);
+        }
+        return;
       }
 
       // Fetch quota snapshot
@@ -64,7 +76,7 @@ export default defineCommand({
       try {
         const url = quotaEndpoint(config.baseUrl);
         const quota = await requestJson<QuotaResponse>(config, { url, method: 'GET' });
-        renderQuotaTable(quota.model_remains || [], config);
+        renderUsage(quota, config);
       } catch (e) {
         console.log(`  Quota fetch failed: ${(e as Error).message}`);
       }

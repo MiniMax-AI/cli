@@ -1,15 +1,10 @@
-import { REGIONS, type Region } from "./schema";
-import { readConfigFile, writeConfigFile } from "./loader";
-import { CLIError } from "../errors/base";
-import { ExitCode } from "../errors/codes";
-
-const QUOTA_PATH = "/v1/token_plan/remains";
+import { REGIONS, type Region } from './schema';
+import { readConfigFile, writeConfigFile } from './loader';
+import { CLIError } from '../errors/base';
+import { ExitCode } from '../errors/codes';
+import { usageEndpoint } from '../client/endpoints';
 
 type ProbeResult = "authorized" | "unauthorized" | "unreachable" | "inconclusive";
-
-function quotaUrl(region: Region): string {
-  return REGIONS[region] + QUOTA_PATH;
-}
 
 async function probeRegion(
   region: Region,
@@ -31,7 +26,7 @@ async function probeRegion(
   for (const authHeader of authHeaders) {
     let res: Response;
     try {
-      res = await fetch(quotaUrl(region), {
+      res = await fetch(usageEndpoint(REGIONS[region], apiKey), {
         headers: { ...authHeader, "Content-Type": "application/json" },
         signal: AbortSignal.timeout(timeoutMs),
       });
@@ -74,12 +69,15 @@ export async function detectRegion(apiKey: string): Promise<Region> {
   const match = results.find((r) => r.result === "authorized");
   if (!match) {
     process.stderr.write(" failed\n");
+    const authHint = apiKey.startsWith('sk-api-')
+      ? 'No credentials were changed. Check that the key is valid and belongs to an API secret key.'
+      : 'No credentials were changed. Check that the key is valid and belongs to a Token Plan.';
 
     if (results.every((r) => r.result === "unauthorized")) {
       throw new CLIError(
         "API key was rejected by all regions.",
         ExitCode.AUTH,
-        "No credentials were changed. Check that the key is valid and belongs to a Token Plan.",
+        authHint,
       );
     }
 
