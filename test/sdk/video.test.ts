@@ -33,6 +33,73 @@ describe('MiniMaxSDK.video', () => {
     expect(result.taskId).toBe('vid-123');
   });
 
+  it('keeps the legacy V1 request payload unchanged', async () => {
+    let requestText = '';
+    server = createMockServer({
+      routes: {
+        'POST /v1/video_generation': async (req) => {
+          requestText = await req.text();
+          return jsonResponse({
+            task_id: 'vid-legacy',
+            base_resp: { status_code: 0, status_msg: 'success' },
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    await sdk.video.generate({
+      model: 'MiniMax-Hailuo-2.3',
+      prompt: 'A cat walking',
+      first_frame_image: 'https://example.com/first.png',
+      callback_url: 'https://example.com/callback',
+      async: true,
+    });
+
+    expect(requestText).toBe(JSON.stringify({
+      model: 'MiniMax-Hailuo-2.3',
+      prompt: 'A cat walking',
+      first_frame_image: 'https://example.com/first.png',
+      callback_url: 'https://example.com/callback',
+    }));
+  });
+
+  it('should use Video Generation V2 for MiniMax-H3', async () => {
+    let requestBody: unknown;
+    server = createMockServer({
+      routes: {
+        '/v2/video_generation': async (req) => {
+          requestBody = await req.json();
+          return jsonResponse({ task_id: 'h3-123' });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    const result = await sdk.video.generate({
+      model: 'MiniMax-H3',
+      content: [{ type: 'text', text: 'Ocean waves' }],
+      async: true,
+    });
+
+    expect(result.taskId).toBe('h3-123');
+    expect(requestBody).toEqual({
+      model: 'MiniMax-H3',
+      content: [{ type: 'text', text: 'Ocean waves' }],
+      resolution: '2K',
+      duration: 5,
+      ratio: '16:9',
+    });
+  });
+
   it('should get task status', async () => {
     server = createMockServer({
       routes: {
@@ -52,6 +119,70 @@ describe('MiniMaxSDK.video', () => {
     const result = await sdk.video.getTask({ taskId: 'vid-123' });
 
     expect(result.status).toBe('Success');
+  });
+
+  it('should get MiniMax-H3 task status from Video Generation V2', async () => {
+    server = createMockServer({
+      routes: {
+        '/v2/query/video_generation/h3-123': () => jsonResponse({
+          task: {
+            id: 'h3-123',
+            model: 'MiniMax-H3',
+            status: 'succeeded',
+            content: { url: 'https://example.com/video.mp4' },
+          },
+        }),
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    const result = await sdk.video.getTask({ taskId: 'h3-123', model: 'MiniMax-H3' });
+
+    expect(result.status).toBe('succeeded');
+  });
+
+  it('should poll a MiniMax-H3 task from running to succeeded', async () => {
+    let pollCount = 0;
+    server = createMockServer({
+      routes: {
+        '/v2/video_generation': () => jsonResponse({ task_id: 'h3-sync' }),
+        '/v2/query/video_generation/h3-sync': () => {
+          pollCount++;
+          return jsonResponse({
+            task: {
+              id: 'h3-sync',
+              model: 'MiniMax-H3',
+              status: pollCount === 1 ? 'running' : 'succeeded',
+              ...(pollCount === 1
+                ? {}
+                : { content: { url: 'https://example.com/h3-sync.mp4' } }),
+            },
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    const result = await sdk.video.generate({
+      model: 'MiniMax-H3',
+      content: [{ type: 'text', text: 'Ocean waves' }],
+      pollInterval: 0,
+    });
+
+    expect(pollCount).toBe(2);
+    expect(result).toMatchObject({
+      id: 'h3-sync',
+      status: 'succeeded',
+      content: { url: 'https://example.com/h3-sync.mp4' },
+    });
   });
 });
 
@@ -83,6 +214,26 @@ describe('VideoSDK.validateParams', () => {
     await expect(
       sdk.generate({ prompt: 'test', model: 'MiniMax-Hailuo-2.3-Fast' }),
     ).rejects.toThrow('MiniMax-Hailuo-2.3-Fast only supports I2V');
+  });
+
+  it('keeps H3-only fields out of the MiniMax-Hailuo-2.3 request path', async () => {
+    await expect(
+      sdk.generate({
+        model: 'MiniMax-Hailuo-2.3',
+        prompt: 'test',
+        duration: 5,
+      } as never),
+    ).rejects.toThrow('require model MiniMax-H3');
+
+    await expect(
+      sdk.generate({
+        model: 'MiniMax-Hailuo-2.3',
+        content: [{ type: 'text', text: 'test' }],
+        resolution: '2K',
+        duration: 5,
+        ratio: '16:9',
+      } as never),
+    ).rejects.toThrow('content is only supported with model MiniMax-H3');
   });
 
   it('auto-selects SEF model when last_frame_image is provided', async () => {

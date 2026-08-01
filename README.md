@@ -85,11 +85,23 @@ mmx image generate --prompt "Logo" --out-dir ./out/
 ### `mmx video`
 
 ```bash
+# Hailuo-2.3 (Video Generation V1)
 mmx video generate --prompt "Ocean waves at sunset" --download sunset.mp4
 mmx video generate --prompt "A robot painting" --async
+
+# MiniMax-H3 (Video Generation V2)
+mmx video generate --api-key "$MINIMAX_API_KEY" --model MiniMax-H3 --prompt "Ocean waves at sunset"
+mmx video generate --api-key "$MINIMAX_API_KEY" --model MiniMax-H3 --prompt "The subject walks forward" --image start.jpg
+mmx video generate --api-key "$MINIMAX_API_KEY" --model MiniMax-H3 --prompt "Keep the same character" --reference-image character.png --reference-video motion.mp4
+
 mmx video task get --task-id 123456
+mmx video task get --task-id 424010985738629 --model MiniMax-H3
 mmx video download --file-id 176844028768320 --out video.mp4
 ```
+
+For MiniMax-H3, local files and Base64 data URIs are preflight-checked against the documented limits: image 30 MB, reference video 50 MB, reference audio 15 MB, and total JSON request body 64 MB. The API validates dimensions, aspect ratio, duration, frame rate, and codecs for all media.
+
+`--region` is an existing global CLI option, not an H3 parameter. Normal video generation does not need it; the CLI uses the saved or automatically detected region. H3 defaults to 2K, 5 seconds, and 16:9 for text-to-video.
 
 ### `mmx speech`
 

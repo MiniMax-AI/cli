@@ -117,7 +117,7 @@ mmx image generate --prompt "Logo" --n 3 --out-dir ./gen/ --quiet
 
 ### video generate
 
-Generate video. Default model: `MiniMax-Hailuo-2.3`. This is an async task — by default it polls until completion.
+Generate video. Default model: `MiniMax-Hailuo-2.3`. Select `MiniMax-H3` to use the Video Generation V2 multimodal API. This is an async task — by default it polls until completion.
 
 ```bash
 mmx video generate --prompt <text> [flags]
@@ -126,8 +126,14 @@ mmx video generate --prompt <text> [flags]
 | Flag | Type | Description |
 |---|---|---|
 | `--prompt <text>` | string, **required** | Video description |
-| `--model <model>` | string | `MiniMax-Hailuo-2.3` (default) or `MiniMax-Hailuo-2.3-Fast` |
-| `--first-frame <path-or-url>` | string | First frame image |
+| `--model <model>` | string | `MiniMax-Hailuo-2.3` (default), `MiniMax-Hailuo-2.3-Fast`, or `MiniMax-H3` |
+| `--image <path-or-url>` | string | Input image for image-to-video |
+| `--last-frame <path-or-url>` | string | Last frame image; H3 supports last-frame-only input |
+| `--reference-image <path-or-url>` | string, repeatable | H3 reference image |
+| `--reference-video <path-or-url>` | string, repeatable | H3 reference video |
+| `--reference-audio <path-or-url>` | string, repeatable | H3 reference audio; requires a reference image or video |
+| `--duration <seconds>` | number | H3 duration, 4-15 seconds (default: 5) |
+| `--ratio <ratio>` | string | H3 output ratio; T2V cannot use `adaptive` |
 | `--callback-url <url>` | string | Webhook URL for completion |
 | `--download <path>` | string | Save video to specific file |
 | `--async` | boolean | Return task ID immediately |
@@ -138,6 +144,18 @@ mmx video generate --prompt <text> [flags]
 # Non-blocking: get task ID
 mmx video generate --prompt "A robot." --async --quiet
 # stdout: {"taskId":"..."}
+
+# H3 text-to-video
+mmx video generate --model MiniMax-H3 --prompt "Ocean waves." --async --quiet
+
+# H3 image-to-video
+mmx video generate --model MiniMax-H3 --prompt "The subject walks forward." \
+  --image start.jpg --async --quiet
+
+# H3 reference-to-video
+mmx video generate --model MiniMax-H3 --prompt "Keep the same character." \
+  --reference-image character.png \
+  --reference-video motion.mp4 --async --quiet
 
 # Blocking: wait and get file path
 mmx video generate --prompt "Ocean waves." --download ocean.mp4 --quiet

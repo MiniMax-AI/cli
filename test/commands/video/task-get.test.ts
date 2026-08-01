@@ -90,4 +90,62 @@ describe('video task get command', () => {
       console.log = originalLog;
     }
   });
+
+  it('queries MiniMax-H3 task status from the V2 endpoint', async () => {
+    server = createMockServer({
+      routes: {
+        '/v2/query/video_generation/h3-123': () => jsonResponse({
+          task: {
+            id: 'h3-123',
+            model: 'MiniMax-H3',
+            status: 'succeeded',
+            content: { url: 'https://example.com/video.mp4' },
+            resolution: '2K',
+            duration: 5,
+            ratio: '16:9',
+          },
+        }),
+      },
+    });
+
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: server.url,
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: false,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await taskGetCommand.execute(config, {
+        taskId: 'h3-123',
+        model: 'MiniMax-H3',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: false,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.status).toBe('succeeded');
+      expect(parsed.url).toBe('https://example.com/video.mp4');
+    } finally {
+      console.log = originalLog;
+    }
+  });
 });

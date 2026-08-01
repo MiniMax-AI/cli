@@ -48,6 +48,7 @@ export function generateToolSchema(cmd: Command): Record<string, unknown> {
 
   if (cmd.options) {
     for (const opt of cmd.options) {
+      if (opt.hidden) continue;
       const { name, inferredType, isArray } = parseFlag(opt.flag);
       if (!name) continue;
 

@@ -18,8 +18,16 @@ export function videoGenerateEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/video_generation`;
 }
 
+export function videoGenerateV2Endpoint(baseUrl: string): string {
+  return `${baseUrl}/v2/video_generation`;
+}
+
 export function videoTaskEndpoint(baseUrl: string, taskId: string): string {
   return `${baseUrl}/v1/query/video_generation?task_id=${taskId}`;
+}
+
+export function videoTaskV2Endpoint(baseUrl: string, taskId: string): string {
+  return `${baseUrl}/v2/query/video_generation/${taskId}`;
 }
 
 export function fileRetrieveEndpoint(baseUrl: string, fileId: string): string {

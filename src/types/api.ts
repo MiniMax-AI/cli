@@ -202,6 +202,81 @@ export interface VideoTaskResponse {
   video_height?: number;
 }
 
+export type VideoV2ImageRole = 'first_frame' | 'last_frame' | 'reference_image';
+export type VideoV2Ratio = 'adaptive' | '21:9' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16';
+export type VideoV2Duration = 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+
+export interface VideoV2TextContent {
+  type: 'text';
+  text: string;
+}
+
+export interface VideoV2ImageContent {
+  type: 'image_url';
+  image_url: { url: string };
+  role?: VideoV2ImageRole;
+}
+
+export interface VideoV2VideoContent {
+  type: 'video_url';
+  video_url: { url: string };
+  role: 'reference_video';
+}
+
+export interface VideoV2AudioContent {
+  type: 'audio_url';
+  audio_url: { url: string };
+  role: 'reference_audio';
+}
+
+export type VideoV2ContentItem =
+  | VideoV2TextContent
+  | VideoV2ImageContent
+  | VideoV2VideoContent
+  | VideoV2AudioContent;
+
+export interface VideoV2Request {
+  model: 'MiniMax-H3';
+  content: VideoV2ContentItem[];
+  resolution: '2K';
+  duration: VideoV2Duration;
+  ratio?: VideoV2Ratio;
+  callback_url?: string;
+}
+
+export interface VideoV2Response {
+  task_id: string;
+}
+
+export interface VideoV2Task {
+  id: string;
+  model: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'expired';
+  error?: {
+    code?: string;
+    message?: string;
+  };
+  created_at?: number;
+  updated_at?: number;
+  content?: {
+    url?: string;
+  };
+  resolution?: string;
+  duration?: number;
+  usage?: {
+    total_seconds?: number;
+    input_seconds?: number;
+    output_seconds?: number;
+    input_image_count?: number;
+  };
+  ratio?: string;
+  task_type?: string;
+}
+
+export interface VideoV2TaskResponse {
+  task: VideoV2Task;
+}
+
 // ---- Music ----
 
 export interface MusicRequest {

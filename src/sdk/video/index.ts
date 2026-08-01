@@ -1,18 +1,47 @@
 import { Client } from "../client";
-import { fileRetrieveEndpoint, videoGenerateEndpoint, videoTaskEndpoint } from "../../client/endpoints";
-import { FileRetrieveResponse, VideoRequest, VideoResponse, VideoTaskResponse } from "../../types/api";
+import {
+  fileRetrieveEndpoint,
+  videoGenerateEndpoint,
+  videoGenerateV2Endpoint,
+  videoTaskEndpoint,
+  videoTaskV2Endpoint,
+} from "../../client/endpoints";
+import {
+  FileRetrieveResponse,
+  VideoRequest,
+  VideoTaskResponse,
+  VideoV2Request,
+  VideoV2Response,
+  VideoV2Task,
+  VideoV2TaskResponse,
+} from "../../types/api";
 import { ModelPartial } from "../types";
 import { poll } from "../../polling/poll";
 import { downloadFile } from "../../files/download";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
-import { toMerged } from 'es-toolkit/object';
+import {
+  buildVideoV2Request,
+  isVideoV2Model,
+  isVideoV2Request,
+  validateVideoV2Request,
+  VIDEO_V2_MODEL,
+  VideoV2InputError,
+} from '../../video/v2';
 
-export interface VideoAsyncGenerateRequest extends ModelPartial<VideoRequest> {
+export type VideoV2GenerateRequest = Omit<VideoV2Request, 'model' | 'resolution' | 'duration'> & {
+  model?: VideoV2Request['model'];
+  resolution?: VideoV2Request['resolution'];
+  duration?: VideoV2Request['duration'];
+};
+
+export type VideoGenerateRequest = ModelPartial<VideoRequest> | VideoV2GenerateRequest;
+
+export type VideoAsyncGenerateRequest = VideoGenerateRequest & {
   async?: boolean;
   pollInterval?: number;
   timeout?: number;
-}
+};
 
 export interface VideoDownloadRequest {
   fileId: string;
@@ -21,11 +50,14 @@ export interface VideoDownloadRequest {
 
 export class VideoSDK extends Client {
   async generate(request: VideoAsyncGenerateRequest & { async: true }): Promise<{taskId: string}>;
-  async generate(request: ModelPartial<VideoAsyncGenerateRequest>): Promise<VideoResponse>;
-  async generate(request: VideoAsyncGenerateRequest): Promise<VideoResponse | {taskId: string}> {
+  async generate(request: VideoAsyncGenerateRequest): Promise<VideoTaskResponse | VideoV2Task>;
+  async generate(request: VideoAsyncGenerateRequest): Promise<VideoTaskResponse | VideoV2Task | {taskId: string}> {
     const body = this.validateParams(request);
-    const url = videoGenerateEndpoint(this.config.baseUrl);
-    const res = await this.requestJson<VideoResponse>({
+    const usesV2 = isVideoV2Request(body);
+    const url = usesV2
+      ? videoGenerateV2Endpoint(this.config.baseUrl)
+      : videoGenerateEndpoint(this.config.baseUrl);
+    const res = await this.requestJson<VideoV2Response>({
       url,
       method: "POST",
       body,
@@ -36,8 +68,21 @@ export class VideoSDK extends Client {
       return {taskId};
     }
 
+    if (usesV2) {
+      const taskUrl = videoTaskV2Endpoint(this.config.baseUrl, taskId);
+      const result = await poll<VideoV2TaskResponse>(this.config, {
+        url: taskUrl,
+        intervalSec: request.pollInterval ?? 5,
+        timeoutSec: request.timeout ?? this.config.timeout,
+        isComplete: (d) => (d as VideoV2TaskResponse).task.status === 'succeeded',
+        isFailed: (d) => ['failed', 'cancelled', 'expired'].includes((d as VideoV2TaskResponse).task.status),
+        getStatus: (d) => (d as VideoV2TaskResponse).task.status,
+      });
+      return result.task;
+    }
+
     const taskUrl = videoTaskEndpoint(this.config.baseUrl, taskId);
-    const result = await poll<VideoTaskResponse>(this.config, {
+    return await poll<VideoTaskResponse>(this.config, {
       url: taskUrl,
       intervalSec: request.pollInterval ?? 5,
       timeoutSec: request.timeout ?? this.config.timeout,
@@ -45,11 +90,15 @@ export class VideoSDK extends Client {
       isFailed: (d) => (d as VideoTaskResponse).status === 'Failed',
       getStatus: (d) => (d as VideoTaskResponse).status,
     });
-
-    return result;
   }
 
-  async getTask({taskId}: {taskId: string}): Promise<VideoTaskResponse> {
+  async getTask({taskId, model}: {taskId: string; model?: string}): Promise<VideoTaskResponse | VideoV2Task> {
+    if (isVideoV2Model(model)) {
+      const url = videoTaskV2Endpoint(this.config.baseUrl, taskId);
+      const result = await this.requestJson<VideoV2TaskResponse>({ url });
+      return result.task;
+    }
+
     const url = videoTaskEndpoint(this.config.baseUrl, taskId);
     return await this.requestJson<VideoTaskResponse>({ url });
   }
@@ -69,8 +118,68 @@ export class VideoSDK extends Client {
     }
   }
 
-  private validateParams(request: VideoAsyncGenerateRequest): VideoRequest {
-    const { prompt, model, first_frame_image, last_frame_image, subject_reference } = request;
+  private validateParams(request: VideoAsyncGenerateRequest): VideoRequest | VideoV2Request {
+    const params = { ...request } as Record<string, unknown>;
+    delete params.async;
+    delete params.pollInterval;
+    delete params.timeout;
+
+    if ('content' in params || isVideoV2Model(params.model as string | undefined)) {
+      try {
+        if ('content' in params) {
+          if (params.model && !isVideoV2Model(params.model as string)) {
+            throw new VideoV2InputError('content is only supported with model MiniMax-H3');
+          }
+          const content = params.content as VideoV2Request['content'];
+          const hasFrameInput = content.some(item =>
+            item.type === 'image_url' && (!item.role || item.role === 'first_frame' || item.role === 'last_frame'),
+          );
+          const hasReferenceInput = content.some(item =>
+            item.type !== 'text' && item.role?.startsWith('reference_'),
+          );
+          const body = {
+            ...params,
+            model: VIDEO_V2_MODEL,
+            resolution: (params.resolution ?? '2K') as '2K',
+            duration: (params.duration ?? 5) as VideoV2Request['duration'],
+            ratio: params.ratio ?? (hasFrameInput || hasReferenceInput ? 'adaptive' : '16:9'),
+          } as VideoV2Request;
+          validateVideoV2Request(body);
+          return body;
+        }
+
+        const prompt = params.prompt as string | undefined;
+        if (!prompt) {
+          throw new VideoV2InputError('prompt or content is required');
+        }
+        return buildVideoV2Request({
+          prompt,
+          images: [
+            ...(params.first_frame_image
+              ? [{ url: params.first_frame_image as string, role: 'first_frame' as const }]
+              : []),
+            ...(params.last_frame_image
+              ? [{ url: params.last_frame_image as string, role: 'last_frame' as const }]
+              : []),
+          ],
+          resolution: params.resolution as string | undefined,
+          duration: params.duration as number | undefined,
+          ratio: params.ratio as string | undefined,
+          callbackUrl: params.callback_url as string | undefined,
+        });
+      } catch (error) {
+        if (error instanceof VideoV2InputError) {
+          throw new SDKError(error.message, ExitCode.USAGE);
+        }
+        throw error;
+      }
+    }
+
+    if ('resolution' in params || 'duration' in params || 'ratio' in params) {
+      throw new SDKError('resolution, duration, and ratio require model MiniMax-H3', ExitCode.USAGE);
+    }
+
+    const { prompt, model, first_frame_image, last_frame_image, subject_reference } = params as ModelPartial<VideoRequest>;
 
     if (!prompt) {
       throw new SDKError('prompt is required', ExitCode.USAGE);
@@ -107,8 +216,9 @@ export class VideoSDK extends Client {
       );
     }
 
-    return toMerged({
+    return {
+      ...(params as Omit<VideoRequest, 'model'>),
       model: resolvedModel,
-    }, request)
+    };
   }
 }

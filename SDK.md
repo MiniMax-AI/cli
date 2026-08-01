@@ -65,10 +65,27 @@ const video = await sdk.video.generate({
   prompt: 'Ocean waves at sunset',
 });
 
+// MiniMax-H3 — Video Generation V2 with request defaults
+const h3Video = await sdk.video.generate({
+  model: 'MiniMax-H3',
+  prompt: 'Ocean waves at sunset',
+});
+
 // Asynchronous — returns task ID immediately
 const { taskId } = await sdk.video.generate({
   prompt: 'A robot painting',
   async: true,
+});
+
+const { taskId: h3TaskId } = await sdk.video.generate({
+  model: 'MiniMax-H3',
+  prompt: 'Ocean waves at sunset',
+  async: true,
+});
+
+const h3Task = await sdk.video.getTask({
+  taskId: h3TaskId,
+  model: 'MiniMax-H3',
 });
 
 const task = await sdk.video.getTask({ taskId });
