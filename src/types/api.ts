@@ -336,6 +336,17 @@ export interface QuotaResponse {
   model_remains: QuotaModelRemain[];
 }
 
+export interface AccountBalanceResponse {
+  available_amount: string;
+  cash_balance: string;
+  voucher_balance: string;
+  credit_balance: string;
+  owed_amount: string;
+  balance_alert_switch: boolean;
+  balance_alert_threshold: string;
+  base_resp: BaseResp;
+}
+
 export interface QuotaModelRemain {
   model_name: string;
   start_time: number;

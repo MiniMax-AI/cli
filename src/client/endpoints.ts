@@ -54,6 +54,20 @@ export function quotaEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/token_plan/remains`;
 }
 
+export function accountBalanceEndpoint(baseUrl: string): string {
+  return `${baseUrl}/account/query_balance`;
+}
+
+export function isSecretApiKey(apiKey: string): boolean {
+  return apiKey.startsWith('sk-api-');
+}
+
+export function usageEndpoint(baseUrl: string, apiKey: string): string {
+  return isSecretApiKey(apiKey)
+    ? accountBalanceEndpoint(baseUrl)
+    : quotaEndpoint(baseUrl);
+}
+
 export function fileUploadEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/files/upload`;
 }

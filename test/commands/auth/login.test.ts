@@ -119,6 +119,74 @@ describe('auth login command', () => {
     }
   });
 
+  it('uses account/query_balance for sk-api keys', async () => {
+    let balanceRequests = 0;
+    server = createMockServer({
+      routes: {
+        '/account/query_balance': (req) => {
+          balanceRequests += 1;
+          if (req.headers.get('Authorization') === 'Bearer sk-api-secret-key') {
+            return jsonResponse({
+              available_amount: '98.00',
+              cash_balance: '0.00',
+              voucher_balance: '98.00',
+              credit_balance: '0.00',
+              owed_amount: '0.00',
+              balance_alert_switch: false,
+              balance_alert_threshold: '',
+              base_resp: { status_code: 0, status_msg: 'success' },
+            });
+          }
+          return jsonResponse({ error: 'unauthorized' }, 401);
+        },
+      },
+    });
+
+    configDir = mkdtempSync(join(tmpdir(), 'mmx-region-login-'));
+    process.env.MMX_CONFIG_DIR = configDir;
+
+    const originalGlobal = REGIONS.global;
+    (REGIONS as Record<string, string>).global = server.url;
+
+    try {
+      await loginCommand.execute(
+        {
+          region: 'global',
+          baseUrl: originalGlobal,
+          output: 'text',
+          timeout: 1,
+          verbose: false,
+          quiet: true,
+          noColor: true,
+          yes: false,
+          dryRun: false,
+          nonInteractive: true,
+          async: false,
+        },
+        {
+          apiKey: 'sk-api-secret-key',
+          region: 'global',
+          quiet: true,
+          verbose: false,
+          noColor: true,
+          yes: false,
+          dryRun: false,
+          help: false,
+          nonInteractive: true,
+          async: false,
+        },
+      );
+
+      expect(balanceRequests).toBeGreaterThan(0);
+      expect(readConfigFile()).toMatchObject({
+        api_key: 'sk-api-secret-key',
+        region: 'global',
+      });
+    } finally {
+      (REGIONS as Record<string, string>).global = originalGlobal;
+    }
+  });
+
   it('does not save an explicitly selected region when authentication is rejected', async () => {
     server = createMockServer({
       routes: {

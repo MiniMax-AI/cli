@@ -18,10 +18,10 @@ import { CLIError } from '../../src/errors/base';
 import { ExitCode } from '../../src/errors/codes';
 
 // ---------------------------------------------------------------------------
-// Bug 1 — detect-region probes both Bearer and x-api-key auth styles
+// Bug 1 — detect-region probes the correct usage endpoint for each key type
 // ---------------------------------------------------------------------------
 
-describe('detect-region: probeRegion auth style fallback', () => {
+describe('detect-region: usage endpoint selection', () => {
   let server: MockServer;
 
   afterEach(() => server?.close());
@@ -46,6 +46,32 @@ describe('detect-region: probeRegion auth style fallback', () => {
     try {
       const { detectRegion } = await import('../../src/config/detect-region');
       const region = await detectRegion('bearer-only-key');
+      expect(region).toBe('global');
+    } finally {
+      (REGIONS as Record<string, string>).global = origGlobal;
+    }
+  });
+
+  it('uses account/query_balance for sk-api keys', async () => {
+    server = createMockServer({
+      routes: {
+        '/account/query_balance': (req) => {
+          if (req.headers.get('Authorization') === 'Bearer sk-api-secret-key') {
+            return jsonResponse({ base_resp: { status_code: 0 }, available_amount: '1' });
+          }
+          return jsonResponse({ error: 'unauthorized' }, 401);
+        },
+        '/v1/token_plan/remains': () => jsonResponse({ error: 'should not be called' }, 500),
+      },
+    });
+
+    const { REGIONS } = await import('../../src/config/schema');
+    const origGlobal = REGIONS.global;
+    (REGIONS as Record<string, string>).global = server.url;
+
+    try {
+      const { detectRegion } = await import('../../src/config/detect-region');
+      const region = await detectRegion('sk-api-secret-key');
       expect(region).toBe('global');
     } finally {
       (REGIONS as Record<string, string>).global = origGlobal;
