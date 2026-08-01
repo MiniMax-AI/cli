@@ -5,6 +5,7 @@ import type {
   VideoV2ImageRole,
   VideoV2Ratio,
   VideoV2Request,
+  VideoV2Task,
 } from '../types/api';
 import {
   dataUriDecodedSize,
@@ -59,6 +60,14 @@ export function isVideoV2Model(model: string | undefined): model is typeof VIDEO
 
 export function isVideoV2Request(request: VideoRequest | VideoV2Request): request is VideoV2Request {
   return isVideoV2Model(request.model);
+}
+
+export function getVideoV2FailureReason(task: VideoV2Task): string | undefined {
+  const code = task.error?.code?.trim();
+  const message = task.error?.message?.trim();
+
+  if (code && message) return `${code}: ${message}`;
+  return message || code;
 }
 
 export function buildVideoV2Request(options: BuildVideoV2RequestOptions): VideoV2Request {

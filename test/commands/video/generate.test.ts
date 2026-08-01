@@ -474,6 +474,49 @@ describe('video generate command', () => {
     }
   });
 
+  it('surfaces H3 task failure details from the V2 query response', async () => {
+    const server = createMockServer({
+      routes: {
+        '/v2/video_generation': () => new Response(JSON.stringify({ task_id: 'h3-failed' }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+        '/v2/query/video_generation/h3-failed': () => new Response(JSON.stringify({
+          task: {
+            id: 'h3-failed',
+            model: 'MiniMax-H3',
+            status: 'failed',
+            error: {
+              code: 'H3_FAILED',
+              message: 'Reference video could not be decoded',
+            },
+          },
+        }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      },
+    });
+
+    try {
+      await expect(
+        generateCommand.execute({
+          ...h3DryRunConfig,
+          baseUrl: server.url,
+          quiet: true,
+          dryRun: false,
+        }, {
+          ...baseFlags,
+          prompt: 'Ocean waves',
+          model: 'MiniMax-H3',
+          pollInterval: 0,
+          quiet: true,
+          dryRun: false,
+        }),
+      ).rejects.toThrow('H3_FAILED: Reference video could not be decoded');
+    } finally {
+      server.close();
+    }
+  });
+
   it('keeps H3-only parameters out of the MiniMax-Hailuo-2.3 path', async () => {
     const config = {
       apiKey: 'test-key',

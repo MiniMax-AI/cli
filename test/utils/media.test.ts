@@ -34,6 +34,15 @@ describe('H3 media limits', () => {
       .toBe('data:audio/mp3;base64,bXAz');
   });
 
+  it('encodes supported local MOV reference videos', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mmx-h3-mov-'));
+    tempDirs.push(dir);
+    const file = join(dir, 'reference.mov');
+    writeFileSync(file, 'mov-data');
+
+    expect(resolveMediaInput(file, 'video')).toStartWith('data:video/quicktime;base64,');
+  });
+
   it('rejects oversized local reference audio before reading it', () => {
     const dir = mkdtempSync(join(tmpdir(), 'mmx-h3-audio-'));
     tempDirs.push(dir);

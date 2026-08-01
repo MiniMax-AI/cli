@@ -22,6 +22,7 @@ import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import {
   buildVideoV2Request,
+  getVideoV2FailureReason,
   isVideoV2Model,
   isVideoV2Request,
   validateVideoV2Request,
@@ -77,6 +78,7 @@ export class VideoSDK extends Client {
         isComplete: (d) => (d as VideoV2TaskResponse).task.status === 'succeeded',
         isFailed: (d) => ['failed', 'cancelled', 'expired'].includes((d as VideoV2TaskResponse).task.status),
         getStatus: (d) => (d as VideoV2TaskResponse).task.status,
+        getFailureReason: (d) => getVideoV2FailureReason((d as VideoV2TaskResponse).task),
       });
       return result.task;
     }
@@ -130,6 +132,17 @@ export class VideoSDK extends Client {
           if (params.model && !isVideoV2Model(params.model as string)) {
             throw new VideoV2InputError('content is only supported with model MiniMax-H3');
           }
+          const conflictingFields = [
+            'prompt',
+            'first_frame_image',
+            'last_frame_image',
+            'subject_reference',
+          ].filter(field => params[field] !== undefined);
+          if (conflictingFields.length > 0) {
+            throw new VideoV2InputError(
+              `content cannot be combined with legacy video fields: ${conflictingFields.join(', ')}`,
+            );
+          }
           const content = params.content as VideoV2Request['content'];
           const hasFrameInput = content.some(item =>
             item.type === 'image_url' && (!item.role || item.role === 'first_frame' || item.role === 'last_frame'),
@@ -151,6 +164,11 @@ export class VideoSDK extends Client {
         const prompt = params.prompt as string | undefined;
         if (!prompt) {
           throw new VideoV2InputError('prompt or content is required');
+        }
+        if (params.subject_reference !== undefined) {
+          throw new VideoV2InputError(
+            'subject_reference is only supported by legacy video models. Use content with role reference_image for MiniMax-H3.',
+          );
         }
         return buildVideoV2Request({
           prompt,

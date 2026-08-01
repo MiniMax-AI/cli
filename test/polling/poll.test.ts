@@ -82,6 +82,37 @@ describe('poll', () => {
     ).rejects.toThrow('Task error');
   });
 
+  it('includes a structured failure reason when provided', async () => {
+    setFetch(mock(() => Promise.resolve(jsonRes({
+      task: {
+        status: 'failed',
+        error: { code: 'H3_FAILED', message: 'Reference video could not be decoded' },
+      },
+    }))));
+
+    const { poll } = await import('../../src/polling/poll');
+    await expect(
+      poll(baseConfig, {
+        url: 'https://api.mmx.io/poll',
+        intervalSec: 0.01,
+        timeoutSec: 5,
+        isComplete: () => false,
+        isFailed: (data) => (
+          data as { task: { status: string } }
+        ).task.status === 'failed',
+        getStatus: (data) => (
+          data as { task: { status: string } }
+        ).task.status,
+        getFailureReason: (data) => {
+          const error = (
+            data as { task: { error?: { code?: string; message?: string } } }
+          ).task.error;
+          return [error?.code, error?.message].filter(Boolean).join(': ');
+        },
+      }),
+    ).rejects.toThrow('H3_FAILED: Reference video could not be decoded');
+  });
+
   it('throws on timeout', async () => {
     setFetch(mock(() => Promise.resolve(jsonRes({ status: 'Processing' }))));
 
