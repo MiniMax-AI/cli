@@ -10,6 +10,14 @@ export function voicesEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/get_voice`;
 }
 
+export function voiceCloneEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/voice_clone`;
+}
+
+export function voiceDesignEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/voice_design`;
+}
+
 export function imageEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/image_generation`;
 }

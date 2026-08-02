@@ -142,6 +142,22 @@ export interface VoiceListResponse {
   base_resp: BaseResp;
 }
 
+export interface VoiceCloneRequest {
+  file_id: string;
+  voice_id: string;
+  model: string;
+}
+
+export interface VoiceDesignRequest {
+  prompt: string;
+  voice_id: string;
+}
+
+export interface VoiceResponse {
+  voice_id: string;
+  base_resp: BaseResp;
+}
+
 // ---- Image ----
 
 export interface ImageRequest {

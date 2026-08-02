@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { resolve, dirname, basename } from 'node:path';
 import { Client } from "../client";
-import { speechEndpoint, voicesEndpoint } from "../../client/endpoints";
-import { SpeechRequest, SpeechResponse, VoiceListResponse } from "../../types/api";
+import { fileUploadEndpoint, speechEndpoint, voiceCloneEndpoint, voiceDesignEndpoint, voicesEndpoint } from "../../client/endpoints";
+import { FileUploadResponse, SpeechRequest, SpeechResponse, VoiceCloneRequest, VoiceDesignRequest, VoiceListResponse, VoiceResponse } from "../../types/api";
 import { filterByLanguage } from "../../commands/speech/voices";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
@@ -73,6 +74,47 @@ export class SpeechSDK extends Client {
     return voices;
   }
 
+  async uploadCloneAudio(filePath: string): Promise<FileUploadResponse> {
+    return this.uploadVoiceAudio(filePath, 'voice_clone');
+  }
+
+  async uploadPromptAudio(filePath: string): Promise<FileUploadResponse> {
+    return this.uploadVoiceAudio(filePath, 'prompt_audio');
+  }
+
+  async clone(request: VoiceCloneRequest): Promise<VoiceResponse> {
+    if (!request.file_id) {
+      throw new SDKError('file_id is required', ExitCode.USAGE);
+    }
+    if (!request.voice_id) {
+      throw new SDKError('voice_id is required', ExitCode.USAGE);
+    }
+    if (!request.model) {
+      throw new SDKError('model is required', ExitCode.USAGE);
+    }
+
+    return this.requestJson<VoiceResponse>({
+      url: voiceCloneEndpoint(this.config.baseUrl),
+      method: 'POST',
+      body: request,
+    });
+  }
+
+  async design(request: VoiceDesignRequest): Promise<VoiceResponse> {
+    if (!request.prompt) {
+      throw new SDKError('prompt is required', ExitCode.USAGE);
+    }
+    if (!request.voice_id) {
+      throw new SDKError('voice_id is required', ExitCode.USAGE);
+    }
+
+    return this.requestJson<VoiceResponse>({
+      url: voiceDesignEndpoint(this.config.baseUrl),
+      method: 'POST',
+      body: request,
+    });
+  }
+
   /**
    * Save synthesized speech audio to a file. Decodes the hex-encoded audio
    * from the API response and writes it to disk. Creates intermediate
@@ -123,5 +165,23 @@ export class SpeechSDK extends Client {
       },
       output_format: 'hex',
     }, params) as SpeechRequest;
+  }
+
+  private async uploadVoiceAudio(filePath: string, purpose: 'voice_clone' | 'prompt_audio'): Promise<FileUploadResponse> {
+    const fullPath = resolve(filePath);
+    if (!existsSync(fullPath)) {
+      throw new SDKError(`File not found: ${fullPath}`, ExitCode.USAGE);
+    }
+
+    const fileData = await readFile(fullPath);
+    const formData = new FormData();
+    formData.append('file', new Blob([fileData]), basename(fullPath));
+    formData.append('purpose', purpose);
+
+    return this.requestJson<FileUploadResponse>({
+      url: fileUploadEndpoint(this.config.baseUrl),
+      method: 'POST',
+      body: formData,
+    });
   }
 }
