@@ -2,6 +2,9 @@ import { readFileSync, existsSync, statSync } from 'fs';
 import { extname } from 'path';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import type { ContentBlock } from '../types/api';
+
+type ImageBlock = Extract<ContentBlock, { type: 'image' }>;
 
 export const IMAGE_MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -59,4 +62,21 @@ export async function toDataUri(image: string): Promise<string> {
   const ext = extname(image).toLowerCase();
   if (!IMAGE_MIME_TYPES[ext]) throw new CLIError(`Unsupported image format "${ext}". Supported: jpg, jpeg, png, webp`, ExitCode.USAGE);
   return localFileToDataUri(image);
+}
+
+/**
+ * Convert a path / URL / data URI into an Anthropic-shaped image content block.
+ * The Messages API rejects the OpenAI `image_url` shape, so callers targeting
+ * `/anthropic/v1/messages` must use this instead of a raw data URI.
+ */
+export async function toImageBlock(image: string): Promise<ImageBlock> {
+  const uri = await toDataUri(image);
+  const match = /^data:([^;,]+);base64,(.*)$/s.exec(uri);
+  if (!match) {
+    throw new CLIError(
+      `Unsupported image source "${image}": expected a base64 data URI, file path, or http(s) URL.`,
+      ExitCode.USAGE,
+    );
+  }
+  return { type: 'image', source: { type: 'base64', media_type: match[1]!, data: match[2]! } };
 }

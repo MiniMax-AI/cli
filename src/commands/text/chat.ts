@@ -18,6 +18,7 @@ import { readFileSync } from 'fs';
 import { isInteractive } from '../../utils/env';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import { promptText, failIfMissing } from '../../utils/prompt';
+import { toImageBlock } from '../../utils/image';
 
 // ---------------------------------------------------------------------------
 // Thinking indicator — dynamic spinner + color-cycling label
@@ -145,6 +146,27 @@ function parseMessages(flags: GlobalFlags): ParsedMessages {
   return { system, messages };
 }
 
+/**
+ * Attach image blocks to the last user message, promoting its content from a
+ * bare string to a block array. Images land after the text so the model reads
+ * the instruction first.
+ */
+function attachImages(messages: ChatMessage[], images: ContentBlock[]): void {
+  let idx = messages.length - 1;
+  while (idx >= 0 && messages[idx]!.role !== 'user') idx--;
+
+  if (idx < 0) {
+    messages.push({ role: 'user', content: images });
+    return;
+  }
+
+  const target = messages[idx]!;
+  const content = typeof target.content === 'string'
+    ? (target.content ? [{ type: 'text' as const, text: target.content }] : [])
+    : target.content;
+  target.content = [...content, ...images];
+}
+
 function extractText(content: ContentBlock[]): string {
   return content
     .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
@@ -162,6 +184,7 @@ export default defineCommand({
     { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
+    { flag: '--image <path-or-url>',   description: 'Image to send with the message (repeatable, base64 encoded automatically)', type: 'array' },
     { flag: '--max-tokens <n>',        description: 'Maximum tokens to generate (default: 4096)', type: 'number' },
     { flag: '--temperature <n>',       description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
     { flag: '--top-p <n>',             description: 'Nucleus sampling threshold', type: 'number' },
@@ -172,14 +195,17 @@ export default defineCommand({
     'mmx text chat --message "What is MiniMax?"',
     'mmx text chat --model MiniMax-M3 --system "You are a coding assistant." --message "Write fizzbuzz in Python"',
     'mmx text chat --message "Hello" --message "assistant:Hi!" --message "How are you?"',
+    'mmx text chat --image photo.jpg --message "What breed is this dog?"',
+    'mmx text chat --image before.png --image after.png --message "List every visual difference."',
     'cat conversation.json | mmx text chat --messages-file - --stream',
     'mmx text chat --message "Hello" --output json',
   ],
   async run(config: Config, flags: GlobalFlags) {
     const { system, messages: parsedMessages } = parseMessages(flags);
     let messages = parsedMessages;
+    const imageInputs = (flags.image as string[] | undefined) ?? [];
 
-    if (messages.length === 0) {
+    if (messages.length === 0 && imageInputs.length === 0) {
       if (isInteractive({ nonInteractive: config.nonInteractive })) {
         const hint = await promptText({
           message: 'Enter your message:',
@@ -194,8 +220,13 @@ export default defineCommand({
       }
     }
 
+    if (imageInputs.length > 0) {
+      attachImages(messages, await Promise.all(imageInputs.map(toImageBlock)));
+    }
+
+    // Images require a multimodal model, so they override a text-only config default.
     const model = (flags.model as string)
-      || config.defaultTextModel
+      || (imageInputs.length > 0 ? 'MiniMax-M3' : config.defaultTextModel)
       || 'MiniMax-M3';
     const format = detectOutputFormat(config.output);
     const shouldStream = flags.stream === true || (

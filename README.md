@@ -75,6 +75,8 @@ mmx text chat --model MiniMax-M3 --message "Hello" --stream
 mmx text chat --system "You are a coding assistant" --message "Fizzbuzz in Go"
 mmx text chat --message "user:Hi" --message "assistant:Hey!" --message "How are you?"
 cat messages.json | mmx text chat --messages-file - --output json
+mmx text chat --image photo.jpg --message "What breed is this dog?"
+mmx text chat --image before.png --image after.png --message "What changed?"
 ```
 
 ### `mmx image`

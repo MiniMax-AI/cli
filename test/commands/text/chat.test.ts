@@ -1,4 +1,7 @@
 import { describe, it, expect, afterEach } from 'bun:test';
+import { mkdtempSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { createMockServer, jsonResponse, sseResponse, type MockServer } from '../../helpers/mock-server';
 import textChatResponse from '../../fixtures/text-chat-response.json';
 import type { Config } from '../../../src/config/schema';
@@ -301,5 +304,112 @@ describe('text chat command', () => {
     } finally {
       console.log = originalLog;
     }
+  });
+
+  describe('--image', () => {
+    // 1x1 transparent PNG
+    const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const dir = mkdtempSync(join(tmpdir(), 'mmx-chat-image-'));
+    const imgA = join(dir, 'a.png');
+    const imgB = join(dir, 'b.png');
+    writeFileSync(imgA, Buffer.from(PNG_BASE64, 'base64'));
+    writeFileSync(imgB, Buffer.from(PNG_BASE64, 'base64'));
+
+    const baseConfig: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const baseFlags = {
+      quiet: false,
+      verbose: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      help: false,
+      nonInteractive: true,
+      async: false,
+    };
+
+    async function dryRunRequest(config: Config, flags: Record<string, unknown>) {
+      const { default: chatCommand } = await import('../../../src/commands/text/chat');
+      const originalLog = console.log;
+      let output = '';
+      console.log = (msg: string) => { output += msg; };
+      try {
+        await chatCommand.execute(config, { ...baseFlags, ...flags } as never);
+      } finally {
+        console.log = originalLog;
+      }
+      return JSON.parse(output).request;
+    }
+
+    it('appends Anthropic-shaped image blocks to the user message', async () => {
+      const request = await dryRunRequest(baseConfig, {
+        message: ['What is this?'],
+        image: [imgA],
+      });
+
+      expect(request.messages).toHaveLength(1);
+      expect(request.messages[0].content).toEqual([
+        { type: 'text', text: 'What is this?' },
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: PNG_BASE64 } },
+      ]);
+    });
+
+    it('supports multiple images in one message', async () => {
+      const request = await dryRunRequest(baseConfig, {
+        message: ['Compare these.'],
+        image: [imgA, imgB],
+      });
+
+      const blocks = request.messages[0].content;
+      expect(blocks).toHaveLength(3);
+      expect(blocks.filter((b: { type: string }) => b.type === 'image')).toHaveLength(2);
+    });
+
+    it('sends images with no --message', async () => {
+      const request = await dryRunRequest(baseConfig, { image: [imgA] });
+
+      expect(request.messages).toHaveLength(1);
+      expect(request.messages[0].role).toBe('user');
+      expect(request.messages[0].content).toEqual([
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: PNG_BASE64 } },
+      ]);
+    });
+
+    it('overrides a text-only defaultTextModel with MiniMax-M3', async () => {
+      const request = await dryRunRequest(
+        { ...baseConfig, defaultTextModel: 'MiniMax-Text-01' },
+        { message: ['What is this?'], image: [imgA] },
+      );
+
+      expect(request.model).toBe('MiniMax-M3');
+    });
+
+    it('still honours an explicit --model', async () => {
+      const request = await dryRunRequest(
+        { ...baseConfig, defaultTextModel: 'MiniMax-Text-01' },
+        { message: ['What is this?'], image: [imgA], model: 'MiniMax-VL-01' },
+      );
+
+      expect(request.model).toBe('MiniMax-VL-01');
+    });
+
+    it('errors on a missing image file', async () => {
+      await expect(
+        dryRunRequest(baseConfig, { message: ['hi'], image: [join(dir, 'nope.png')] }),
+      ).rejects.toThrow(/File not found/);
+    });
   });
 });
