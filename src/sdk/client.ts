@@ -1,13 +1,14 @@
 import { loadConfig } from "../config/loader";
-import { Config } from "../config/schema";
-import { request as requestClient, requestJson as requestJsonClient, RequestOpts } from "../client/http";
+import type { Config } from "../config/schema";
+import { request as requestClient, requestJson as requestJsonClient } from "../client/http";
+import type { RequestOpts } from "../client/http";
 import { parseSSE } from "../client/stream";
 import { SDKError } from "../errors/base";
 import { ExitCode } from "../errors/codes";
-import { MiniMaxSDKOptions } from "./types";
+import type { MiniMaxSDKOptions } from "./types";
 
-export class Client {
-  protected config: Config;
+export class ClientContext {
+  readonly config: Config;
 
   constructor(options: MiniMaxSDKOptions) {
     const { apiKey, region, baseUrl } = options;
@@ -24,6 +25,18 @@ export class Client {
       nonInteractive: false,
       async: false,
     });
+  }
+}
+
+export class Client {
+  protected readonly context: ClientContext;
+  protected readonly config: Config;
+
+  constructor(optionsOrContext: MiniMaxSDKOptions | ClientContext) {
+    this.context = optionsOrContext instanceof ClientContext
+      ? optionsOrContext
+      : new ClientContext(optionsOrContext);
+    this.config = this.context.config;
   }
 
   protected request(opts: RequestOpts) {
