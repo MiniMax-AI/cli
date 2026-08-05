@@ -10,6 +10,16 @@ import { FileSDK } from "./file";
 import { Client } from "./client";
 import { MiniMaxSDKOptions } from "./types";
 
+export {
+  isAccountBalanceResponse,
+  isQuotaResponse,
+} from "./quota";
+export type {
+  AccountBalanceResponse,
+  QuotaInfoResponse,
+  QuotaResponse,
+} from "./quota";
+
 export class MiniMaxSDK extends Client {
   readonly text: TextSDK;
   readonly speech: SpeechSDK;
