@@ -18,6 +18,50 @@ export interface RequestOpts {
   authStyle?: 'bearer' | 'x-api-key';
 }
 
+const MAX_ATTEMPTS = 3;
+const BASE_RETRY_DELAY_MS = 250;
+const MAX_RETRY_DELAY_MS = 30_000;
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+function parseRetryAfter(value: string | null, now: number): number | undefined {
+  if (value === null) return undefined;
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) return undefined;
+  return Math.max(0, date - now);
+}
+
+export function retryDelayMs(
+  retryNumber: number,
+  retryAfter: string | null,
+  now = Date.now(),
+  random = Math.random(),
+): number {
+  const serverDelay = parseRetryAfter(retryAfter, now);
+  if (serverDelay !== undefined) {
+    return Math.min(serverDelay, MAX_RETRY_DELAY_MS);
+  }
+
+  const exponentialDelay = BASE_RETRY_DELAY_MS * 2 ** (retryNumber - 1);
+  return Math.min(exponentialDelay * Math.max(0, Math.min(random, 1)), MAX_RETRY_DELAY_MS);
+}
+
+function isRetryableNetworkError(error: unknown): boolean {
+  return error instanceof TypeError ||
+    (error instanceof DOMException && error.name === 'TimeoutError');
+}
+
+async function waitBeforeRetry(retryNumber: number, retryAfter: string | null): Promise<void> {
+  const delay = retryDelayMs(retryNumber, retryAfter);
+  if (delay <= 0) return;
+  await new Promise(resolve => setTimeout(resolve, delay));
+}
+
 export async function request(config: Config, opts: RequestOpts): Promise<Response> {
   const isFormData = typeof FormData !== 'undefined' && opts.body instanceof FormData;
 
@@ -53,17 +97,37 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
   }
 
   const timeoutMs = (opts.timeout ?? config.timeout) * 1000;
+  const requestBody = opts.body
+    ? isFormData
+      ? (opts.body as FormData)
+      : JSON.stringify(opts.body)
+    : undefined;
 
-  const res = await fetch(opts.url, {
-    method: opts.method ?? 'GET',
-    headers,
-    body: opts.body
-      ? isFormData
-        ? (opts.body as FormData)
-        : JSON.stringify(opts.body)
-      : undefined,
-    signal: opts.stream ? undefined : AbortSignal.timeout(timeoutMs),
-  });
+  let res: Response | undefined;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      res = await fetch(opts.url, {
+        method: opts.method ?? 'GET',
+        headers,
+        body: requestBody,
+        signal: opts.stream ? undefined : AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS || !isRetryableNetworkError(error)) throw error;
+      await waitBeforeRetry(attempt, null);
+      continue;
+    }
+
+    if (!RETRYABLE_STATUSES.has(res.status) || attempt === MAX_ATTEMPTS) break;
+
+    const retryAfter = res.headers.get('retry-after');
+    await res.body?.cancel();
+    await waitBeforeRetry(attempt, retryAfter);
+  }
+
+  if (!res) {
+    throw new Error('HTTP request completed without a response');
+  }
 
   if (config.verbose) {
     process.stderr.write(`< ${res.status} ${res.statusText}\n`);
