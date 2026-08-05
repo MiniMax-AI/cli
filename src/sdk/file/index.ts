@@ -16,6 +16,7 @@ import type {
 } from '../../types/api';
 import { SDKError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
+import { normalizeFileId } from '../../files/file-id';
 
 export class FileSDK extends Client {
   /**
@@ -54,14 +55,25 @@ export class FileSDK extends Client {
   /**
    * Delete a file from MiniMax storage by its file ID.
    *
-   * @param fileId - The ID of the file to delete (string or number).
+   * Decimal strings are sent unchanged to preserve the full int64 range.
+   * Safe integer numbers remain supported for backwards compatibility.
+   *
+   * @param fileId - The positive int64 ID of the file to delete.
    */
-  async delete(fileId: string | number): Promise<FileDeleteResponse> {
+  async delete(fileId: string | number | bigint): Promise<FileDeleteResponse> {
+    const normalizedFileId = normalizeFileId(fileId);
+    if (!normalizedFileId) {
+      throw new SDKError(
+        'fileId must be a positive decimal integer within the int64 range.',
+        ExitCode.USAGE,
+      );
+    }
+
     const url = fileDeleteEndpoint(this.config.baseUrl);
     return this.requestJson<FileDeleteResponse>({
       url,
       method: 'POST',
-      body: { file_id: Number(fileId) },
+      body: { file_id: normalizedFileId },
     });
   }
 

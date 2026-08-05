@@ -396,7 +396,8 @@ export interface FileListResponse {
 
 export interface FileDeleteResponse {
   base_resp: BaseResp;
-  file_id: number;
+  /** Decimal string, matching the API examples and preserving int64 precision. */
+  file_id: string;
 }
 
 export interface FileRetrieveResponse {
