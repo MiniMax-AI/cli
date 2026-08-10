@@ -271,10 +271,22 @@ export interface VideoV2Task {
   };
   ratio?: string;
   task_type?: string;
+  modality?: string;
 }
 
 export interface VideoV2TaskResponse {
   task: VideoV2Task;
+}
+
+export interface VideoV2TaskListResponse {
+  items: VideoV2Task[];
+  total: number;
+}
+
+export interface VideoV2TaskDeleteResponse {
+  task_id: string;
+  action: string;
+  status: string;
 }
 
 // ---- Music ----

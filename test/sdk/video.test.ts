@@ -145,6 +145,65 @@ describe('MiniMaxSDK.video', () => {
     expect(result.status).toBe('succeeded');
   });
 
+  it('should list MiniMax-H3 tasks from Video Generation V2', async () => {
+    let requestedUrl = '';
+    server = createMockServer({
+      routes: {
+        '/v2/query/video_generation': (req) => {
+          requestedUrl = req.url;
+          return jsonResponse({
+            items: [{ id: 'h3-123', model: 'MiniMax-H3', status: 'succeeded' }],
+            total: 1,
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    const result = await sdk.video.listTasks({
+      pageNum: 2,
+      pageSize: 10,
+      status: 'succeeded',
+      taskIds: ['h3-123'],
+      taskType: 'text_to_video',
+    });
+
+    const url = new URL(requestedUrl);
+    expect(url.searchParams.get('page_num')).toBe('2');
+    expect(url.searchParams.get('page_size')).toBe('10');
+    expect(url.searchParams.get('filter.status')).toBe('succeeded');
+    expect(url.searchParams.get('filter.task_ids')).toBe('h3-123');
+    expect(url.searchParams.get('filter.model')).toBe('MiniMax-H3');
+    expect(url.searchParams.get('filter.task_type')).toBe('text_to_video');
+    expect(result.total).toBe(1);
+  });
+
+  it('should delete a MiniMax-H3 task from Video Generation V2', async () => {
+    let method = '';
+    server = createMockServer({
+      routes: {
+        '/v2/video_generation/h3-123': (req) => {
+          method = req.method;
+          return jsonResponse({ task_id: 'h3-123', action: 'delete', status: 'deleted' });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    const result = await sdk.video.deleteTask({ taskId: 'h3-123' });
+
+    expect(method).toBe('DELETE');
+    expect(result).toEqual({ task_id: 'h3-123', action: 'delete', status: 'deleted' });
+  });
+
   it('should poll a MiniMax-H3 task from running to succeeded', async () => {
     let pollCount = 0;
     server = createMockServer({

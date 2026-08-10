@@ -4,12 +4,16 @@ import {
   videoGenerateEndpoint,
   videoGenerateV2Endpoint,
   videoTaskEndpoint,
+  videoTaskV2DeleteEndpoint,
   videoTaskV2Endpoint,
+  videoTaskV2ListEndpoint,
 } from "../../client/endpoints";
 import {
   FileRetrieveResponse,
   VideoRequest,
   VideoTaskResponse,
+  VideoV2TaskDeleteResponse,
+  VideoV2TaskListResponse,
   VideoV2Request,
   VideoV2Response,
   VideoV2Task,
@@ -47,6 +51,14 @@ export type VideoAsyncGenerateRequest = VideoGenerateRequest & {
 export interface VideoDownloadRequest {
   fileId: string;
   outPath: string;
+}
+
+export interface VideoV2ListTasksRequest {
+  pageNum?: number;
+  pageSize?: number;
+  status?: string;
+  taskIds?: string[];
+  taskType?: string;
 }
 
 export class VideoSDK extends Client {
@@ -103,6 +115,23 @@ export class VideoSDK extends Client {
 
     const url = videoTaskEndpoint(this.config.baseUrl, taskId);
     return await this.requestJson<VideoTaskResponse>({ url });
+  }
+
+  async listTasks(request: VideoV2ListTasksRequest = {}): Promise<VideoV2TaskListResponse> {
+    const url = new URL(videoTaskV2ListEndpoint(this.config.baseUrl));
+    if (request.pageNum !== undefined) url.searchParams.set('page_num', String(request.pageNum));
+    if (request.pageSize !== undefined) url.searchParams.set('page_size', String(request.pageSize));
+    if (request.status) url.searchParams.set('filter.status', request.status);
+    if (request.taskIds?.length) url.searchParams.set('filter.task_ids', request.taskIds.join(','));
+    url.searchParams.set('filter.model', VIDEO_V2_MODEL);
+    if (request.taskType) url.searchParams.set('filter.task_type', request.taskType);
+
+    return await this.requestJson<VideoV2TaskListResponse>({ url: url.toString() });
+  }
+
+  async deleteTask({taskId}: {taskId: string}): Promise<VideoV2TaskDeleteResponse> {
+    const url = videoTaskV2DeleteEndpoint(this.config.baseUrl, taskId);
+    return await this.requestJson<VideoV2TaskDeleteResponse>({ url, method: 'DELETE' });
   }
 
   async download(request: VideoDownloadRequest) {
