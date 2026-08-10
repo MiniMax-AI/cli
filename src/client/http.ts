@@ -18,6 +18,84 @@ export interface RequestOpts {
   authStyle?: 'bearer' | 'x-api-key';
 }
 
+function timeoutError(message: string): DOMException {
+  return new DOMException(message, 'TimeoutError');
+}
+
+function withIdleTimeout(
+  response: Response,
+  timeoutMs: number,
+  abortController: AbortController,
+): Response {
+  if (!response.body) return response;
+
+  const reader = response.body.getReader();
+  let released = false;
+
+  const releaseReader = (): void => {
+    if (released) return;
+    released = true;
+    reader.releaseLock();
+  };
+
+  const cancelRequest = async (reason?: unknown): Promise<void> => {
+    if (!abortController.signal.aborted) abortController.abort(reason);
+    try {
+      await reader.cancel(reason);
+    } finally {
+      releaseReader();
+    }
+  };
+
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      try {
+        const result = await new Promise<Awaited<ReturnType<typeof reader.read>>>((resolve, reject) => {
+          timer = setTimeout(() => {
+            const error = timeoutError(`Stream received no data for ${timeoutMs}ms.`);
+            abortController.abort(error);
+            reject(error);
+          }, timeoutMs);
+
+          reader.read().then(resolve, reject);
+        });
+
+        if (result.done) {
+          releaseReader();
+          controller.close();
+        } else {
+          controller.enqueue(result.value);
+        }
+      } catch (error) {
+        await cancelRequest(error).catch(() => {});
+        controller.error(error);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    },
+    cancel(reason) {
+      return cancelRequest(reason);
+    },
+  });
+
+  const timedResponse = new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+
+  // Response's constructor does not carry fetch metadata across to a wrapped body.
+  Object.defineProperties(timedResponse, {
+    url: { value: response.url },
+    redirected: { value: response.redirected },
+    type: { value: response.type },
+  });
+
+  return timedResponse;
+}
+
 export async function request(config: Config, opts: RequestOpts): Promise<Response> {
   const isFormData = typeof FormData !== 'undefined' && opts.body instanceof FormData;
 
@@ -54,16 +132,32 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
 
   const timeoutMs = (opts.timeout ?? config.timeout) * 1000;
 
-  const res = await fetch(opts.url, {
-    method: opts.method ?? 'GET',
-    headers,
-    body: opts.body
-      ? isFormData
-        ? (opts.body as FormData)
-        : JSON.stringify(opts.body)
-      : undefined,
-    signal: opts.stream ? undefined : AbortSignal.timeout(timeoutMs),
-  });
+  const streamAbortController = opts.stream ? new AbortController() : undefined;
+  const headerTimeout = streamAbortController
+    ? setTimeout(() => {
+        streamAbortController.abort(timeoutError(`Request headers were not received within ${timeoutMs}ms.`));
+      }, timeoutMs)
+    : undefined;
+
+  let res: Response;
+  try {
+    res = await fetch(opts.url, {
+      method: opts.method ?? 'GET',
+      headers,
+      body: opts.body
+        ? isFormData
+          ? (opts.body as FormData)
+          : JSON.stringify(opts.body)
+        : undefined,
+      signal: streamAbortController?.signal ?? AbortSignal.timeout(timeoutMs),
+    });
+  } finally {
+    if (headerTimeout) clearTimeout(headerTimeout);
+  }
+
+  if (streamAbortController) {
+    res = withIdleTimeout(res, timeoutMs, streamAbortController);
+  }
 
   if (config.verbose) {
     process.stderr.write(`< ${res.status} ${res.statusText}\n`);
