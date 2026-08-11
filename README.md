@@ -113,6 +113,7 @@ echo "Breaking news" | mmx speech synthesize --text-file - --out news.mp3
 mmx speech websocket --text "Hello!" --out hello.mp3
 mmx speech websocket --text "Stream me" --stream | mpv -
 mmx speech async --text "Long text..." --wait --out long.mp3
+mmx speech async --text-file long.txt --wait --out long.mp3
 mmx speech task get --task-id 95157322514444
 mmx speech voices
 ```

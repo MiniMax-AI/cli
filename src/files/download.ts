@@ -7,6 +7,7 @@ export interface DownloadOpts {
   quiet?: boolean;
   retries?: number;
   retryDelayMs?: number;
+  headers?: Record<string, string>;
 }
 
 export async function downloadFile(
@@ -31,7 +32,7 @@ export async function downloadFile(
         await new Promise(r => setTimeout(r, delay));
       }
 
-      const res = await fetch(downloadUrl);
+      const res = await fetch(downloadUrl, { headers: opts?.headers });
 
       if (!res.ok) {
         throw new CLIError(`Download failed: HTTP ${res.status}`, ExitCode.GENERAL);

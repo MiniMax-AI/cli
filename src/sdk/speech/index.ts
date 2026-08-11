@@ -40,6 +40,8 @@ function defaultFilename(prefix: string, ext: string): string {
   return `${prefix}_${ts}.${ext}`;
 }
 
+const DIRECT_ASYNC_TEXT_LIMIT = 50_000;
+
 export class SpeechSDK extends Client {
   async synthesize(request: ModelPartial<SpeechRequest> & { stream: true }): Promise<AsyncGenerator<SpeechResponse>>;
   async synthesize(request: ModelPartial<SpeechRequest>): Promise<SpeechResponse>;
@@ -94,7 +96,7 @@ export class SpeechSDK extends Client {
    * and can be polled with `queryAsync()`. Supports long-form text (up to
    * 1M characters).
    *
-   * @param request — Model, text, voice and audio settings.
+   * @param request — Model, text or text_file_id, voice and audio settings.
    * @returns The created task, including its `task_id` and `file_id`.
    */
   async createAsync(request: ModelPartial<SpeechAsyncRequest>): Promise<SpeechAsyncResponse> {
@@ -226,8 +228,17 @@ export class SpeechSDK extends Client {
   }
 
   private validateAsyncParams(params: Partial<SpeechAsyncRequest>): SpeechAsyncRequest {
-    if (!params.text) {
-      throw new SDKError('text is required', ExitCode.USAGE);
+    if (!params.text && !params.text_file_id) {
+      throw new SDKError('text or text_file_id is required', ExitCode.USAGE);
+    }
+    if (params.text && params.text_file_id) {
+      throw new SDKError('provide either text or text_file_id, not both', ExitCode.USAGE);
+    }
+    if (params.text && params.text.length > DIRECT_ASYNC_TEXT_LIMIT) {
+      throw new SDKError(
+        'text is limited to 50,000 characters; upload longer input with purpose t2a_async_input and use text_file_id',
+        ExitCode.USAGE,
+      );
     }
 
     return toMerged({
@@ -237,7 +248,7 @@ export class SpeechSDK extends Client {
       },
       audio_setting: {
         format: "mp3",
-        sample_rate: 32000,
+        audio_sample_rate: 32000,
         bitrate: 128000,
         channel: 1,
       },

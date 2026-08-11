@@ -108,4 +108,22 @@ describe('downloadFile', () => {
 
     expect(readFileSync(destPath, 'utf-8')).toBe('new');
   });
+
+  it('passes request headers to the download', async () => {
+    const dir = makeTempDir();
+    const destPath = join(dir, 'audio.mp3');
+    const request = { authorization: null as string | null };
+
+    globalThis.fetch = (async (_input, init) => {
+      request.authorization = new Headers(init?.headers).get('Authorization');
+      return new Response(new TextEncoder().encode('audio'), { status: 200 });
+    }) as typeof fetch;
+
+    await downloadFile('https://example.com/audio.mp3', destPath, {
+      quiet: true,
+      headers: { Authorization: 'Bearer test-key' },
+    });
+
+    expect(request.authorization).toBe('Bearer test-key');
+  });
 });

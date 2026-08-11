@@ -3,10 +3,12 @@ import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { requestJson } from '../../client/http';
 import {
+  fileUploadEndpoint,
   speechAsyncEndpoint,
   speechAsyncFileEndpoint,
   speechAsyncQueryEndpoint,
 } from '../../client/endpoints';
+import { resolveCredential } from '../../auth/resolver';
 import { poll } from '../../polling/poll';
 import { downloadFile } from '../../files/download';
 import { formatOutput, detectOutputFormat, dryRun } from '../../output/formatter';
@@ -15,10 +17,28 @@ import { T2A_FORMATS, formatList, validateAudioFormat, t2aDefaultSampleRate } fr
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type {
+  FileUploadResponse,
   SpeechAsyncRequest,
   SpeechAsyncQueryResponse,
   SpeechAsyncResponse,
 } from '../../types/api';
+
+const DIRECT_TEXT_LIMIT = 50_000;
+
+async function uploadTextFile(config: Config, path: string): Promise<string> {
+  const text = readTextFromPathOrStdin(path);
+  const fileName = path === '-' ? 'stdin.txt' : path.split(/[\\/]/).pop() || 'input.txt';
+  const formData = new FormData();
+  formData.append('file', new Blob([text], { type: 'text/plain' }), fileName);
+  formData.append('purpose', 't2a_async_input');
+
+  const response = await requestJson<FileUploadResponse>(config, {
+    url: fileUploadEndpoint(config.baseUrl),
+    method: 'POST',
+    body: formData,
+  });
+  return response.file.file_id;
+}
 
 export default defineCommand({
   name: 'speech async',
@@ -49,17 +69,22 @@ export default defineCommand({
     'mmx speech async --text "Hello" --output json',
   ],
   async run(config: Config, flags: GlobalFlags) {
-    let text = (flags.text ?? (flags._positional as string[] | undefined)?.[0]) as string | undefined;
+    const text = (flags.text ?? (flags._positional as string[] | undefined)?.[0]) as string | undefined;
+    const textFile = flags.textFile as string | undefined;
 
-    if (flags.textFile) {
-      text = readTextFromPathOrStdin(flags.textFile as string);
-    }
-
-    if (!text) {
+    if (!text && !textFile) {
       throw new CLIError(
         '--text or --text-file is required.',
         ExitCode.USAGE,
         'mmx speech async --text "Long text" --wait --out long.mp3',
+      );
+    }
+
+    if (text && text.length > DIRECT_TEXT_LIMIT) {
+      throw new CLIError(
+        `--text is limited to ${DIRECT_TEXT_LIMIT.toLocaleString('en-US')} characters. Use --text-file for longer input.`,
+        ExitCode.USAGE,
+        'mmx speech async --text-file long.txt --wait --out long.mp3',
       );
     }
 
@@ -72,7 +97,6 @@ export default defineCommand({
 
     const body: SpeechAsyncRequest = {
       model,
-      text,
       voice_setting: {
         voice_id: voice,
         speed: (flags.speed as number) ?? undefined,
@@ -81,7 +105,7 @@ export default defineCommand({
       },
       audio_setting: {
         format: ext,
-        sample_rate: (flags.sampleRate as number) ?? t2aDefaultSampleRate(ext, 32000),
+        audio_sample_rate: (flags.sampleRate as number) ?? t2aDefaultSampleRate(ext, 32000),
         bitrate: (flags.bitrate as number) ?? 128000,
         channel: (flags.channels as number) ?? 1,
       },
@@ -93,6 +117,16 @@ export default defineCommand({
       body.pronunciation_dict = {
         tone: flags.pronunciation as string[],
       };
+    }
+
+    if (textFile) {
+      if (config.dryRun) {
+        body.text_file_id = '<uploaded file id>';
+      } else {
+        body.text_file_id = await uploadTextFile(config, textFile);
+      }
+    } else {
+      body.text = text;
     }
 
     if (dryRun(config, body)) return;
@@ -139,8 +173,10 @@ export default defineCommand({
     const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
     const outPath = (flags.out as string | undefined) ?? `speech_${ts}.${ext}`;
 
+    const credential = await resolveCredential(config);
     await downloadFile(speechAsyncFileEndpoint(config.baseUrl, fileId), outPath, {
       quiet: config.quiet,
+      headers: { Authorization: `Bearer ${credential.token}` },
     });
 
     if (config.quiet) {

@@ -35,12 +35,37 @@ describe('MiniMaxSDK.speech.createAsync', () => {
     expect(result.task_id).toBe(95157322514444);
     expect(requestBody?.model).toBe('speech-2.8-hd');
     expect(requestBody?.text).toBe('Hello world');
+    expect((requestBody?.audio_setting as Record<string, unknown>).audio_sample_rate).toBe(32000);
+    expect((requestBody?.audio_setting as Record<string, unknown>).sample_rate).toBeUndefined();
     expect(requestBody?.output_format).toBeUndefined();
   });
 
-  it('throws when text is missing', async () => {
+  it('accepts text_file_id for uploaded long text', async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    server = createMockServer({
+      routes: {
+        '/v1/t2a_async_v2': async (req) => {
+          requestBody = await req.json() as Record<string, unknown>;
+          return jsonResponse({ task_id: 123, base_resp: { status_code: 0 } });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({ apiKey: 'test-key', baseUrl: server.url });
+    await sdk.speech.createAsync({ text_file_id: 'file-123' });
+
+    expect(requestBody?.text_file_id).toBe('file-123');
+    expect(requestBody?.text).toBeUndefined();
+  });
+
+  it('throws when text and text_file_id are missing', async () => {
     const sdk = new MiniMaxSDK({ apiKey: 'test-key', baseUrl: 'https://x' });
-    await expect(sdk.speech.createAsync({} as SpeechAsyncRequest)).rejects.toThrow('text is required');
+    await expect(sdk.speech.createAsync({} as SpeechAsyncRequest)).rejects.toThrow('text or text_file_id is required');
+  });
+
+  it('rejects direct text over 50,000 characters', async () => {
+    const sdk = new MiniMaxSDK({ apiKey: 'test-key', baseUrl: 'https://x' });
+    await expect(sdk.speech.createAsync({ text: 'x'.repeat(50_001) })).rejects.toThrow('text is limited to 50,000 characters');
   });
 });
 
@@ -99,10 +124,13 @@ describe('MiniMaxSDK.speech.downloadAsyncFile', () => {
   it('downloads the audio bytes to disk', async () => {
     server = createMockServer({
       routes: {
-        '/v1/files/retrieve_content': () => new Response(
-          Buffer.from('hello audio'),
-          { headers: { 'Content-Type': 'application/octet-stream' } },
-        ),
+        '/v1/files/retrieve_content': (req) => {
+          expect(req.headers.get('Authorization')).toBe('Bearer test-key');
+          return new Response(
+            Buffer.from('hello audio'),
+            { headers: { 'Content-Type': 'application/octet-stream' } },
+          );
+        },
       },
     });
 

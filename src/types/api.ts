@@ -140,9 +140,15 @@ export interface SpeechVoiceModify {
 
 export interface SpeechAsyncRequest {
   model: string;
-  text: string;
+  text?: string;
+  text_file_id?: string | number;
   voice_setting?: SpeechRequest['voice_setting'];
-  audio_setting?: SpeechRequest['audio_setting'];
+  audio_setting?: {
+    format?: string;
+    audio_sample_rate?: number;
+    bitrate?: number;
+    channel?: number;
+  };
   language_boost?: string;
   pronunciation_dict?: SpeechRequest['pronunciation_dict'];
   voice_modify?: SpeechVoiceModify;
