@@ -11,6 +11,7 @@ import {
 } from "../../client/endpoints";
 import {
   SpeechAsyncQueryResponse,
+  SpeechAsyncQueryRequest,
   SpeechAsyncRequest,
   SpeechAsyncResponse,
   SpeechRequest,
@@ -117,8 +118,12 @@ export class SpeechSDK extends Client {
    *          `Expired`) and, when complete, the resulting `file_id`.
    */
   async queryAsync(taskId: string | number): Promise<SpeechAsyncQueryResponse> {
-    const url = speechAsyncQueryEndpoint(this.config.baseUrl, taskId);
-    return this.requestJson<SpeechAsyncQueryResponse>({ url });
+    const body: SpeechAsyncQueryRequest = { task_id: taskId };
+    return this.requestJson<SpeechAsyncQueryResponse>({
+      url: speechAsyncQueryEndpoint(this.config.baseUrl),
+      method: 'POST',
+      body,
+    });
   }
 
   /**

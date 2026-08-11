@@ -10,8 +10,8 @@ export function speechAsyncEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/t2a_async_v2`;
 }
 
-export function speechAsyncQueryEndpoint(baseUrl: string, taskId: string | number): string {
-  return `${baseUrl}/v1/query/t2a_async_query_v2?task_id=${taskId}`;
+export function speechAsyncQueryEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/query/t2a_async_query_v2`;
 }
 
 export function speechAsyncFileEndpoint(baseUrl: string, fileId: string | number): string {

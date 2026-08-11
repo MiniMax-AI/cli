@@ -61,9 +61,17 @@ class CommandRegistry {
   }
 
   getAllCommands(): Command[] {
+    // Aliases register the same Command object under more than one path
+    // ('speech generate' -> speechSynthesize, 'search web' -> searchQuery), so
+    // a plain traversal yields it once per alias. Dedupe by identity: callers
+    // want the set of distinct commands, not the set of invocation paths.
+    const seen = new Set<Command>();
     const commands: Command[] = [];
     const traverse = (node: CommandNode) => {
-      if (node.command) commands.push(node.command);
+      if (node.command && !seen.has(node.command)) {
+        seen.add(node.command);
+        commands.push(node.command);
+      }
       for (const child of node.children.values()) {
         traverse(child);
       }

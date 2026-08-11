@@ -103,12 +103,15 @@ describe('speech async command', () => {
 
   it('authenticates the completed task download', async () => {
     const download = { authorization: null as string | null };
+    const query = { method: '', body: undefined as Record<string, unknown> | undefined };
     globalThis.fetch = (async (input, init) => {
       const url = new URL(String(input));
       if (url.pathname === '/v1/t2a_async_v2') {
         return jsonResponse({ task_id: 123, base_resp: { status_code: 0 } });
       }
       if (url.pathname === '/v1/query/t2a_async_query_v2') {
+        query.method = init?.method ?? 'GET';
+        query.body = JSON.parse(String(init?.body)) as Record<string, unknown>;
         return jsonResponse({
           task_id: 123,
           status: 'Success',
@@ -132,6 +135,8 @@ describe('speech async command', () => {
     );
 
     expect(download.authorization).toBe('Bearer k');
+    expect(query.method).toBe('POST');
+    expect(query.body).toEqual({ task_id: 123 });
   });
 });
 
@@ -163,6 +168,36 @@ describe('speech task get command', () => {
         { quiet: false, verbose: false, noColor: true, yes: false, dryRun: true, help: false, nonInteractive: true, async: false },
       ),
     ).rejects.toThrow('--task-id is required');
+  });
+
+  it('queries the task with a POST body', async () => {
+    const query = { method: '', body: undefined as Record<string, unknown> | undefined };
+    const taskServer = createMockServer({
+      routes: {
+        '/v1/query/t2a_async_query_v2': async (req) => {
+          query.method = req.method;
+          query.body = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            task_id: 123,
+            status: 'Processing',
+            base_resp: { status_code: 0 },
+          });
+        },
+      },
+    });
+
+    try {
+      const { command } = registry.resolve(['speech', 'task', 'get']);
+      await command.execute(
+        { ...baseConfig, baseUrl: taskServer.url, dryRun: false, quiet: true },
+        { taskId: '123', quiet: true, verbose: false, noColor: true, yes: false, dryRun: false, help: false, nonInteractive: true, async: false },
+      );
+    } finally {
+      taskServer.close();
+    }
+
+    expect(query.method).toBe('POST');
+    expect(query.body).toEqual({ task_id: '123' });
   });
 });
 

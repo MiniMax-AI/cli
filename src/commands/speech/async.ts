@@ -9,21 +9,77 @@ import {
   speechAsyncQueryEndpoint,
 } from '../../client/endpoints';
 import { resolveCredential } from '../../auth/resolver';
-import { poll } from '../../polling/poll';
 import { downloadFile } from '../../files/download';
 import { formatOutput, detectOutputFormat, dryRun } from '../../output/formatter';
+import { createSpinner } from '../../output/progress';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import { T2A_FORMATS, formatList, validateAudioFormat, t2aDefaultSampleRate } from '../../utils/audio-formats';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type {
   FileUploadResponse,
+  SpeechAsyncQueryRequest,
   SpeechAsyncRequest,
   SpeechAsyncQueryResponse,
   SpeechAsyncResponse,
 } from '../../types/api';
 
 const DIRECT_TEXT_LIMIT = 50_000;
+
+async function queryAsyncTask(
+  config: Config,
+  taskId: string | number,
+): Promise<SpeechAsyncQueryResponse> {
+  const body: SpeechAsyncQueryRequest = { task_id: taskId };
+  return requestJson<SpeechAsyncQueryResponse>(config, {
+    url: speechAsyncQueryEndpoint(config.baseUrl),
+    method: 'POST',
+    body,
+  });
+}
+
+async function waitForAsyncTask(
+  config: Config,
+  taskId: string | number,
+  intervalSec: number,
+): Promise<SpeechAsyncQueryResponse> {
+  const deadline = Date.now() + config.timeout * 1000;
+  const spinner = createSpinner('Polling...');
+
+  if (!config.quiet) spinner.start();
+
+  try {
+    while (Date.now() < deadline) {
+      const result = await queryAsyncTask(config, taskId);
+      if (!config.quiet) spinner.update(`Status: ${result.status}`);
+
+      if (result.status === 'Success') {
+        spinner.stop('Done.');
+        return result;
+      }
+
+      if (result.status === 'Failed' || result.status === 'Expired') {
+        spinner.stop('Failed.');
+        const reason = result.base_resp?.status_msg;
+        throw new CLIError(
+          `Task ${result.status}.${reason ? ` (${reason})` : ''}`,
+          ExitCode.GENERAL,
+          'Check the MiniMax dashboard or --verbose output for details.',
+        );
+      }
+
+      await new Promise(resolve => setTimeout(resolve, intervalSec * 1000));
+    }
+  } finally {
+    spinner.stop();
+  }
+
+  throw new CLIError(
+    'Polling timed out.',
+    ExitCode.TIMEOUT,
+    'Try increasing --timeout or check task status manually.',
+  );
+}
 
 async function uploadTextFile(config: Config, path: string): Promise<string> {
   const text = readTextFromPathOrStdin(path);
@@ -153,14 +209,11 @@ export default defineCommand({
 
     if (!config.quiet) process.stderr.write(`[Model: ${model}]\n`);
 
-    const result = await poll<SpeechAsyncQueryResponse>(config, {
-      url: speechAsyncQueryEndpoint(config.baseUrl, taskId),
-      intervalSec: (flags.pollInterval as number) ?? 5,
-      timeoutSec: config.timeout,
-      isComplete: (d) => (d as SpeechAsyncQueryResponse).status === 'Success',
-      isFailed: (d) => ['Failed', 'Expired'].includes((d as SpeechAsyncQueryResponse).status),
-      getStatus: (d) => (d as SpeechAsyncQueryResponse).status,
-    });
+    const result = await waitForAsyncTask(
+      config,
+      taskId,
+      (flags.pollInterval as number) ?? 5,
+    );
 
     const fileId = result.file_id;
     if (!fileId) {

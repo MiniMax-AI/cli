@@ -6,7 +6,7 @@ import { speechAsyncQueryEndpoint } from '../../client/endpoints';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { SpeechAsyncQueryResponse } from '../../types/api';
+import type { SpeechAsyncQueryRequest, SpeechAsyncQueryResponse } from '../../types/api';
 
 export default defineCommand({
   name: 'speech task get',
@@ -36,8 +36,12 @@ export default defineCommand({
     }
 
     const format = detectOutputFormat(config.output);
-    const url = speechAsyncQueryEndpoint(config.baseUrl, taskId);
-    const response = await requestJson<SpeechAsyncQueryResponse>(config, { url });
+    const body: SpeechAsyncQueryRequest = { task_id: taskId };
+    const response = await requestJson<SpeechAsyncQueryResponse>(config, {
+      url: speechAsyncQueryEndpoint(config.baseUrl),
+      method: 'POST',
+      body,
+    });
 
     if (config.quiet) {
       console.log(response.status);

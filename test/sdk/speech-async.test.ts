@@ -77,13 +77,18 @@ describe('MiniMaxSDK.speech.queryAsync', () => {
   });
 
   it('queries the async task status', async () => {
+    const query = { method: '', body: undefined as Record<string, unknown> | undefined };
     server = createMockServer({
       routes: {
-        '/v1/query/t2a_async_query_v2': () => jsonResponse({
-          task_id: 95157322514444,
-          status: 'Processing',
-          base_resp: { status_code: 0, status_msg: 'success' },
-        }),
+        '/v1/query/t2a_async_query_v2': async (req) => {
+          query.method = req.method;
+          query.body = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            task_id: 95157322514444,
+            status: 'Processing',
+            base_resp: { status_code: 0, status_msg: 'success' },
+          });
+        },
       },
     });
 
@@ -92,6 +97,8 @@ describe('MiniMaxSDK.speech.queryAsync', () => {
 
     expect(result.task_id).toBe(95157322514444);
     expect(result.status).toBe('Processing');
+    expect(query.method).toBe('POST');
+    expect(query.body).toEqual({ task_id: '95157322514444' });
   });
 
   it('surfaces the file id when the task completes', async () => {
