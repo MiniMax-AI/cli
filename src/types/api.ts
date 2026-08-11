@@ -320,6 +320,20 @@ export interface MusicResponse {
   };
 }
 
+export interface LyricsGenerationRequest {
+  mode: 'write_full_song' | 'edit';
+  prompt?: string;
+  lyrics?: string;
+  title?: string;
+}
+
+export interface LyricsGenerationResponse {
+  song_title?: string;
+  style_tags?: string;
+  lyrics: string;
+  base_resp: BaseResp;
+}
+
 export interface CoverPreprocessRequest {
   model: 'music-cover';
   audio_url?: string;

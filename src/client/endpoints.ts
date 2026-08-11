@@ -38,6 +38,10 @@ export function musicEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/music_generation`;
 }
 
+export function lyricsGenerationEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/lyrics_generation`;
+}
+
 export function musicCoverPreprocessEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/music_cover_preprocess`;
 }

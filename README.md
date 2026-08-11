@@ -120,6 +120,8 @@ mmx speech voices
 mmx music generate --prompt "Upbeat pop" --lyrics "[verse] La da dee, sunny day" --out song.mp3
 # Auto-generate lyrics from prompt
 mmx music generate --prompt "Indie folk, melancholic, rainy night" --lyrics-optimizer --out song.mp3
+# Save lyrics to a custom path (defaults to current directory)
+mmx music generate --prompt "Indie folk, melancholic, rainy night" --lyrics-optimizer --out song.mp3 --lyrics-out ./lyrics/
 # Instrumental (no vocals)
 mmx music generate --prompt "Cinematic orchestral" --instrumental --out bgm.mp3
 # Cover — generate a cover version from a reference audio file

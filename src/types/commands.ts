@@ -72,6 +72,7 @@ export interface MusicGenerateFlags {
   prompt?: string;
   lyrics?: string;
   lyricsFile?: string;
+  lyricsOut?: string;
   format?: string;
   sampleRate?: number;
   bitrate?: number;

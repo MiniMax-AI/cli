@@ -2,26 +2,59 @@ import { defineCommand } from '../../command';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { request, requestJson } from '../../client/http';
-import { musicEndpoint } from '../../client/endpoints';
-import { detectOutputFormat, dryRun } from '../../output/formatter';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join, resolve } from 'node:path';
+import { lyricsGenerationEndpoint, musicEndpoint } from '../../client/endpoints';
+import { detectOutputFormat, dryRun, formatOutput } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import { MUSIC_FORMATS, formatList, validateAudioFormat } from '../../utils/audio-formats';
 import { pipeAudioStream } from '../../utils/audio-stream';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { MusicRequest, MusicResponse } from '../../types/api';
+import type { LyricsGenerationRequest, LyricsGenerationResponse, MusicRequest, MusicResponse } from '../../types/api';
 import { MUSIC_GENERATE_MODELS, musicGenerateModel } from './models';
+
+function defaultLyricsFilename(audioOutPath: string): string {
+  return `${basename(audioOutPath, extname(audioOutPath))}.lyrics.txt`;
+}
+
+function resolveLyricsOutputPath(lyricsOut: string | undefined, audioOutPath: string): string {
+  const filename = defaultLyricsFilename(audioOutPath);
+
+  if (!lyricsOut) {
+    return resolve(filename);
+  }
+
+  const dest = resolve(lyricsOut);
+  const treatAsDirectory =
+    lyricsOut.endsWith('/') ||
+    lyricsOut.endsWith('\\') ||
+    (existsSync(dest) && statSync(dest).isDirectory());
+
+  return treatAsDirectory ? join(dest, filename) : dest;
+}
+
+function saveLyricsOutput(lyrics: string, lyricsOut: string | undefined, audioOutPath: string): string {
+  const dest = resolveLyricsOutputPath(lyricsOut, audioOutPath);
+  const dir = dirname(dest);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(dest, lyrics, 'utf-8');
+  return dest;
+}
 
 export default defineCommand({
   name: 'music generate',
   description: 'Generate a song (music-3.0)',
   apiDocs: '/docs/api-reference/music-generation',
-  usage: 'mmx music generate --prompt <text> (--lyrics <text> | --instrumental | --lyrics-optimizer) [--out <path>] [flags]',
+  usage: 'mmx music generate --prompt <text> (--lyrics <text> | --instrumental | --lyrics-optimizer) [--out <path>] [--lyrics-out <path>] [flags]',
   options: [
     { flag: '--prompt <text>', description: 'Music style description (e.g. "cinematic orchestral, building tension"). Max 2000 chars when combined with structured flags.' },
     { flag: '--lyrics <text>', description: 'Song lyrics with structure tags (newline separated). Supported: [Intro], [Verse], [Pre Chorus], [Chorus], [Interlude], [Bridge], [Outro], [Post Chorus], [Transition], [Break], [Hook], [Build Up], [Inst], [Solo]. Tags must be clean — no descriptions inside brackets (they will be sung). Max 3500 chars.' },
     { flag: '--lyrics-file <path>', description: 'Read lyrics from file (use - for stdin). Same tag rules as --lyrics.' },
+    { flag: '--lyrics-out <path>', description: 'Save the resolved lyrics to a file or directory. Default: current directory as <audio-basename>.lyrics.txt.' },
     { flag: '--lyrics-optimizer', description: 'Auto-generate lyrics from prompt (cannot be used with --lyrics or --instrumental)' },
     { flag: '--instrumental', description: 'Generate instrumental music (no vocals). music-2.6/music-2.5+: native is_instrumental flag; music-2.5: lyrics workaround. Cannot be used with --lyrics.' },
     { flag: '--vocals <text>', description: 'Vocal style, e.g. "warm male baritone", "bright female soprano", "duet with harmonies"' },
@@ -50,6 +83,7 @@ export default defineCommand({
     'mmx music generate --prompt "Indie folk, melancholic" --lyrics-file song.txt --out my_song.mp3',
     '# Auto-generate lyrics from prompt:',
     'mmx music generate --prompt "Upbeat pop about summer" --lyrics-optimizer --out summer.mp3',
+    'mmx music generate --prompt "Upbeat pop about summer" --lyrics-optimizer --out summer.mp3 --lyrics-out ./lyrics/',
     '# Instrumental:',
     'mmx music generate --prompt "Cinematic orchestral, building tension" --instrumental --out bgm.mp3',
     '# URL output (24h expiry — download promptly):',
@@ -178,10 +212,41 @@ export default defineCommand({
 
     const format = detectOutputFormat(config.output);
     const url = musicEndpoint(config.baseUrl);
+    let resolvedLyrics = lyrics?.trim() ? lyrics : undefined;
+
+    if (lyricsOptimizer) {
+      const lyricsResponse = await requestJson<LyricsGenerationResponse>(config, {
+        url: lyricsGenerationEndpoint(config.baseUrl),
+        method: 'POST',
+        body: {
+          mode: 'write_full_song',
+          prompt,
+        } satisfies LyricsGenerationRequest,
+      });
+
+      if (!lyricsResponse.lyrics?.trim()) {
+        throw new CLIError(
+          'Lyrics optimizer did not return lyrics.',
+          ExitCode.GENERAL,
+        );
+      }
+
+      resolvedLyrics = lyricsResponse.lyrics;
+      body.lyrics = resolvedLyrics;
+      body.lyrics_optimizer = undefined;
+    }
 
     if (flags.stream) {
       const res = await request(config, { url, method: 'POST', body, stream: true });
       await pipeAudioStream(res);
+      if (resolvedLyrics) {
+        const lyricsPath = saveLyricsOutput(resolvedLyrics, flags.lyricsOut as string | undefined, outPath);
+        if (config.quiet) {
+          console.log(lyricsPath);
+        } else {
+          console.log(formatOutput({ lyrics: lyricsPath }, format));
+        }
+      }
       return;
     }
 
@@ -201,8 +266,24 @@ export default defineCommand({
           ExitCode.GENERAL,
         );
       }
+      if (resolvedLyrics) {
+        const lyricsPath = saveLyricsOutput(resolvedLyrics, flags.lyricsOut as string | undefined, outPath);
+        if (config.quiet) {
+          console.log(lyricsPath);
+        } else {
+          console.log(formatOutput({ lyrics: lyricsPath }, format));
+        }
+      }
       return;
     }
     saveAudioOutput(response, outPath, format, config.quiet);
+    if (resolvedLyrics) {
+      const lyricsPath = saveLyricsOutput(resolvedLyrics, flags.lyricsOut as string | undefined, outPath);
+      if (config.quiet) {
+        console.log(lyricsPath);
+      } else {
+        console.log(formatOutput({ lyrics: lyricsPath }, format));
+      }
+    }
   },
 });
