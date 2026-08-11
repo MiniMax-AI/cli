@@ -97,6 +97,11 @@ export interface SpeechRequest {
     speed?: number;
     vol?: number;
     pitch?: number;
+    // Emotion hint (e.g. 'happy', 'sad', 'calm'); passed through as-is — the
+    // API validates the value, so no local enum to keep in sync.
+    emotion?: string;
+    text_normalization?: boolean;
+    latex_read?: boolean;
   };
   audio_setting?: {
     format?: string;
