@@ -20,6 +20,12 @@ import { readTextFromPathOrStdin } from '../../utils/fs';
 import { promptText, failIfMissing } from '../../utils/prompt';
 import { toImageBlock } from '../../utils/image';
 
+// MiniMax Anthropic API contract (platform.minimax.io/docs/api-reference/text-anthropic-api):
+// per-image cap, supported formats, and the whole-request-body cap.
+const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const CHAT_IMAGE_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const CHAT_MAX_REQUEST_BYTES = 64 * 1024 * 1024;
+
 // ---------------------------------------------------------------------------
 // Thinking indicator — dynamic spinner + color-cycling label
 // ---------------------------------------------------------------------------
@@ -221,7 +227,30 @@ export default defineCommand({
     }
 
     if (imageInputs.length > 0) {
-      attachImages(messages, await Promise.all(imageInputs.map(toImageBlock)));
+      const images: ContentBlock[] = [];
+      // Track the running request-body size so a run bails as soon as it's
+      // clear the request would exceed the cap, not after every image is
+      // fetched and encoded.
+      let requestBytes = Buffer.byteLength(JSON.stringify(messages), 'utf-8')
+        + Buffer.byteLength(system ?? '', 'utf-8');
+
+      for (const input of imageInputs) {
+        const block = await toImageBlock(input, {
+          maxBytes: CHAT_IMAGE_MAX_BYTES,
+          allowedMediaTypes: CHAT_IMAGE_ALLOWED_TYPES,
+        });
+        requestBytes += block.source.data.length;
+        if (requestBytes > CHAT_MAX_REQUEST_BYTES) {
+          throw new CLIError(
+            `Request body exceeds the ${CHAT_MAX_REQUEST_BYTES / 1024 / 1024} MB limit once this image is attached.`,
+            ExitCode.USAGE,
+            'Send fewer or smaller --image inputs.',
+          );
+        }
+        images.push(block);
+      }
+
+      attachImages(messages, images);
     }
 
     // Images require a multimodal model, so they override a text-only config default.

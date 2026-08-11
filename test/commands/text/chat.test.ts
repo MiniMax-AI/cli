@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { mkdtempSync, writeFileSync } from 'fs';
+import { mkdtempSync, writeFileSync, truncateSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { createMockServer, jsonResponse, sseResponse, type MockServer } from '../../helpers/mock-server';
@@ -410,6 +410,71 @@ describe('text chat command', () => {
       await expect(
         dryRunRequest(baseConfig, { message: ['hi'], image: [join(dir, 'nope.png')] }),
       ).rejects.toThrow(/File not found/);
+    });
+
+    it('rejects an oversized local image', async () => {
+      const big = join(dir, 'big.png');
+      writeFileSync(big, '');
+      truncateSync(big, 11 * 1024 * 1024);
+
+      await expect(
+        dryRunRequest(baseConfig, { message: ['hi'], image: [big] }),
+      ).rejects.toThrow(/too large/i);
+    });
+
+    it('rejects HEIC images for chat', async () => {
+      const heic = join(dir, 'photo.heic');
+      writeFileSync(heic, Buffer.from('not really heic'));
+
+      await expect(
+        dryRunRequest(baseConfig, { message: ['hi'], image: [heic] }),
+      ).rejects.toThrow(/Unsupported image format/);
+    });
+
+    it('accepts GIF images for chat', async () => {
+      const gif = join(dir, 'a.gif');
+      writeFileSync(gif, Buffer.from('GIF89a'));
+
+      const request = await dryRunRequest(baseConfig, { message: ['hi'], image: [gif] });
+      const block = request.messages[0].content.find((b: { type: string }) => b.type === 'image');
+      expect(block.source.media_type).toBe('image/gif');
+    });
+
+    it('rejects a remote image over 10 MB via content-length', async () => {
+      const imgServer = createMockServer({
+        routes: {
+          '/big.png': () => new Response(Buffer.alloc(11 * 1024 * 1024), {
+            headers: { 'Content-Type': 'image/png' },
+          }),
+        },
+      });
+
+      try {
+        await expect(
+          dryRunRequest(baseConfig, { message: ['hi'], image: [`${imgServer.url}/big.png`] }),
+        ).rejects.toThrow(/too large/i);
+      } finally {
+        imgServer.close();
+      }
+    });
+
+    it('rejects a data: URI image over the per-image cap', async () => {
+      const oversized = 'A'.repeat(Math.ceil((11 * 1024 * 1024) / 3) * 4);
+
+      await expect(
+        dryRunRequest(baseConfig, { message: ['hi'], image: [`data:image/png;base64,${oversized}`] }),
+      ).rejects.toThrow(/too large/i);
+    });
+
+    it('rejects when images cumulatively exceed the 64 MB request cap', async () => {
+      // ~7.15 MB decoded each — under the 10 MB per-image cap, but seven of
+      // them push the whole request past the 64 MB aggregate cap.
+      const chunk = 'A'.repeat(10_000_000);
+      const images = Array.from({ length: 7 }, () => `data:image/png;base64,${chunk}`);
+
+      await expect(
+        dryRunRequest(baseConfig, { message: ['hi'], image: images }),
+      ).rejects.toThrow(/64 MB/);
     });
   });
 });
