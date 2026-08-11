@@ -57,4 +57,12 @@ describe('text repl command', () => {
 
     await expect(cmd.execute(config, flags)).rejects.toThrow('interactive');
   });
+
+  it('lists supported models in --model help', async () => {
+    const mod = await import('../../../src/commands/text/repl');
+    const modelOption = mod.default.options?.find(option => option.flag.includes('--model'));
+
+    expect(modelOption?.description).toContain('MiniMax-M3');
+    expect(modelOption?.description).toContain('MiniMax-M2.7');
+  });
 });

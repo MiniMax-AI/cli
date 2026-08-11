@@ -302,4 +302,12 @@ describe('text chat command', () => {
       console.log = originalLog;
     }
   });
+
+  it('lists supported models in --model help', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+    const modelOption = chatCommand.options?.find(option => option.flag.includes('--model'));
+
+    expect(modelOption?.description).toContain('MiniMax-M3');
+    expect(modelOption?.description).toContain('MiniMax-M2.7');
+  });
 });

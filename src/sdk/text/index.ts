@@ -3,6 +3,7 @@ import { chatEndpoint } from "../../client/endpoints";
 import { ChatRequest, ChatResponse, StreamEvent } from "../../types/api";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
+import { DEFAULT_TEXT_MODEL } from "../../commands/text/models";
 
 export class TextSDK extends Client {
   private async *chatStream(body: Partial<ChatRequest>): AsyncGenerator<StreamEvent> {
@@ -56,7 +57,7 @@ export class TextSDK extends Client {
 
     return {
       ...params,
-      model: params.model ?? 'MiniMax-M3',
+      model: params.model ?? DEFAULT_TEXT_MODEL,
       max_tokens: params.max_tokens ?? 4096,
     } as ChatRequest;
   }

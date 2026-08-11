@@ -17,6 +17,7 @@ import type {
 import { readFileSync } from 'fs';
 import { isInteractive } from '../../utils/env';
 import { promptText, failIfMissing } from '../../utils/prompt';
+import { DEFAULT_TEXT_MODEL, TEXT_MODELS } from './models';
 
 // ---------------------------------------------------------------------------
 // Thinking indicator — dynamic spinner + color-cycling label
@@ -159,7 +160,10 @@ export default defineCommand({
   apiDocs: '/docs/api-reference/text-post',
   usage: 'mmx text chat --message <text> [flags]',
   options: [
-    { flag: '--model <model>', description: 'Model ID (default: MiniMax-M3)' },
+    {
+      flag: '--model <model>',
+      description: `Model ID (default: ${DEFAULT_TEXT_MODEL}; supported: ${TEXT_MODELS.join(', ')})`,
+    },
     { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
@@ -197,7 +201,7 @@ export default defineCommand({
 
     const model = (flags.model as string)
       || config.defaultTextModel
-      || 'MiniMax-M3';
+      || DEFAULT_TEXT_MODEL;
     const format = detectOutputFormat(config.output);
     const shouldStream = flags.stream === true || (
       flags.stream === undefined
