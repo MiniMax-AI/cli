@@ -398,3 +398,69 @@ describe('speech synthesize format validation', () => {
     }
   });
 });
+
+describe('speech synthesize voice_setting flags', () => {
+  const config = {
+    apiKey: 'test-key',
+    region: 'global' as const,
+    baseUrl: 'https://api.mmx.io',
+    output: 'json' as const,
+    timeout: 10,
+    verbose: false,
+    quiet: false,
+    noColor: true,
+    yes: false,
+    dryRun: true,
+    nonInteractive: true,
+    async: false,
+  };
+
+  const flags = {
+    text: 'Hello',
+    quiet: false,
+    verbose: false,
+    noColor: true,
+    yes: false,
+    dryRun: true,
+    help: false,
+    nonInteractive: true,
+    async: false,
+  };
+
+  async function dryRunRequest(extraFlags: Record<string, unknown>) {
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+    try {
+      await synthesizeCommand.execute(config, { ...flags, ...extraFlags });
+      return JSON.parse(output).request;
+    } finally {
+      console.log = originalLog;
+    }
+  }
+
+  it('--emotion sets voice_setting.emotion', async () => {
+    const request = await dryRunRequest({ emotion: 'happy' });
+    expect(request.voice_setting.emotion).toBe('happy');
+  });
+
+  it('--emotion passes through arbitrary values without local validation', async () => {
+    const request = await dryRunRequest({ emotion: 'bored' });
+    expect(request.voice_setting.emotion).toBe('bored');
+  });
+
+  it('omits voice_setting.emotion when --emotion is not provided', async () => {
+    const request = await dryRunRequest({});
+    expect(request.voice_setting.emotion).toBeUndefined();
+  });
+
+  it('--text-normalization sets voice_setting.text_normalization', async () => {
+    const request = await dryRunRequest({ textNormalization: true });
+    expect(request.voice_setting.text_normalization).toBe(true);
+  });
+
+  it('--latex-read sets voice_setting.latex_read', async () => {
+    const request = await dryRunRequest({ latexRead: true });
+    expect(request.voice_setting.latex_read).toBe(true);
+  });
+});
