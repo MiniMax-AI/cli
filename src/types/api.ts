@@ -1,7 +1,25 @@
 // ---- Text / Chat (Anthropic Messages API) ----
 
+export type VideoSource =
+  | {
+      type: 'url';
+      url: string;
+      detail?: 'low' | 'default' | 'high';
+      fps?: number;
+      max_long_side_pixel?: number;
+    }
+  | {
+      type: 'base64';
+      media_type: string;
+      data: string;
+      detail?: 'low' | 'default' | 'high';
+      fps?: number;
+      max_long_side_pixel?: number;
+    };
+
 export type ContentBlock =
   | { type: 'text'; text: string }
+  | { type: 'video'; source: VideoSource }
   | { type: 'thinking'; thinking: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string };

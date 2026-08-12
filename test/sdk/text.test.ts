@@ -37,6 +37,70 @@ describe('MiniMaxSDK.text', () => {
     expect(result.id).toBe('msg-123');
   });
 
+  it('passes video content blocks through to chat requests', async () => {
+    let requestBody: unknown;
+    server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': async request => {
+          requestBody = await request.json();
+          return jsonResponse({
+            id: 'msg-video',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'A short clip.' }],
+            model: 'MiniMax-M3',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 20, output_tokens: 4 },
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    await sdk.text.chat({
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What happens in this clip?' },
+          {
+            type: 'video',
+            source: {
+              type: 'url',
+              url: 'https://example.com/clip.mp4',
+              detail: 'high',
+              fps: 0.5,
+              max_long_side_pixel: 1280,
+            },
+          },
+        ],
+      }],
+    });
+
+    expect(requestBody).toMatchObject({
+      model: 'MiniMax-M3',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What happens in this clip?' },
+          {
+            type: 'video',
+            source: {
+              type: 'url',
+              url: 'https://example.com/clip.mp4',
+              detail: 'high',
+              fps: 0.5,
+              max_long_side_pixel: 1280,
+            },
+          },
+        ],
+      }],
+    });
+  });
+
   it('streaming skips empty SSE data events', async () => {
     const chunk = JSON.stringify({
       type: 'content_block_delta',
