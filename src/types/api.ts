@@ -282,59 +282,6 @@ export interface VideoV2TaskResponse {
   task: VideoV2Task;
 }
 
-// ---- Music ----
-
-export interface MusicRequest {
-  model: string;
-  prompt?: string;
-  lyrics?: string;
-  is_instrumental?: boolean;
-  lyrics_optimizer?: boolean;
-  audio_url?: string;
-  audio_base64?: string;
-  cover_feature_id?: string;
-  seed?: number;
-  audio_setting?: {
-    format?: string;
-    sample_rate?: number;
-    bitrate?: number;
-    channel?: number;
-  };
-  output_format?: 'url' | 'hex';
-  stream?: boolean;
-  aigc_watermark?: boolean;
-}
-
-export interface MusicResponse {
-  base_resp: BaseResp;
-  data: {
-    audio?: string;
-    audio_url?: string;
-    status: number;
-  };
-  extra_info?: {
-    audio_length?: number;
-    audio_sample_rate?: number;
-    audio_size?: number;
-    bitrate?: number;
-  };
-}
-
-export interface CoverPreprocessRequest {
-  model: 'music-cover';
-  audio_url?: string;
-  audio_base64?: string;
-}
-
-export interface CoverPreprocessResponse {
-  cover_feature_id: string;
-  formatted_lyrics?: string;
-  structure_result?: string;
-  audio_duration?: number;
-  trace_id?: string;
-  base_resp: BaseResp;
-}
-
 // ---- Quota ----
 
 export interface QuotaResponse {

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import {
   T2A_FORMATS,
-  MUSIC_FORMATS,
   formatList,
   validateAudioFormat,
   validateT2AStreaming,
@@ -18,18 +17,6 @@ describe('audio-formats', () => {
     it.each(['aac', 'ogg', 'wma', 'mp4', ''])(
       'rejects %s',
       (fmt) => expect(() => validateAudioFormat(fmt, T2A_FORMATS)).toThrow(/Invalid audio format/),
-    );
-  });
-
-  describe('MUSIC_FORMATS', () => {
-    it.each(['mp3', 'wav', 'pcm'] as const)(
-      'accepts %s',
-      (fmt) => expect(() => validateAudioFormat(fmt, MUSIC_FORMATS)).not.toThrow(),
-    );
-
-    it.each(['opus', 'pcmu_raw', 'pcmu_wav', 'flac', 'aac'])(
-      'rejects %s',
-      (fmt) => expect(() => validateAudioFormat(fmt, MUSIC_FORMATS)).toThrow(/Invalid audio format/),
     );
   });
 

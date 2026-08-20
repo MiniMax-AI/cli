@@ -14,8 +14,6 @@ const API_REFS: ApiRef[] = [
   { command: 'mmx speech synthesize',    title: 'Speech T2A (Text-to-Audio)',           path: '/docs/api-reference/speech-t2a-http' },
   { command: 'mmx image generate',       title: 'Image Generation (T2I / I2I)',         path: '/docs/api-reference/image-generation-t2i' },
   { command: 'mmx video generate',       title: 'Video Generation (T2V / I2V / S2V)',   path: '/docs/api-reference/video-generation' },
-  { command: 'mmx music generate',       title: 'Music Generation',                     path: '/docs/api-reference/music-generation' },
-  { command: 'mmx music cover',          title: 'Music Cover (via Music Generation)',   path: '/docs/api-reference/music-generation' },
   { command: 'mmx search query',         title: 'Web Search',                           path: '/docs/api-reference/web-search' },
   { command: 'mmx vision describe',      title: 'Vision (Image Understanding)',         path: '/docs/api-reference/vision' },
 ];

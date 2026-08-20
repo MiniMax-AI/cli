@@ -90,12 +90,10 @@ describe('parseConfigFile', () => {
       default_text_model: 'MiniMax-M3',
       default_speech_model: 'speech-2.8-hd',
       default_video_model: 'MiniMax-Hailuo-2.3',
-      default_music_model: 'music-3.0',
     });
     expect(cfg.default_text_model).toBe('MiniMax-M3');
     expect(cfg.default_speech_model).toBe('speech-2.8-hd');
     expect(cfg.default_video_model).toBe('MiniMax-Hailuo-2.3');
-    expect(cfg.default_music_model).toBe('music-3.0');
   });
 
   it('rejects empty string default model', () => {

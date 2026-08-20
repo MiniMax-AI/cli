@@ -35,7 +35,6 @@ export default defineCommand({
     if (file.default_text_model) result.default_text_model = file.default_text_model;
     if (file.default_speech_model) result.default_speech_model = file.default_speech_model;
     if (file.default_video_model) result.default_video_model = file.default_video_model;
-    if (file.default_music_model) result.default_music_model = file.default_music_model;
     if (file.proxy) result.proxy = file.proxy;
 
     console.log(formatOutput(result, format));

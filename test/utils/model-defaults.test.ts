@@ -20,7 +20,7 @@ const baseConfig: Config = {
  * Each command implements this inline; this mirrors the logic for testing.
  */
 function resolveModel(
-  configKey: 'defaultTextModel' | 'defaultSpeechModel' | 'defaultVideoModel' | 'defaultMusicModel',
+  configKey: 'defaultTextModel' | 'defaultSpeechModel' | 'defaultVideoModel',
   fallback: string,
   config: Partial<Config>,
   flags: Record<string, unknown>,
@@ -55,10 +55,5 @@ describe('model resolution (flag > config default > fallback)', () => {
   it('config default overrides hardcoded', () => {
     const model = resolveModel('defaultVideoModel', 'MiniMax-Hailuo-2.3', { ...baseConfig, defaultVideoModel: 'MiniMax-Hailuo-2.3-6s-768p' }, {});
     expect(model).toBe('MiniMax-Hailuo-2.3-6s-768p');
-  });
-
-  it('handles music model default', () => {
-    const model = resolveModel('defaultMusicModel', 'music-3.0', { ...baseConfig, defaultMusicModel: 'music-3.0' }, {});
-    expect(model).toBe('music-3.0');
   });
 });

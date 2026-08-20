@@ -7,14 +7,13 @@ import { maskToken } from '../../utils/token';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 
-const VALID_KEYS = ['region', 'base_url', 'output', 'timeout', 'api_key', 'proxy', 'default_text_model', 'default_speech_model', 'default_video_model', 'default_music_model'];
+const VALID_KEYS = ['region', 'base_url', 'output', 'timeout', 'api_key', 'proxy', 'default_text_model', 'default_speech_model', 'default_video_model'];
 
 // Allow hyphen-style keys (e.g. default-text-model → default_text_model)
 const KEY_ALIASES: Record<string, string> = {
   'default-text-model': 'default_text_model',
   'default-speech-model': 'default_speech_model',
   'default-video-model': 'default_video_model',
-  'default-music-model': 'default_music_model',
 };
 
 function valueForOutput(key: string, value: unknown): unknown {
@@ -26,7 +25,7 @@ export default defineCommand({
   description: 'Set a config value',
   usage: 'mmx config set --key <key> --value <value>',
   options: [
-    { flag: '--key <key>', description: 'Config key (region, base_url, output, timeout, api_key, proxy, default_text_model, default_speech_model, default_video_model, default_music_model)' },
+    { flag: '--key <key>', description: 'Config key (region, base_url, output, timeout, api_key, proxy, default_text_model, default_speech_model, default_video_model)' },
     { flag: '--value <value>', description: 'Value to set' },
   ],
   examples: [

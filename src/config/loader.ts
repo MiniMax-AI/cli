@@ -110,7 +110,6 @@ export function loadConfig(flags: GlobalFlags): Config {
     defaultTextModel: file.default_text_model,
     defaultSpeechModel: file.default_speech_model,
     defaultVideoModel: file.default_video_model,
-    defaultMusicModel: file.default_music_model,
     verbose: flags.verbose || process.env.MINIMAX_VERBOSE === '1',
     quiet: flags.quiet || false,
     noColor: flags.noColor || process.env.NO_COLOR !== undefined || !process.stdout.isTTY,

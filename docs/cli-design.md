@@ -28,8 +28,6 @@ mmx
 │   ├── task
 │   │   └── get            Query video task status
 │   └── download           Download a completed video by file ID
-├── music
-│   └── generate           Generate a song (music-3.0)
 ├── quota
 │   └── show               Display Token Plan usage and remaining quotas
 └── config

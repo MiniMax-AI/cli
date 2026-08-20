@@ -2,10 +2,7 @@ import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
 
 export const T2A_FORMATS = ['mp3', 'pcm', 'flac', 'wav', 'pcmu_raw', 'pcmu_wav', 'opus'] as const;
-export const MUSIC_FORMATS = ['mp3', 'wav', 'pcm'] as const;
-
 export type T2AFormat = (typeof T2A_FORMATS)[number];
-export type MusicFormat = (typeof MUSIC_FORMATS)[number];
 
 export function formatList(formats: readonly string[]): string {
   return formats.join(', ');

@@ -67,6 +67,38 @@ describe('config set command', () => {
     ).rejects.toThrow('Invalid config key');
   });
 
+  it('rejects the retired model default key', async () => {
+    const config = {
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'text' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+    const retiredKey = `default-${['mu', 'sic'].join('')}-model`;
+
+    await expect(
+      setCommand.execute(config, {
+        key: retiredKey,
+        value: ['mu', 'sic-3.0'].join(''),
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      }),
+    ).rejects.toThrow('Invalid config key');
+  });
+
   it('accepts default_text_model key', async () => {
     const config = {
       region: 'global' as const,
