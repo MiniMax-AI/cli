@@ -1,4 +1,4 @@
-<img src="https://file.cdn.minimax.io/public/MMX.png" alt="MiniMax" width="100%" />
+<img src="https://file.cdn.minimax.io/public/MMX-capabilities.png" alt="MiniMax" width="100%" />
 
 <p align="center">
   <strong>MiniMax AI 开放平台官方命令行工具</strong><br>
@@ -25,7 +25,7 @@
 - **网络搜索** — MiniMax 搜索引擎
 - **双区域** — 国际版（`api.minimax.io`）和国内版（`api.minimaxi.com`）自动切换
 
-<img src="https://file.cdn.minimax.io/public/MMX-CLI.png" alt="MiniMax" width="100%" />
+<img src="https://file.cdn.minimax.io/public/MMX-CLI-help.png" alt="MiniMax" width="100%" />
 
 ## 安装
 

@@ -1,4 +1,4 @@
-<img src="https://file.cdn.minimax.io/public/MMX.png" alt="MiniMax" width="100%" />
+<img src="https://file.cdn.minimax.io/public/MMX-capabilities.png" alt="MiniMax" width="100%" />
 
 <p align="center">
   <strong>The official CLI for the MiniMax AI Platform</strong><br>
@@ -25,7 +25,7 @@
 - **Search** — Web search powered by MiniMax
 - **Dual Region** — Seamless Global (`api.minimax.io`) and CN (`api.minimaxi.com`) support
 
-<img src="https://file.cdn.minimax.io/public/MMX-CLI.png" alt="MiniMax" width="100%" />
+<img src="https://file.cdn.minimax.io/public/MMX-CLI-help.png" alt="MiniMax" width="100%" />
 
 ## Install
 
