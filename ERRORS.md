@@ -125,20 +125,6 @@ All errors fall under [Network Errors](#networkerrors).
 
 ---
 
-## Music Commands
-
-### `mmx music generate`
-
-| Scenario | Error Message |
-|---|---|
-| Neither `--prompt` nor `--lyrics` provided | `At least one of --prompt or --lyrics is required.` |
-| `--lyrics-file` not found | `File not found: ${flags.lyricsFile}` |
-| `--lyrics-file` unreadable | `Cannot read file: ${e.message}` |
-| `--out` path no write permission | `Permission denied: cannot write to "${outPath}".` |
-| Disk full | `Disk full — cannot write audio file.` |
-
----
-
 ## Vision Commands
 
 ### `mmx vision describe`

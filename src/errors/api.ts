@@ -20,7 +20,6 @@ function planHintForUrl(url?: string): string {
   if (url.includes('/image_generation')) return '\n\nimage-01 requires the Plus plan or above.';
   if (url.includes('/video_generation') || url.includes('/query/video_generation'))
                                          return '\n\nVideo models (Hailuo-2.3 / 2.3-Fast) require the Max plan or above.';
-  if (url.includes('/music_generation')) return '\n\nMusic-2.6 requires the Max plan or above.';
   return '';
 }
 

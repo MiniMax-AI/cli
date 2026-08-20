@@ -34,14 +34,6 @@ export function fileRetrieveEndpoint(baseUrl: string, fileId: string): string {
   return `${baseUrl}/v1/files/retrieve?file_id=${fileId}`;
 }
 
-export function musicEndpoint(baseUrl: string): string {
-  return `${baseUrl}/v1/music_generation`;
-}
-
-export function musicCoverPreprocessEndpoint(baseUrl: string): string {
-  return `${baseUrl}/v1/music_cover_preprocess`;
-}
-
 export function searchEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/coding_plan/search`;
 }

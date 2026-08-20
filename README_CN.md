@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>MiniMax AI 开放平台官方命令行工具</strong><br>
-  专为 AI Agent 打造。在任意 Agent 或终端中生成文字、图像、视频、语音和音乐。
+  专为 AI Agent 打造。在任意 Agent 或终端中生成文字、图像、视频和语音。
 </p>
 
 <p align="center">
@@ -21,7 +21,6 @@
 - **图像生成** — 文生图，支持比例和批量控制
 - **视频生成** — 异步生成，进度追踪
 - **语音合成** — 30+ 音色、语速调节、流式播放
-- **音乐生成** — 文生音乐，支持自定义歌词、纯音乐、自动生词，以及基于参考音频的 Cover 生成
 - **图像理解** — 图片描述与识别
 - **网络搜索** — MiniMax 搜索引擎
 - **双区域** — 国际版（`api.minimax.io`）和国内版（`api.minimaxi.com`）自动切换
@@ -56,7 +55,6 @@ mmx text chat --message "你好，MiniMax！"
 mmx image "一只穿宇航服的猫"
 mmx speech synthesize --text "你好！" --out hello.mp3
 mmx video generate --prompt "海浪拍打礁石"
-mmx music generate --prompt "欢快的流行乐" --lyrics "[主歌] 啦啦啦，阳光照"
 mmx search "MiniMax AI 最新动态"
 mmx vision photo.jpg
 mmx quota
@@ -111,20 +109,6 @@ mmx speech synthesize --text "流式输出" --stream | mpv -
 mmx speech synthesize --text "Hi" --voice English_magnetic_voiced_man --speed 1.2
 echo "头条新闻" | mmx speech synthesize --text-file - --out news.mp3
 mmx speech voices
-```
-
-### `mmx music`
-
-```bash
-# 带歌词生成
-mmx music generate --prompt "欢快的流行乐" --lyrics "[主歌] 啦啦啦，阳光照" --out song.mp3
-# 自动生成歌词
-mmx music generate --prompt "忧郁的独立民谣，雨夜" --lyrics-optimizer --out song.mp3
-# 纯音乐（无人声）
-mmx music generate --prompt "史诗管弦乐" --instrumental --out bgm.mp3
-# Cover — 基于参考音频生成翻唱版本
-mmx music cover --prompt "爵士钢琴，慵懒女声" --audio-file original.mp3 --out cover.mp3
-mmx music cover --prompt "民谣吉他" --audio https://example.com/song.mp3 --out cover.mp3
 ```
 
 ### `mmx vision`

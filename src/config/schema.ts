@@ -37,7 +37,6 @@ export interface ConfigFile {
   default_text_model?: string;
   default_speech_model?: string;
   default_video_model?: string;
-  default_music_model?: string;
 }
 
 const VALID_REGIONS = new Set<string>(['global', 'cn']);
@@ -76,7 +75,6 @@ export function parseConfigFile(raw: unknown): ConfigFile {
   if (typeof obj.default_text_model === 'string' && obj.default_text_model.length > 0) out.default_text_model = obj.default_text_model;
   if (typeof obj.default_speech_model === 'string' && obj.default_speech_model.length > 0) out.default_speech_model = obj.default_speech_model;
   if (typeof obj.default_video_model === 'string' && obj.default_video_model.length > 0) out.default_video_model = obj.default_video_model;
-  if (typeof obj.default_music_model === 'string' && obj.default_music_model.length > 0) out.default_music_model = obj.default_music_model;
 
   return out;
 }
@@ -93,7 +91,6 @@ export interface Config {
   defaultTextModel?: string;
   defaultSpeechModel?: string;
   defaultVideoModel?: string;
-  defaultMusicModel?: string;
   verbose: boolean;
   quiet: boolean;
   noColor: boolean;

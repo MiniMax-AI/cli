@@ -68,18 +68,6 @@ export interface VideoDownloadFlags {
   out?: string;
 }
 
-export interface MusicGenerateFlags {
-  prompt?: string;
-  lyrics?: string;
-  lyricsFile?: string;
-  format?: string;
-  sampleRate?: number;
-  bitrate?: number;
-  stream?: boolean;
-  out?: string;
-  outFormat?: string;
-}
-
 export interface AuthLoginFlags {
   method?: string;
   apiKey?: string;

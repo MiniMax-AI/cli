@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>The official CLI for the MiniMax AI Platform</strong><br>
-  Built for AI agents. Generate text, images, video, speech, and music — from any agent or terminal.
+  Built for AI agents. Generate text, images, video, and speech — from any agent or terminal.
 </p>
 
 <p align="center">
@@ -21,7 +21,6 @@
 - **Image** — Text-to-image with aspect ratio and batch controls
 - **Video** — Async video generation with progress tracking
 - **Speech** — TTS with 30+ voices, speed control, streaming playback
-- **Music** — Text-to-music with lyrics, instrumental mode, auto lyrics, and cover generation from reference audio
 - **Vision** — Image understanding and description
 - **Search** — Web search powered by MiniMax
 - **Dual Region** — Seamless Global (`api.minimax.io`) and CN (`api.minimaxi.com`) support
@@ -56,7 +55,6 @@ mmx text chat --message "What is MiniMax?"
 mmx image "A cat in a spacesuit"
 mmx speech synthesize --text "Hello!" --out hello.mp3
 mmx video generate --prompt "Ocean waves at sunset"
-mmx music generate --prompt "Upbeat pop" --lyrics "[verse] La da dee, sunny day"
 mmx search "MiniMax AI latest news"
 mmx vision photo.jpg
 mmx quota
@@ -111,20 +109,6 @@ mmx speech synthesize --text "Stream me" --stream | mpv -
 mmx speech synthesize --text "Hi" --voice English_magnetic_voiced_man --speed 1.2
 echo "Breaking news" | mmx speech synthesize --text-file - --out news.mp3
 mmx speech voices
-```
-
-### `mmx music`
-
-```bash
-# Generate with lyrics
-mmx music generate --prompt "Upbeat pop" --lyrics "[verse] La da dee, sunny day" --out song.mp3
-# Auto-generate lyrics from prompt
-mmx music generate --prompt "Indie folk, melancholic, rainy night" --lyrics-optimizer --out song.mp3
-# Instrumental (no vocals)
-mmx music generate --prompt "Cinematic orchestral" --instrumental --out bgm.mp3
-# Cover — generate a cover version from a reference audio file
-mmx music cover --prompt "Jazz, piano, warm female vocal" --audio-file original.mp3 --out cover.mp3
-mmx music cover --prompt "Indie folk" --audio https://example.com/song.mp3 --out cover.mp3
 ```
 
 ### `mmx vision`
