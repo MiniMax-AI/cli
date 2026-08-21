@@ -14,11 +14,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate and read release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] \
+            || { echo "Tag '${GITHUB_REF_NAME}' must be a SemVer tag such as v1.2.3"; exit 1; }
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install
 
       - run: bun run build
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Pack npm tarball
+        id: npm-package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          staging_dir="$(mktemp -d)"
+          trap 'rm -rf "$staging_dir"' EXIT
+
+          cp package.json "$staging_dir/package.json"
+          cp -R dist "$staging_dir/dist"
+          node -e '
+            const fs = require("fs");
+            const path = process.argv[1];
+            const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+            pkg.version = process.env.VERSION;
+            fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+          ' "$staging_dir/package.json"
+
+          npm pack "$staging_dir" --pack-destination . --ignore-scripts
+          tarball="mmx-cli-${VERSION}.tgz"
+          test -f "$tarball"
+          echo "path=${tarball}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -33,6 +70,6 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish to npm
-        run: npm publish
+        run: npm publish "${{ steps.npm-package.outputs.path }}" --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
