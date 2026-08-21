@@ -44,9 +44,8 @@ bun test --grep "auth login"
 
 ### Publishing
 
-```bash
-npm publish
-```
+- Releases are tag-driven; see `docs/releasing.md`.
+- Do not change `package.json` from its `0.0.0-dev` development version for a release.
 
 ## Code Style
 

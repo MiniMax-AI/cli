@@ -60,6 +60,11 @@ mmx vision photo.jpg
 mmx quota
 ```
 
+## Releasing
+
+Maintainers publish releases by pushing a SemVer Git tag; the release workflow
+derives the npm package version from that tag. See [the release guide](docs/releasing.md).
+
 ## Commands
 
 ### `mmx text`
