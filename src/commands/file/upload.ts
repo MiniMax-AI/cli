@@ -2,16 +2,13 @@ import { defineCommand } from '../../command';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { requestJson } from '../../client/http';
-import { fileUploadEndpoint } from '../../client/endpoints';
+import { resolveFileUploadPath, uploadFile } from '../../files/upload';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { isInteractive } from '../../utils/env';
 import { promptText, failIfMissing } from '../../utils/prompt';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { FileUploadResponse } from '../../types/api';
-import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { resolve, basename } from 'path';
 
 export default defineCommand({
   name: 'file upload',
@@ -40,10 +37,9 @@ export default defineCommand({
       }
     }
 
-    const fullPath = resolve(filePath);
-    if (!existsSync(fullPath)) {
-      throw new CLIError(`File not found: ${fullPath}`, ExitCode.USAGE);
-    }
+    const createFileNotFoundError = (fullPath: string) =>
+      new CLIError(`File not found: ${fullPath}`, ExitCode.USAGE);
+    const fullPath = resolveFileUploadPath(filePath, createFileNotFoundError);
 
     const purpose = (flags.purpose as string) || 'retrieval';
     const format = detectOutputFormat(config.output);
@@ -53,19 +49,12 @@ export default defineCommand({
       return;
     }
 
-    const formData = new FormData();
-    // Read file using Node.js fs/promises (compatible with both Node and Bun)
-    const fileData = await readFile(fullPath);
-    const fileName = basename(fullPath);
-    const fileBlob = new Blob([fileData]);
-    formData.append('file', fileBlob, fileName);
-    formData.append('purpose', purpose);
-
-    const url = fileUploadEndpoint(config.baseUrl);
-    const response = await requestJson<FileUploadResponse>(config, {
-      url,
-      method: 'POST',
-      body: formData,
+    const response = await uploadFile({
+      filePath: fullPath,
+      purpose,
+      baseUrl: config.baseUrl,
+      requestJson: (opts) => requestJson<FileUploadResponse>(config, opts),
+      createFileNotFoundError,
     });
 
     if (config.quiet) {

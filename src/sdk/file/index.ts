@@ -1,13 +1,10 @@
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { resolve, basename } from 'node:path';
 import { Client } from '../client';
 import {
-  fileUploadEndpoint,
   fileListEndpoint,
   fileDeleteEndpoint,
   fileRetrieveEndpoint,
 } from '../../client/endpoints';
+import { uploadFile } from '../../files/upload';
 import type {
   FileUploadResponse,
   FileListResponse,
@@ -25,23 +22,13 @@ export class FileSDK extends Client {
    * @param purpose  - File purpose, defaults to `"retrieval"`.
    */
   async upload(filePath: string, purpose = 'retrieval'): Promise<FileUploadResponse> {
-    const fullPath = resolve(filePath);
-    if (!existsSync(fullPath)) {
-      throw new SDKError(`File not found: ${fullPath}`, ExitCode.USAGE);
-    }
-
-    const fileData = await readFile(fullPath);
-    const fileName = basename(fullPath);
-
-    const formData = new FormData();
-    formData.append('file', new Blob([fileData]), fileName);
-    formData.append('purpose', purpose);
-
-    const url = fileUploadEndpoint(this.config.baseUrl);
-    return this.requestJson<FileUploadResponse>({
-      url,
-      method: 'POST',
-      body: formData,
+    return uploadFile({
+      filePath,
+      purpose,
+      baseUrl: this.config.baseUrl,
+      requestJson: (opts) => this.requestJson<FileUploadResponse>(opts),
+      createFileNotFoundError: (fullPath) =>
+        new SDKError(`File not found: ${fullPath}`, ExitCode.USAGE),
     });
   }
 
