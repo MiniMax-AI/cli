@@ -58,16 +58,15 @@ describe('speech clone command', () => {
     const output = await captureStdout(async () => {
       await cloneCommand.execute(baseConfig, {
         ...baseFlags,
-        fileId: 'file-123',
+        fileId: '123',
         voiceId: 'my_voice',
       });
     });
 
     const parsed = JSON.parse(output);
     expect(parsed.request).toEqual({
-      file_id: 'file-123',
+      file_id: 123,
       voice_id: 'my_voice',
-      model: 'speech-2.8-hd',
     });
   });
 
@@ -84,9 +83,9 @@ describe('speech clone command', () => {
     const parsed = JSON.parse(output);
     expect(parsed.request.upload.purpose).toBe('voice_clone');
     expect(parsed.request.clone).toEqual({
-      file_id: '<uploaded-file-id>',
-      voice_id: 'my_voice',
-      model: 'speech-2.6-hd',
+        file_id: 0,
+        voice_id: 'my_voice',
+        model: 'speech-2.6-hd',
     });
   });
 });

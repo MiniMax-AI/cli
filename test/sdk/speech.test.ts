@@ -75,12 +75,14 @@ describe('MiniMaxSDK.speech', () => {
         '/v1/voice_clone': async (req) => {
           const body = await req.json() as Record<string, unknown>;
           expect(body).toEqual({
-            file_id: 'file-123',
+            file_id: 123,
             voice_id: 'my_voice',
-            model: 'speech-2.8-hd',
           });
           return jsonResponse({
-            voice_id: 'my_voice',
+            input_sensitive: false,
+            input_sensitive_type: 0,
+            demo_audio: '',
+            extra_info: { audio_length: 1000 },
             base_resp: { status_code: 0, status_msg: 'success' },
           });
         },
@@ -93,12 +95,11 @@ describe('MiniMaxSDK.speech', () => {
     });
 
     const result = await sdk.speech.clone({
-      file_id: 'file-123',
+      file_id: 123,
       voice_id: 'my_voice',
-      model: 'speech-2.8-hd',
     });
 
-    expect(result.voice_id).toBe('my_voice');
+    expect(result.input_sensitive).toBe(false);
   });
 
   it('should design a voice successfully', async () => {
@@ -108,10 +109,10 @@ describe('MiniMaxSDK.speech', () => {
           const body = await req.json() as Record<string, unknown>;
           expect(body).toEqual({
             prompt: 'Warm and clear narrator',
-            voice_id: 'designed_voice',
+            preview_text: 'Welcome to the show',
           });
           return jsonResponse({
-            voice_id: 'designed_voice',
+            trial_audio: 'hex-audio',
             base_resp: { status_code: 0, status_msg: 'success' },
           });
         },
@@ -125,10 +126,10 @@ describe('MiniMaxSDK.speech', () => {
 
     const result = await sdk.speech.design({
       prompt: 'Warm and clear narrator',
-      voice_id: 'designed_voice',
+      preview_text: 'Welcome to the show',
     });
 
-    expect(result.voice_id).toBe('designed_voice');
+    expect(result.trial_audio).toBe('hex-audio');
   });
 });
 

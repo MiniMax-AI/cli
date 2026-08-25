@@ -34,7 +34,7 @@ describe('speech design command', () => {
 
   it('requires prompt', async () => {
     await expect(
-      designCommand.execute(baseConfig, { ...baseFlags, voiceId: 'designed_voice' }),
+      designCommand.execute(baseConfig, { ...baseFlags, previewText: 'Hello' }),
     ).rejects.toThrow('--prompt is required');
   });
 
@@ -47,13 +47,13 @@ describe('speech design command', () => {
       await designCommand.execute(baseConfig, {
         ...baseFlags,
         prompt: 'Warm and clear narrator',
-        voiceId: 'designed_voice',
+        previewText: 'Welcome to the show',
       });
 
       const parsed = JSON.parse(output);
       expect(parsed.request).toEqual({
         prompt: 'Warm and clear narrator',
-        voice_id: 'designed_voice',
+        preview_text: 'Welcome to the show',
       });
     } finally {
       console.log = originalLog;

@@ -143,18 +143,38 @@ export interface VoiceListResponse {
 }
 
 export interface VoiceCloneRequest {
-  file_id: string;
+  file_id: number;
   voice_id: string;
-  model: string;
+  clone_prompt?: {
+    prompt_audio?: number;
+    prompt_text?: string;
+  };
+  text?: string;
+  model?: string;
+  text_validation?: string;
+  accuracy?: number;
+  need_noise_reduction?: boolean;
+  need_volume_normalization?: boolean;
+  aigc_watermark?: boolean;
 }
 
 export interface VoiceDesignRequest {
   prompt: string;
-  voice_id: string;
+  preview_text: string;
+  voice_id?: string;
 }
 
-export interface VoiceResponse {
-  voice_id: string;
+export interface VoiceCloneResponse {
+  input_sensitive?: boolean;
+  input_sensitive_type?: number;
+  demo_audio?: string;
+  extra_info?: Record<string, unknown>;
+  base_resp: BaseResp;
+}
+
+export interface VoiceDesignResponse {
+  trial_audio?: string;
+  voice_id?: string;
   base_resp: BaseResp;
 }
 

@@ -6,7 +6,7 @@ import { ExitCode } from '../../errors/codes';
 import { detectOutputFormat, formatOutput } from '../../output/formatter';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { FileUploadResponse, VoiceCloneRequest, VoiceResponse } from '../../types/api';
+import type { FileUploadResponse, VoiceCloneRequest, VoiceCloneResponse } from '../../types/api';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, resolve } from 'path';
@@ -34,12 +34,13 @@ export default defineCommand({
   name: 'speech clone',
   description: 'Clone a voice from uploaded audio',
   apiDocs: '/docs/api-reference/voice-cloning-clone',
-  usage: 'mmx speech clone --file-id <id> --voice-id <id> [--model <model>]',
+  usage: 'mmx speech clone --file-id <id> --voice-id <id> [--text <text>] [--model <model>]',
   options: [
     { flag: '--file-id <id>', description: 'Uploaded clone audio file ID' },
     { flag: '--file <path>', description: 'Upload local clone audio before cloning' },
     { flag: '--voice-id <id>', description: 'Voice ID to create', required: true },
-    { flag: '--model <model>', description: 'Clone model (default: speech-2.8-hd)' },
+    { flag: '--text <text>', description: 'Optional preview text; enables model requirement' },
+    { flag: '--model <model>', description: 'Clone model (required with --text)' },
   ],
   examples: [
     'mmx file upload --file sample.wav --purpose voice_clone',
@@ -57,12 +58,17 @@ export default defineCommand({
     if (!fileId && !filePath) {
       throw new CLIError('--file-id or --file is required.', ExitCode.USAGE, 'mmx speech clone --file-id <id> --voice-id <id>');
     }
+    if (fileId && (!Number.isSafeInteger(Number(fileId)) || Number(fileId) <= 0)) {
+      throw new CLIError('--file-id must be a positive integer.', ExitCode.USAGE);
+    }
 
-    const model = (flags.model as string) || DEFAULT_VOICE_CLONE_MODEL;
+    const text = flags.text as string | undefined;
+    const model = (flags.model as string | undefined) || (text ? DEFAULT_VOICE_CLONE_MODEL : undefined);
     const body: VoiceCloneRequest = {
-      file_id: fileId || '<uploaded-file-id>',
+      file_id: fileId ? Number(fileId) : 0,
       voice_id: voiceId,
-      model,
+      ...(text ? { text } : {}),
+      ...(model ? { model } : {}),
     };
     const format = detectOutputFormat(config.output);
 
@@ -77,17 +83,17 @@ export default defineCommand({
     if (!fileId && filePath) {
       const upload = await uploadCloneAudio(config, filePath);
       fileId = upload.file.file_id;
-      body.file_id = fileId;
+      body.file_id = Number(fileId);
     }
 
-    const response = await requestJson<VoiceResponse>(config, {
+    const response = await requestJson<VoiceCloneResponse>(config, {
       url: voiceCloneEndpoint(config.baseUrl),
       method: 'POST',
       body,
     });
 
     if (config.quiet) {
-      process.stdout.write(response.voice_id + '\n');
+      process.stdout.write((response.demo_audio || '') + '\n');
       return;
     }
 

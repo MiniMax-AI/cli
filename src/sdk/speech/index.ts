@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, dirname, basename } from 'node:path';
 import { Client } from "../client";
 import { fileUploadEndpoint, speechEndpoint, voiceCloneEndpoint, voiceDesignEndpoint, voicesEndpoint } from "../../client/endpoints";
-import { FileUploadResponse, SpeechRequest, SpeechResponse, VoiceCloneRequest, VoiceDesignRequest, VoiceListResponse, VoiceResponse } from "../../types/api";
+import { FileUploadResponse, SpeechRequest, SpeechResponse, VoiceCloneRequest, VoiceCloneResponse, VoiceDesignRequest, VoiceDesignResponse, VoiceListResponse } from "../../types/api";
 import { filterByLanguage } from "../../commands/speech/voices";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
@@ -82,33 +82,33 @@ export class SpeechSDK extends Client {
     return this.uploadVoiceAudio(filePath, 'prompt_audio');
   }
 
-  async clone(request: VoiceCloneRequest): Promise<VoiceResponse> {
-    if (!request.file_id) {
-      throw new SDKError('file_id is required', ExitCode.USAGE);
+  async clone(request: VoiceCloneRequest): Promise<VoiceCloneResponse> {
+    if (!Number.isSafeInteger(request.file_id) || request.file_id <= 0) {
+      throw new SDKError('file_id must be a positive integer', ExitCode.USAGE);
     }
     if (!request.voice_id) {
       throw new SDKError('voice_id is required', ExitCode.USAGE);
     }
-    if (!request.model) {
-      throw new SDKError('model is required', ExitCode.USAGE);
+    if (request.text && !request.model) {
+      throw new SDKError('model is required when text is provided', ExitCode.USAGE);
     }
 
-    return this.requestJson<VoiceResponse>({
+    return this.requestJson<VoiceCloneResponse>({
       url: voiceCloneEndpoint(this.config.baseUrl),
       method: 'POST',
       body: request,
     });
   }
 
-  async design(request: VoiceDesignRequest): Promise<VoiceResponse> {
+  async design(request: VoiceDesignRequest): Promise<VoiceDesignResponse> {
     if (!request.prompt) {
       throw new SDKError('prompt is required', ExitCode.USAGE);
     }
-    if (!request.voice_id) {
-      throw new SDKError('voice_id is required', ExitCode.USAGE);
+    if (!request.preview_text) {
+      throw new SDKError('preview_text is required', ExitCode.USAGE);
     }
 
-    return this.requestJson<VoiceResponse>({
+    return this.requestJson<VoiceDesignResponse>({
       url: voiceDesignEndpoint(this.config.baseUrl),
       method: 'POST',
       body: request,
