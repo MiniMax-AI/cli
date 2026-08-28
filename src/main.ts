@@ -1,6 +1,8 @@
-import { scanCommandPath, parseFlags } from './args';
+import { findOptionError, scanCommandPath, parseFlags } from './args';
 import { registry } from './registry';
 import { GLOBAL_OPTIONS } from './command';
+import { CLIError } from './errors/base';
+import { ExitCode } from './errors/codes';
 import { handleError } from './errors/handler';
 import { loadConfig, readConfigFile } from './config/loader';
 import { detectRegion, saveDetectedRegion } from './config/detect-region';
@@ -30,6 +32,7 @@ const NO_AUTH_SETUP = [
   ['config', 'show'],
   ['config', 'set'],
   ['config', 'export-schema'],
+  ['agent', 'setup'],
   ['update'],
 ];
 
@@ -41,7 +44,14 @@ async function main() {
     process.exit(0);
   }
 
-  const commandPath = scanCommandPath(argv, GLOBAL_OPTIONS);
+  let commandPath = scanCommandPath(argv, GLOBAL_OPTIONS);
+  if (commandPath[0] === 'agent') {
+    const { command: agentSetupCommand } = registry.resolve(['agent', 'setup']);
+    commandPath = scanCommandPath(argv, [
+      ...GLOBAL_OPTIONS,
+      ...(agentSetupCommand.options ?? []),
+    ]);
+  }
 
   // Proxy: env vars take precedence over config file
   const rawConfig = readConfigFile();
@@ -82,9 +92,28 @@ async function main() {
   }
 
   const { command, extra } = registry.resolve(commandPath);
-  const flags = parseFlags(argv, [...GLOBAL_OPTIONS, ...(command.options ?? [])]);
+  const flagOptions = [...GLOBAL_OPTIONS, ...(command.options ?? [])];
+  if (command.name === 'agent setup') {
+    const optionError = findOptionError(argv, flagOptions);
+    if (optionError) {
+      throw new CLIError(
+        optionError,
+        ExitCode.USAGE,
+        'Run mmx agent setup --help to see supported options.',
+      );
+    }
+  }
+  const flags = parseFlags(argv, flagOptions);
 
-  if (extra.length > 0) (flags as Record<string, unknown>)._positional = extra;
+  const separatorIndex = command.name === 'agent setup' ? argv.indexOf('--') : -1;
+  const positionals = separatorIndex >= 0
+    ? [...extra, ...argv.slice(separatorIndex + 1)]
+    : extra;
+  if (positionals.length > 0) (flags as Record<string, unknown>)._positional = positionals;
+  if (command.name === 'agent setup') {
+    (flags as Record<string, unknown>)._hasExplicitOptions = positionals.length > 0
+      || argv.some((arg) => arg.startsWith('-'));
+  }
 
   const config = loadConfig(flags);
 
@@ -95,7 +124,7 @@ async function main() {
     await ensureAuth(config);
   }
 
-  if (config.needsRegionDetection) {
+  if (config.needsRegionDetection && command.name !== 'agent setup') {
     const apiKey = config.apiKey || config.fileApiKey;
     if (apiKey) {
       const detected = await detectRegion(apiKey);
@@ -106,7 +135,9 @@ async function main() {
     }
   }
 
-  const updateCheckPromise = checkForUpdate(CLI_VERSION).catch(() => {});
+  const updateCheckPromise = command.name === 'agent setup' && config.dryRun
+    ? Promise.resolve()
+    : checkForUpdate(CLI_VERSION).catch(() => {});
 
   await command.execute(config, flags);
 

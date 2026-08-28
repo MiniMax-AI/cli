@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
-import { parseFlags } from '../src/args';
-import type { OptionDef } from '../src/command';
+import { findOptionError, parseFlags, scanCommandPath } from '../src/args';
+import { GLOBAL_OPTIONS, type OptionDef } from '../src/command';
 
 const OPTIONS: OptionDef[] = [
   { flag: '--timeout <seconds>', description: 'Request timeout', type: 'number' },
@@ -51,5 +51,39 @@ describe('parseFlags', () => {
     expect(() => parseFlags(['--verbose='], OPTIONS)).toThrow(
       'Flag --verbose requires a boolean value',
     );
+  });
+});
+
+describe('scanCommandPath', () => {
+  it('does not mistake a value after a command-local boolean for a positional', () => {
+    const agentOptions: OptionDef[] = [
+      { flag: '--all', description: 'All agents' },
+    ];
+
+    expect(scanCommandPath(
+      ['agent', 'setup', '--all', '--api-key', 'secret', '--region', 'cn'],
+      [...GLOBAL_OPTIONS, ...agentOptions],
+    )).toEqual(['agent', 'setup']);
+  });
+
+  it('reports an unknown option before it can consume a safety flag', () => {
+    expect(findOptionError(
+      ['agent', 'setup', '--skip-verfiy', '--dry-run'],
+      GLOBAL_OPTIONS,
+    )).toBe('Unknown option: --skip-verfiy');
+  });
+
+  it('rejects a missing value before it can consume a safety flag', () => {
+    expect(findOptionError(
+      ['agent', 'setup', '--api-key', '--dry-run'],
+      GLOBAL_OPTIONS,
+    )).toBe('Option --api-key requires a value.');
+  });
+
+  it('rejects empty equals-form values', () => {
+    for (const option of ['--output=', '--base-url=   ']) {
+      expect(findOptionError(['agent', 'setup', option], GLOBAL_OPTIONS))
+        .toContain('requires a value');
+    }
   });
 });

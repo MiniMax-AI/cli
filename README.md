@@ -180,6 +180,18 @@ mmx config set --key default-text-model --value MiniMax-M3
 mmx config export-schema | jq .
 ```
 
+### `mmx agent setup`
+
+Configure MiniMax for Claude Code, Codex, Grok Build, OpenCode, Hermes, or Pi while preserving unrelated settings. Run without options for the interactive wizard; supplying options makes the command non-interactive and suitable for scripts.
+
+```bash
+mmx agent setup
+mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" --region global
+mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
+```
+
+The command verifies the key and selected region before writing. Existing files are backed up when changed; use `--dry-run` to preview or `--skip-verify` to skip the live request.
+
 ### `mmx update`
 
 ```bash

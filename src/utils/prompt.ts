@@ -59,6 +59,53 @@ export async function promptConfirm(options: {
   return val as boolean;
 }
 
+export async function promptPassword(options: {
+  message: string;
+}): Promise<string | undefined> {
+  if (!isInteractive()) return undefined;
+
+  const inquirer = await import('@clack/prompts');
+  const val = await inquirer.password({ message: options.message, mask: '•' });
+  if (typeof val === 'symbol') return undefined;
+  return val;
+}
+
+export async function promptSelect(options: {
+  message: string;
+  choices: Array<{ value: string; label: string; hint?: string }>;
+  initialValue?: string;
+}): Promise<string | undefined> {
+  if (!isInteractive()) return undefined;
+
+  const inquirer = await import('@clack/prompts');
+  const val = await inquirer.select({
+    message: options.message,
+    options: options.choices,
+    initialValue: options.initialValue,
+  });
+  if (typeof val === 'symbol') return undefined;
+  return val as string;
+}
+
+export async function promptMultiSelect(options: {
+  message: string;
+  choices: Array<{ value: string; label: string; hint?: string }>;
+  initialValues?: string[];
+  required?: boolean;
+}): Promise<string[] | undefined> {
+  if (!isInteractive()) return undefined;
+
+  const inquirer = await import('@clack/prompts');
+  const val = await inquirer.multiselect({
+    message: options.message,
+    options: options.choices,
+    initialValues: options.initialValues,
+    required: options.required,
+  });
+  if (typeof val === 'symbol') return undefined;
+  return val as string[];
+}
+
 /**
  * Fail fast with a user-friendly error when a required option is missing
  * in non-interactive (agent / CI) mode.

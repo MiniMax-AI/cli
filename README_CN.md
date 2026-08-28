@@ -156,6 +156,18 @@ mmx config set --key default-text-model --value MiniMax-M3
 mmx config export-schema | jq .
 ```
 
+### `mmx agent setup`
+
+一键为 Claude Code、Codex、Grok Build、OpenCode、Hermes 或 Pi 配置 MiniMax，并保留配置文件中的其他设置。不带选项时进入交互式向导；带选项时自动使用非交互模式，便于脚本调用。
+
+```bash
+mmx agent setup
+mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" --region global
+mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
+```
+
+写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览，或用 `--skip-verify` 跳过联网验证。
+
 ### `mmx update`
 
 ```bash
