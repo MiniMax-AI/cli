@@ -45,7 +45,14 @@ describe('agent configurator', () => {
     mkdirSync(join(home, '.claude'), { recursive: true });
     mkdirSync(join(home, '.codex'), { recursive: true });
     mkdirSync(join(home, '.config', 'opencode'), { recursive: true });
-    writeFileSync(join(home, '.claude', 'settings.json'), '{\n  "theme": "dark"\n}\n');
+    writeFileSync(
+      join(home, '.claude', 'settings.json'),
+      '{\n  "theme": "dark",\n  "modelPicker": {\n'
+        + '    "options": [\n'
+        + '      { "model": "keep-model", "label": "Keep" },\n'
+        + '      { "model": "MiniMax-M2.7", "label": "Old MiniMax" }\n'
+        + '    ],\n    "replaceBuiltInOptions": false\n  }\n}\n',
+    );
     writeFileSync(join(home, '.codex', 'config.toml'), '[mcp_servers.keep]\ncommand = "keep"\n');
     writeFileSync(
       join(home, '.config', 'opencode', 'opencode.json'),
@@ -75,22 +82,69 @@ describe('agent configurator', () => {
     expect(claude.env.ANTHROPIC_BASE_URL).toBe('https://api.minimaxi.com/anthropic');
     expect(claude.env.ANTHROPIC_AUTH_TOKEN).toBe('sk-test-secret');
     expect(claude.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('1000000');
-    expect(claude.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBe('512000');
+    expect(claude.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS).toBeUndefined();
     expect(claude.env.ANTHROPIC_MODEL).toBe('MiniMax-M3[1m]');
+    expect(claude.env.ANTHROPIC_DEFAULT_OPUS_MODEL).toBe('MiniMax-M3[1m]');
+    expect(claude.env.ANTHROPIC_DEFAULT_SONNET_MODEL).toBe('MiniMax-M2.7');
+    expect(claude.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('MiniMax-M2.7-highspeed');
+    expect(claude.modelPicker).toEqual({
+      options: [
+        { model: 'keep-model', label: 'Keep' },
+        { model: 'MiniMax-M3[1m]', label: 'MiniMax-M3', description: '1M context' },
+        { model: 'MiniMax-M2.7', label: 'MiniMax-M2.7', description: '204.8K context' },
+        {
+          model: 'MiniMax-M2.7-highspeed',
+          label: 'MiniMax-M2.7-highspeed',
+          description: '204.8K context · faster inference',
+        },
+      ],
+      replaceBuiltInOptions: false,
+    });
 
     const codex = parseToml(readFileSync(join(home, '.codex', 'config.toml'), 'utf8'));
     expect(codex.model).toBe('MiniMax-M3');
     expect(codex.model_provider).toBe('minimax');
+    expect(codex.model_catalog_json).toBe('mmx-model-catalog.json');
     expect(codex.mcp_servers).toEqual({ keep: { command: 'keep' } });
     expect((codex.model_providers as Record<string, Record<string, unknown>>).minimax.base_url)
       .toBe('https://api.minimaxi.com/v1');
+    const codexCatalog = JSON.parse(
+      readFileSync(join(home, '.codex', 'mmx-model-catalog.json'), 'utf8'),
+    );
+    expect(codexCatalog._managed_by).toBe('mmx agent setup');
+    expect(codexCatalog.models).toHaveLength(3);
+    expect(codexCatalog.models[0]).toMatchObject({
+      slug: 'MiniMax-M3',
+      description: 'MiniMax',
+      priority: 0,
+      base_instructions: 'You are Codex, a coding agent based on MiniMax-M3. '
+        + "You and the user share the same workspace and collaborate to achieve the user's goals.",
+      shell_type: 'shell_command',
+      supports_parallel_tool_calls: true,
+      context_window: 1000000,
+      max_context_window: 1000000,
+      input_modalities: ['text', 'image'],
+    });
+    expect(codexCatalog.models[1]).toMatchObject({
+      slug: 'MiniMax-M2.7',
+      priority: 1,
+      context_window: 204800,
+      max_context_window: 204800,
+      input_modalities: ['text'],
+    });
+    expect(codexCatalog.models[2].slug).toBe('MiniMax-M2.7-highspeed');
+    expect(codexCatalog.models[0].apply_patch_tool_type).toBeUndefined();
 
     const grok = parseToml(readFileSync(join(home, '.grok', 'config.toml'), 'utf8'));
     expect((grok.models as Record<string, unknown>).default).toBe('minimax');
     expect((grok.model as Record<string, Record<string, unknown>>).minimax.api_backend)
       .toBe('chat_completions');
     expect((grok.model as Record<string, Record<string, unknown>>).minimax.max_completion_tokens)
-      .toBe(512000);
+      .toBe(128000);
+    expect((grok.model as Record<string, Record<string, unknown>>)['minimax-m2-7'].model)
+      .toBe('MiniMax-M2.7');
+    expect((grok.model as Record<string, Record<string, unknown>>)['minimax-m2-7-highspeed'].model)
+      .toBe('MiniMax-M2.7-highspeed');
 
     const openCodeText = readFileSync(join(home, '.config', 'opencode', 'opencode.json'), 'utf8');
     const openCode = JSON.parse(openCodeText.replace(/^\s*\/\/.*$/gm, ''));
@@ -101,13 +155,25 @@ describe('agent configurator', () => {
     expect(openCode.provider.minimax.options.headers).toEqual({ 'x-keep': 'yes' });
     expect(openCode.provider.minimax.models['keep-model']).toEqual({ name: 'Keep' });
     expect(openCode.provider.minimax.models['MiniMax-M3'].custom).toBe(true);
+    expect(openCode.provider.minimax.models['MiniMax-M3'].attachment).toBe(true);
+    expect(openCode.provider.minimax.models['MiniMax-M3'].modalities)
+      .toEqual({ input: ['text', 'image'], output: ['text'] });
     expect(openCode.provider.minimax.models['MiniMax-M3'].limit)
-      .toEqual({ context: 1000000, output: 512000 });
+      .toEqual({ context: 1000000, output: 128000 });
+    expect(openCode.provider.minimax.models['MiniMax-M2.7'].attachment).toBe(false);
+    expect(openCode.provider.minimax.models['MiniMax-M2.7'].modalities)
+      .toEqual({ input: ['text'], output: ['text'] });
+    expect(openCode.provider.minimax.models['MiniMax-M2.7'].limit)
+      .toEqual({ context: 204800, output: 131072 });
+    expect(openCode.provider.minimax.models['MiniMax-M2.7-highspeed'].limit)
+      .toEqual({ context: 204800, output: 131072 });
 
     const hermes = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
     expect(hermes.model.provider).toBe('minimax-cn');
     expect(hermes.model.context_length).toBe(1000000);
-    expect(hermes.model.max_tokens).toBe(512000);
+    expect(hermes.model.max_tokens).toBe(128000);
+    expect(Object.keys(hermes.providers['minimax-cn'].models))
+      .toEqual(['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed']);
     expect(readFileSync(join(home, '.hermes', '.env'), 'utf8'))
       .toContain('MINIMAX_CN_API_KEY=sk-test-secret');
 
@@ -117,14 +183,35 @@ describe('agent configurator', () => {
     expect(piModels.providers['minimax-cn'].models[0].id).toBe('keep-model');
     expect(piModels.providers['minimax-cn'].models[1].custom).toBe(true);
     expect(piModels.providers['minimax-cn'].models[1].cost.currency).toBe('credits');
-    expect(piModels.providers['minimax-cn'].models[1].contextWindow).toBe(1000000);
-    expect(piModels.providers['minimax-cn'].models[1].maxTokens).toBe(512000);
+    expect(piModels.providers['minimax-cn'].models[1]).toMatchObject({
+      id: 'MiniMax-M3',
+      input: ['text', 'image'],
+      contextWindow: 1000000,
+      maxTokens: 128000,
+    });
+    expect(piModels.providers['minimax-cn'].api).toBe('anthropic-messages');
+    expect(piModels.providers['minimax-cn'].baseUrl).toBe('https://api.minimaxi.com/anthropic');
+    expect(piModels.providers['minimax-cn'].models.map((model: { id: string }) => model.id))
+      .toEqual(['keep-model', 'MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed']);
     expect(piSettings).toMatchObject({ defaultProvider: 'minimax-cn', defaultModel: 'MiniMax-M3' });
 
     for (const file of result) {
       expect(statSync(file.path).mode & 0o777).toBe(0o600);
-      if (file.backup) expect(existsSync(file.backup)).toBe(true);
+      if (file.backup) {
+        expect(existsSync(file.backup)).toBe(true);
+        expect(statSync(file.backup).mode & 0o777).toBe(0o600);
+      }
     }
+  });
+
+  it('accepts the scalar model field from a clean Hermes config', () => {
+    mkdirSync(join(home, '.hermes'), { recursive: true });
+    writeFileSync(join(home, '.hermes', 'config.yaml'), 'model: ""\nproviders: {}\n');
+
+    applyAgentConfigurations(prepareAgentConfigurations(setupOptions(['hermes'])));
+
+    const configured = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
+    expect(configured.model).toMatchObject({ default: 'MiniMax-M3', provider: 'minimax' });
   });
 
   it('is idempotent and does not create another backup for unchanged files', () => {
@@ -134,6 +221,22 @@ describe('agent configurator', () => {
 
     expect(second.every((file) => file.status === 'unchanged')).toBe(true);
     expect(second.every((file) => file.backup === undefined)).toBe(true);
+  });
+
+  it('adds every MiniMax model to a clean Pi catalog', () => {
+    const modelsPath = join(home, '.pi', 'agent', 'models.json');
+    writeFileSync(modelsPath, '{}\n');
+
+    applyAgentConfigurations(prepareAgentConfigurations(setupOptions(['pi'])));
+
+    const configured = JSON.parse(readFileSync(modelsPath, 'utf8'));
+    expect(configured.providers.minimax.models.map((model: { id: string }) => model.id))
+      .toEqual(['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed']);
+    expect(configured.providers.minimax.models[0]).toMatchObject({
+      input: ['text', 'image'],
+      contextWindow: 1000000,
+      maxTokens: 128000,
+    });
   });
 
   it('does not write files in dry-run mode', () => {
@@ -183,6 +286,8 @@ describe('agent configurator', () => {
 
   it('rejects malformed existing configuration before any write', () => {
     const fakeSecret = 'sk-FAKE-SECRET-IN-MALFORMED-TOML';
+    const claudePath = join(home, '.claude', 'settings.json');
+    const claudeBefore = readFileSync(claudePath, 'utf8');
     writeFileSync(join(home, '.codex', 'config.toml'), `api_key = "${fakeSecret}" trailing`);
     try {
       prepareAgentConfigurations(setupOptions(['claude-code', 'codex']));
@@ -192,8 +297,7 @@ describe('agent configurator', () => {
       expect((error as Error).message).not.toContain(fakeSecret);
     }
 
-    const claude = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8'));
-    expect(claude).toEqual({ theme: 'dark' });
+    expect(readFileSync(claudePath, 'utf8')).toBe(claudeBefore);
   });
 
   it('does not treat a following TOML array table as part of the target section', () => {
@@ -221,6 +325,33 @@ describe('agent configurator', () => {
     const config = readFileSync(path, 'utf8');
     expect(config).toContain('model = "MiniMax-M3" # keep root reason');
     expect(config).toContain('name = "MiniMax" # keep provider reason');
+  });
+
+  it('does not replace a user-managed Codex model catalog', () => {
+    const configPath = join(home, '.codex', 'config.toml');
+    const catalogPath = join(home, '.codex', 'my-models.json');
+    const config = 'model_catalog_json = "my-models.json"\n';
+    const catalog = '{"models":[{"slug":"keep"}]}\n';
+    writeFileSync(configPath, config);
+    writeFileSync(catalogPath, catalog);
+
+    expect(() => prepareAgentConfigurations(setupOptions(['codex'])))
+      .toThrow('already uses a user-managed model catalog');
+    expect(readFileSync(configPath, 'utf8')).toBe(config);
+    expect(readFileSync(catalogPath, 'utf8')).toBe(catalog);
+    expect(existsSync(join(home, '.codex', 'mmx-model-catalog.json'))).toBe(false);
+  });
+
+  it('does not claim an existing unmarked mmx Codex catalog', () => {
+    const configPath = join(home, '.codex', 'config.toml');
+    const catalogPath = join(home, '.codex', 'mmx-model-catalog.json');
+    const catalog = '{"models":[{"slug":"keep"}]}\n';
+    writeFileSync(catalogPath, catalog);
+
+    expect(() => prepareAgentConfigurations(setupOptions(['codex'])))
+      .toThrow('is not managed by mmx');
+    expect(readFileSync(configPath, 'utf8')).toBe('[mcp_servers.keep]\ncommand = "keep"\n');
+    expect(readFileSync(catalogPath, 'utf8')).toBe(catalog);
   });
 
   it('rejects TOML multiline strings instead of editing their contents', () => {
@@ -257,6 +388,35 @@ describe('agent configurator', () => {
 
     expect(result[0]?.status).toBe('configured');
     expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+
+  it('rejects duplicate targets before creating files or backups', () => {
+    const shared = join(home, 'shared-agent-config');
+    const prepared = prepareAgentConfigurations(setupOptions(
+      ['claude-code', 'pi'],
+      { env: { CLAUDE_CONFIG_DIR: shared, PI_CODING_AGENT_DIR: shared } },
+    ));
+
+    expect(() => applyAgentConfigurations(prepared)).toThrow('Multiple agent configuration paths');
+    expect(existsSync(shared)).toBe(false);
+  });
+
+  it('preserves comments on unrelated Claude model picker entries', () => {
+    const settingsPath = join(home, '.claude', 'settings.json');
+    writeFileSync(
+      settingsPath,
+      '{\n  "modelPicker": {\n    "options": [\n'
+        + '      // keep this custom model\n'
+        + '      { "model": "keep-model", "label": "Keep" },\n'
+        + '      { "model": "MiniMax-M2.7", "label": "Replace" }\n'
+        + '    ]\n  }\n}\n',
+    );
+
+    applyAgentConfigurations(prepareAgentConfigurations(setupOptions(['claude-code'])));
+
+    const updated = readFileSync(settingsPath, 'utf8');
+    expect(updated).toContain('// keep this custom model');
+    expect(updated).toContain('"model": "keep-model"');
   });
 
   it('updates a symbolic-link target without replacing the link', () => {

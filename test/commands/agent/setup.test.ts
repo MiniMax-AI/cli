@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdirSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -39,13 +39,24 @@ function testFlags(overrides: Partial<GlobalFlags> = {}): GlobalFlags {
   };
 }
 
+async function captureConsoleLog(task: () => Promise<void>): Promise<string> {
+  const originalLog = console.log;
+  let output = '';
+  console.log = (message: string) => { output += message; };
+  try {
+    await task();
+    return output;
+  } finally {
+    console.log = originalLog;
+  }
+}
+
 describe('agent setup command', () => {
   let home: string;
   let originalHome: string | undefined;
 
   beforeEach(() => {
-    home = join(tmpdir(), `mmx-agent-command-${process.pid}-${Date.now()}`);
-    mkdirSync(home, { recursive: true });
+    home = mkdtempSync(join(tmpdir(), 'mmx-agent-command-'));
     originalHome = process.env.HOME;
     process.env.HOME = home;
   });
@@ -60,28 +71,31 @@ describe('agent setup command', () => {
     expect(registry.resolve(['agent', 'setup']).command).toBe(setupCommand);
   });
 
+  it('explains the supported credentials in command help metadata', () => {
+    expect(setupCommand.description).toContain('using a MiniMax API key');
+    const apiKeyOption = setupCommand.options?.find(option => option.flag === '--api-key <key>');
+    expect(apiKeyOption?.description).toContain('Token Plan (sk-cp)');
+    expect(apiKeyOption?.description).toContain('pay-as-you-go (sk-api)');
+    expect(apiKeyOption?.description).toContain('not interchangeable');
+    expect(setupCommand.options?.some(option => option.flag === '--skip-verify')).toBe(false);
+  });
+
   it('supports scriptable dry-run output without exposing the key', async () => {
-    let output = '';
-    const originalLog = console.log;
-    console.log = (message: string) => { output += message; };
-    try {
-      await setupCommand.execute(
-        testConfig(),
-        testFlags({
-          agent: ['codex'],
-          apiKey: 'sk-test-secret',
-          region: 'cn',
-          output: 'json',
-        }),
-      );
-    } finally {
-      console.log = originalLog;
-    }
+    const output = await captureConsoleLog(() => setupCommand.execute(
+      testConfig(),
+      testFlags({
+        agent: ['codex'],
+        apiKey: 'sk-test-secret',
+        region: 'cn',
+        output: 'json',
+      }),
+    ));
 
     const parsed = JSON.parse(output);
     expect(parsed.agents).toEqual(['codex']);
     expect(parsed.files[0].status).toBe('would-configure');
     expect(output).not.toContain('sk-test-secret');
+    expect(output).not.toContain('\x1b');
   });
 
   it('requires an explicit region for scripts', async () => {
@@ -94,6 +108,76 @@ describe('agent setup command', () => {
     )).rejects.toThrow('--region global|cn is required');
   });
 
+  it('requires an API key for agent setup', async () => {
+    await expect(setupCommand.execute(
+      testConfig(),
+      testFlags({
+        agent: ['codex'],
+        region: 'cn',
+      }),
+    )).rejects.toThrow('A MiniMax API key is required');
+  });
+
+  it('does not reuse an API key saved for mmx', async () => {
+    await expect(setupCommand.execute(
+      testConfig({ fileApiKey: 'sk-saved-mmx-key' }),
+      testFlags({
+        agent: ['codex'],
+        region: 'cn',
+      }),
+    )).rejects.toThrow('A MiniMax API key is required');
+  });
+
+  it('routes the shorthand agent command without invoking global auth setup', async () => {
+    const child = Bun.spawn({
+      cmd: [process.execPath, 'run', 'src/main.ts', 'agent', '--non-interactive', '--dry-run'],
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        HOME: home,
+        MMX_CONFIG_DIR: join(home, '.mmx'),
+        NO_COLOR: '1',
+      },
+      stdout: 'ignore',
+      stderr: 'pipe',
+    });
+    const stderr = await new Response(child.stderr).text();
+    await child.exited;
+
+    expect(stderr).toContain('At least one --agent or --all is required');
+    expect(stderr).not.toContain('How would you like to authenticate');
+  });
+
+  it('shows setup options for the shorthand agent help', async () => {
+    const child = Bun.spawn({
+      cmd: [process.execPath, 'run', 'src/main.ts', 'agent', '--help'],
+      cwd: process.cwd(),
+      env: { ...process.env, HOME: home, MMX_CONFIG_DIR: join(home, '.mmx'), NO_COLOR: '1' },
+      stdout: 'ignore',
+      stderr: 'pipe',
+    });
+    const stderr = await new Response(child.stderr).text();
+    await child.exited;
+
+    expect(stderr).toContain('Usage: mmx agent setup');
+    expect(stderr).toContain('--api-key <key>');
+    expect(stderr).toContain('not interchangeable');
+  });
+
+  it('keeps non-interactive text output free of prompt colors', async () => {
+    const output = await captureConsoleLog(() => setupCommand.execute(
+      testConfig({ output: 'text', noColor: false }),
+      testFlags({
+        agent: ['codex'],
+        apiKey: 'sk-test-secret',
+        region: 'cn',
+        output: 'text',
+      }),
+    ));
+
+    expect(output).not.toContain('\x1b');
+  });
+
   it('does not enter the wizard when an option was explicitly set to false', async () => {
     await expect(setupCommand.execute(
       testConfig({
@@ -104,7 +188,6 @@ describe('agent setup command', () => {
       }),
       testFlags({
         dryRun: false,
-        skipVerify: false,
         _hasExplicitOptions: true,
       }),
     )).rejects.toThrow('At least one --agent or --all is required');
@@ -119,11 +202,11 @@ describe('agent setup command', () => {
         region: 'cn',
         _positional: ['codex'],
       }),
-    )).rejects.toThrow('Unexpected positional argument: codex');
+    )).rejects.toThrow('Unexpected positional argument.');
   });
 
-  it('rejects models whose limits are outside this setup contract', async () => {
-    await expect(setupCommand.execute(
+  it('accepts a supported model as the default', async () => {
+    const output = await captureConsoleLog(() => setupCommand.execute(
       testConfig(),
       testFlags({
         agent: ['codex'],
@@ -131,25 +214,31 @@ describe('agent setup command', () => {
         region: 'cn',
         model: 'MiniMax-M2.7',
       }),
-    )).rejects.toThrow('supports only --model MiniMax-M3');
+    ));
+    expect(JSON.parse(output).verification.model).toBe('MiniMax-M2.7');
+  });
+
+  it('rejects a legacy model outside this setup contract', async () => {
+    await expect(setupCommand.execute(
+      testConfig(),
+      testFlags({
+        agent: ['codex'],
+        apiKey: 'sk-test-secret',
+        region: 'cn',
+        model: 'MiniMax-M2.5',
+      }),
+    )).rejects.toThrow('Unsupported MiniMax model "MiniMax-M2.5"');
   });
 
   it('accepts grok-build as an alias', async () => {
-    let output = '';
-    const originalLog = console.log;
-    console.log = (message: string) => { output += message; };
-    try {
-      await setupCommand.execute(
-        testConfig(),
-        testFlags({
-          agent: ['grok-build'],
-          apiKey: 'sk-test-secret',
-          region: 'cn',
-        }),
-      );
-    } finally {
-      console.log = originalLog;
-    }
+    const output = await captureConsoleLog(() => setupCommand.execute(
+      testConfig(),
+      testFlags({
+        agent: ['grok-build'],
+        apiKey: 'sk-test-secret',
+        region: 'cn',
+      }),
+    ));
     expect(JSON.parse(output).agents).toEqual(['grok']);
   });
 
@@ -165,38 +254,34 @@ describe('agent setup command', () => {
     )).rejects.toThrow('Unsupported agent "typo"');
   });
 
-  it('warns on stderr when a selected agent is not detected on PATH', async () => {
+  it('warns scripts when a selected agent is not detected on PATH', async () => {
     const originalPath = process.env.PATH;
-    const originalLog = console.log;
     const originalWrite = process.stderr.write.bind(process.stderr);
     let stderr = '';
     process.env.PATH = home;
-    console.log = () => {};
     (process.stderr as NodeJS.WriteStream).write = (chunk: unknown) => {
       stderr += String(chunk);
       return true;
     };
 
     try {
-      await setupCommand.execute(
+      await captureConsoleLog(() => setupCommand.execute(
         testConfig({ quiet: false }),
         testFlags({
           agent: ['pi'],
           apiKey: 'sk-test-secret',
           region: 'cn',
         }),
-      );
+      ));
     } finally {
       if (originalPath === undefined) delete process.env.PATH;
       else process.env.PATH = originalPath;
-      console.log = originalLog;
       (process.stderr as NodeJS.WriteStream).write = originalWrite;
     }
 
     expect(stderr).toBe(
       'Warning: Not detected on PATH: Pi. '
-      + 'mmx only manages configuration; it does not install or launch agents.\n',
+      + 'mmx can write configuration files for them, but will not download or install them for you.\n',
     );
   });
-
 });

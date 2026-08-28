@@ -166,7 +166,7 @@ mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" -
 mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
 ```
 
-写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览，或用 `--skip-verify` 跳过联网验证。该命令只管理配置文件，不会安装或启动所选 Agent。
+写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览且不会发起联网请求。该命令只管理配置文件，不会安装或启动所选 Agent。
 
 ### `mmx update`
 

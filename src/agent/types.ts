@@ -11,11 +11,35 @@ export const AGENT_IDS = [
 
 export type AgentId = typeof AGENT_IDS[number];
 
+export const MINIMAX_MODELS = [
+  {
+    id: 'MiniMax-M3',
+    contextWindow: 1000000,
+    maxTokens: 128000,
+    input: ['text', 'image'],
+  },
+  {
+    id: 'MiniMax-M2.7',
+    contextWindow: 204800,
+    maxTokens: 131072,
+    input: ['text'],
+  },
+  {
+    id: 'MiniMax-M2.7-highspeed',
+    contextWindow: 204800,
+    maxTokens: 131072,
+    input: ['text'],
+  },
+] as const;
+
+export const DEFAULT_MINIMAX_MODEL = MINIMAX_MODELS[0].id;
+export type MiniMaxModelId = typeof MINIMAX_MODELS[number]['id'];
+
 export interface AgentSetupOptions {
   agents: AgentId[];
   apiKey: string;
   region: Region;
-  model: string;
+  model: MiniMaxModelId;
   homeDir?: string;
   env?: NodeJS.ProcessEnv;
 }

@@ -1,13 +1,9 @@
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { parseSSE } from '../client/stream';
 import { endpointsForRegion } from './configurator';
 import type { AgentVerification } from './types';
 import type { Region } from '../config/schema';
-
-interface ErrorResponse {
-  error?: { message?: string };
-  base_resp?: { status_msg?: string };
-}
 
 export async function verifyAgentCredential(options: {
   apiKey: string;
@@ -28,6 +24,7 @@ export async function verifyAgentCredential(options: {
         model: options.model,
         input: 'Reply with exactly OK.',
         max_output_tokens: 16,
+        stream: true,
       }),
       signal: AbortSignal.timeout((options.timeoutSeconds ?? 30) * 1000),
     });
@@ -40,16 +37,50 @@ export async function verifyAgentCredential(options: {
   }
 
   if (!response.ok) {
-    let detail = '';
-    try {
-      const body = await response.json() as ErrorResponse;
-      detail = body.error?.message ?? body.base_resp?.status_msg ?? '';
-    } catch {
-      // The status code is enough when the upstream body is not JSON.
-    }
+    await response.body?.cancel().catch(() => undefined);
     throw new CLIError(
-      `MiniMax rejected the agent verification request (${response.status})${detail ? `: ${detail}` : '.'}`,
+      `MiniMax rejected the agent verification request (${response.status}).`,
       response.status === 401 || response.status === 403 ? ExitCode.AUTH : ExitCode.GENERAL,
+      'No agent configuration files were changed. Check --region, --model, and the API key.',
+    );
+  }
+
+  let verified = false;
+  try {
+    for await (const event of parseSSE(response)) {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(event.data) as unknown;
+      } catch {
+        continue;
+      }
+      if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) continue;
+      const record = payload as Record<string, unknown>;
+      const created = record.response;
+      if (record.type === 'response.created'
+        && typeof created === 'object'
+        && created !== null
+        && !Array.isArray(created)
+        && typeof (created as Record<string, unknown>).id === 'string'
+        && typeof (created as Record<string, unknown>).model === 'string') {
+        verified = true;
+        break;
+      }
+    }
+  } catch {
+    throw new CLIError(
+      'Could not read the MiniMax agent verification response.',
+      ExitCode.NETWORK,
+      'No agent configuration files were changed.',
+    );
+  } finally {
+    await response.body?.cancel().catch(() => undefined);
+  }
+
+  if (!verified) {
+    throw new CLIError(
+      'MiniMax returned an invalid agent verification response.',
+      ExitCode.GENERAL,
       'No agent configuration files were changed. Check --region, --model, and the API key.',
     );
   }

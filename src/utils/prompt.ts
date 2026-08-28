@@ -10,11 +10,11 @@
  * case explicitly.
  */
 
-import { PasswordPrompt } from '@clack/core';
+import colors from 'picocolors';
 
-import { isInteractive } from './env.js';
 import { CLIError } from '../errors/base.js';
 import { ExitCode } from '../errors/codes';
+import { isInteractive } from './env.js';
 
 // Dynamic import to avoid loading @clack/prompts in non-interactive envs unnecessarily
 // (though for CLI tools the startup cost is usually acceptable)
@@ -44,6 +44,65 @@ export async function promptText(options: {
   return val as string;
 }
 
+const API_KEY_VISIBLE_LENGTH = 30;
+
+export function apiKeyPreview(value: string): string {
+  const visible = value.slice(0, API_KEY_VISIBLE_LENGTH);
+  const ellipsis = value.length > API_KEY_VISIBLE_LENGTH ? '....' : '';
+  return `${visible}${ellipsis} (${value.length} chars)`;
+}
+
+export async function promptApiKey(options: { message: string }): Promise<string | undefined> {
+  if (!isInteractive()) return undefined;
+
+  const { TextPrompt } = await import('@clack/core');
+  const val = await new TextPrompt({
+    render() {
+      const preview = apiKeyPreview(this.userInput);
+      const cursor = colors.inverse(colors.hidden('_'));
+      const leadingBar = colors.gray('│');
+      switch (this.state) {
+        case 'submit':
+          return `${leadingBar}\n${colors.green('◇')}  ${options.message}\n`
+            + `${leadingBar}  ${colors.dim(preview)}`;
+        case 'cancel':
+          return `${leadingBar}\n${colors.red('■')}  ${options.message}\n`
+            + `${leadingBar}  ${colors.strikethrough(colors.dim(preview))}`;
+        case 'error':
+          return `${leadingBar}\n${colors.yellow('▲')}  ${options.message}\n`
+            + `${colors.yellow('│')}  ${preview}${cursor}\n`
+            + `${colors.yellow('└')}  ${colors.yellow(this.error)}`;
+        default:
+          return `${leadingBar}\n${colors.cyan('◆')}  ${options.message}\n`
+            + `${colors.cyan('│')}  ${preview}${cursor}\n${colors.cyan('└')}`;
+      }
+    },
+  }).prompt();
+
+  if (typeof val === 'symbol') return undefined;
+  return val;
+}
+
+export async function withPromptSpinner<T>(options: {
+  message: string;
+  successMessage: string;
+  errorMessage: string;
+}, task: () => Promise<T>): Promise<T> {
+  if (!isInteractive()) return task();
+
+  const { spinner } = await import('@clack/prompts');
+  const indicator = spinner();
+  indicator.start(options.message);
+  try {
+    const result = await task();
+    indicator.stop(options.successMessage);
+    return result;
+  } catch (error) {
+    indicator.error(options.errorMessage);
+    throw error;
+  }
+}
+
 /**
  * Like promptText but confirms with y/N before proceeding.
  */
@@ -61,37 +120,14 @@ export async function promptConfirm(options: {
   return val as boolean;
 }
 
-const PASSWORD_MASK_PREVIEW_LENGTH = 12;
-const PROMPT_THEME = '\x1b[38;2;248;103;58m'; // #F8673A
-const RESET_COLOR = '\x1b[0m';
+export async function promptNote(options: {
+  message: string;
+  title?: string;
+}): Promise<void> {
+  if (!isInteractive()) return;
 
-function themed(value: string): string {
-  return process.env.NO_COLOR ? value : `${PROMPT_THEME}${value}${RESET_COLOR}`;
-}
-
-export function passwordMaskPreview(length: number): string {
-  const mask = '•'.repeat(Math.min(length, PASSWORD_MASK_PREVIEW_LENGTH));
-  return length > PASSWORD_MASK_PREVIEW_LENGTH ? `${mask}… (${length} chars)` : mask;
-}
-
-export async function promptPassword(options: { message: string }): Promise<string | undefined> {
-  if (!isInteractive()) return undefined;
-
-  const val = await new PasswordPrompt({
-    mask: '•',
-    render() {
-      const length = typeof this.value === 'string' ? this.value.length : 0;
-      const preview = passwordMaskPreview(length);
-      if (this.state === 'submit') {
-        return `${themed('│')}\n${themed('◇')}  ${options.message}\n${themed('│')}  ${preview}`;
-      }
-      if (this.state === 'cancel') return `${themed('│')}\n■  ${options.message}\n│  Cancelled`;
-      return `${themed('│')}\n${themed('◆')}  ${options.message}\n`
-        + `${themed('│')}  ${preview}${themed('_')}\n${themed('└')}`;
-    },
-  }).prompt();
-  if (typeof val === 'symbol') return undefined;
-  return val;
+  const inquirer = await import('@clack/prompts');
+  inquirer.note(options.message, options.title);
 }
 
 export async function promptSelect(options: {

@@ -1,3 +1,5 @@
+import colors from 'picocolors';
+
 import { defineCommand } from '../../command';
 import {
   applyAgentConfigurations,
@@ -6,9 +8,12 @@ import {
 import { detectAgentsOnPath } from '../../agent/availability';
 import {
   AGENT_IDS,
+  DEFAULT_MINIMAX_MODEL,
+  MINIMAX_MODELS,
   type AgentId,
   type AgentSetupOptions,
   type AgentVerification,
+  type AppliedAgentFile,
 } from '../../agent/types';
 import { verifyAgentCredential } from '../../agent/verify';
 import { CLIError } from '../../errors/base';
@@ -16,12 +21,13 @@ import { ExitCode } from '../../errors/codes';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import {
   promptConfirm,
+  promptApiKey,
   promptMultiSelect,
-  promptPassword,
+  promptNote,
   promptSelect,
+  withPromptSpinner,
 } from '../../utils/prompt';
-import { maskToken } from '../../utils/token';
-import type { Config } from '../../config/schema';
+import { DOCS_HOSTS, type Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 
 const AGENT_ALIASES: Record<string, AgentId> = {
@@ -46,6 +52,70 @@ const AGENT_LABELS: Record<AgentId, string> = {
   pi: 'Pi',
 };
 const DEFAULT_INTERACTIVE_AGENTS: AgentId[] = ['claude-code', 'codex'];
+
+type ApiKeyKind = 'token-plan' | 'paygo';
+
+const API_KEY_CHOICES: Array<{
+  value: ApiKeyKind;
+  label: string;
+  hint: string;
+  pagePath: string;
+  noteTitle: string;
+  prompt: string;
+}> = [
+  {
+    value: 'token-plan',
+    label: 'Token Plan (sk-cp-...)',
+    hint: 'Uses plan quota and Credits',
+    pagePath: '/user-center/payment/token-plan',
+    noteTitle: 'Get your Token Plan key',
+    prompt: 'Paste your Token Plan key',
+  },
+  {
+    value: 'paygo',
+    label: 'Pay-as-you-go (sk-api-...)',
+    hint: 'Uses account balance',
+    pagePath: '/user-center/basic-information/interface-key',
+    noteTitle: 'Create a pay-as-you-go key',
+    prompt: 'Paste your pay-as-you-go key',
+  },
+];
+
+function detectApiKeyKind(apiKey: string): ApiKeyKind | undefined {
+  if (apiKey.startsWith('sk-cp-')) return 'token-plan';
+  if (apiKey.startsWith('sk-api-')) return 'paygo';
+  return undefined;
+}
+
+function formatAgentSetupResult(
+  result: {
+    verification: AgentVerification;
+    agents: AgentId[];
+    files: AppliedAgentFile[];
+  },
+  format: 'text' | 'json',
+  color: boolean,
+): string {
+  if (format === 'json' || !color) return formatOutput(result, format);
+
+  const key = colors.cyan;
+  const value = colors.green;
+  return formatOutput({
+    [key('verification')]: {
+      [key('region')]: result.verification.region,
+      [key('model')]: result.verification.model,
+      [key('endpoint')]: result.verification.endpoint,
+      [key('status')]: value(result.verification.status),
+    },
+    [key('agents')]: result.agents.map((agent) => value(agent)),
+    [key('files')]: result.files.map((file) => ({
+      [key('agent')]: value(file.agent),
+      [key('path')]: file.path,
+      [key('status')]: value(file.status),
+      ...(file.backup ? { [key('backup')]: file.backup } : {}),
+    })),
+  }, 'text');
+}
 
 function uniqueAgents(values: string[]): AgentId[] {
   const result: AgentId[] = [];
@@ -100,39 +170,54 @@ async function interactiveOptions(
   if (selectedRegion !== 'global' && selectedRegion !== 'cn') {
     throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
   }
-  let apiKey = config.apiKey ?? config.fileApiKey;
-  if (apiKey) {
-    const reuse = await promptConfirm({
-      message: `Use the saved mmx API key (${maskToken(apiKey)})?`,
-    });
-    if (reuse === undefined) throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
-    if (!reuse) apiKey = undefined;
+  const selectedKeyKind = await promptSelect({
+    message: 'Choose an API key type',
+    choices: API_KEY_CHOICES,
+    initialValue: 'token-plan',
+  });
+  const keyChoice = API_KEY_CHOICES.find(choice => choice.value === selectedKeyKind);
+  if (!keyChoice) throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
+
+  await promptNote({
+    title: keyChoice.noteTitle,
+    message: `${DOCS_HOSTS[selectedRegion]}${keyChoice.pagePath}\n\nCopy the key, then paste it below.`,
+  });
+  const apiKey = (await promptApiKey({
+    message: keyChoice.prompt,
+  }))?.trim();
+
+  const detectedKind = apiKey ? detectApiKeyKind(apiKey) : undefined;
+  if (detectedKind && detectedKind !== keyChoice.value) {
+    const detectedChoice = API_KEY_CHOICES.find(choice => choice.value === detectedKind);
+    if (detectedChoice) {
+      await promptNote({
+        title: 'API key type detected',
+        message: `This looks like ${detectedChoice.label}. ${detectedChoice.hint}.`,
+      });
+    }
   }
   if (!apiKey) {
-    apiKey = (await promptPassword({ message: 'MiniMax API key' }))?.trim();
+    throw new CLIError('A MiniMax API key is required.', ExitCode.USAGE);
   }
-  if (!apiKey) throw new CLIError('An API key is required.', ExitCode.USAGE);
 
   const notDetected = agents.filter((agent) => !detectedAgents.has(agent));
   let message = `Configure ${agents.map((agent) => AGENT_LABELS[agent]).join(', ')}? `
-    + 'mmx will only write configuration files; it will not install or launch agents.';
+    + 'mmx will write configuration files.';
   if (notDetected.length > 0) {
-    message += ` Not detected on PATH: ${notDetected.map((agent) => AGENT_LABELS[agent]).join(', ')}.`;
+    message += ` Not detected on PATH: ${notDetected.map((agent) => AGENT_LABELS[agent]).join(', ')}. `
+      + 'mmx will still write configuration files for them, but will not download or install them for you.';
   }
   const confirmed = await promptConfirm({ message });
   if (!confirmed) throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
 
-  return { agents, apiKey, region: selectedRegion, model: 'MiniMax-M3' };
+  return { agents, apiKey, region: selectedRegion, model: DEFAULT_MINIMAX_MODEL };
 }
 
-function nonInteractiveOptions(
-  config: Config,
-  flags: GlobalFlags,
-): AgentSetupOptions {
+function nonInteractiveOptions(flags: GlobalFlags): AgentSetupOptions {
   const positional = flags._positional as string[] | undefined;
   if (positional?.length) {
     throw new CLIError(
-      `Unexpected positional argument: ${positional[0]}`,
+      'Unexpected positional argument.',
       ExitCode.USAGE,
       'Select agents with --agent <name> or --all.',
     );
@@ -155,30 +240,32 @@ function nonInteractiveOptions(
     );
   }
 
-  const apiKey = ((flags.apiKey as string | undefined) ?? config.fileApiKey)?.trim();
+  const apiKey = (flags.apiKey as string | undefined)?.trim();
   if (!apiKey) {
     throw new CLIError(
-      'An API key is required in non-interactive mode.',
+      'A MiniMax API key is required in non-interactive mode.',
       ExitCode.USAGE,
-      'Pass --api-key <key>, or save one first with mmx config set --key api_key --value <key>.',
+      'Pass --api-key <key>.\n'
+        + 'Token Plan keys (sk-cp-...) and pay-as-you-go keys (sk-api-...) use separate quotas.',
     );
   }
 
-  const model = ((flags.model as string | undefined) ?? 'MiniMax-M3').trim();
+  const model = ((flags.model as string | undefined) ?? DEFAULT_MINIMAX_MODEL).trim();
   if (!model) throw new CLIError('--model must not be empty.', ExitCode.USAGE);
-  if (model !== 'MiniMax-M3') {
+  const supportedModel = MINIMAX_MODELS.find(candidate => candidate.id === model)?.id;
+  if (!supportedModel) {
     throw new CLIError(
-      'Agent setup currently supports only --model MiniMax-M3.',
+      `Unsupported MiniMax model "${model}".`,
       ExitCode.USAGE,
-      'Other MiniMax models have different context and output limits.',
+      `Supported models: ${MINIMAX_MODELS.map(candidate => candidate.id).join(', ')}`,
     );
   }
-  return { agents: selected, apiKey, region: flags.region, model };
+  return { agents: selected, apiKey, region: flags.region, model: supportedModel };
 }
 
 export default defineCommand({
   name: 'agent setup',
-  description: 'Configure external coding agents (does not install or launch them)',
+  description: 'Configure external coding agents using a MiniMax API key (does not install or launch them)',
   usage: 'mmx agent setup [--agent <name> ... | --all] [--api-key <key>] [--region <region>]',
   options: [
     {
@@ -186,9 +273,15 @@ export default defineCommand({
       description: 'Agent: claude-code, codex, grok/grok-build, opencode, hermes, pi (repeatable)',
       type: 'array',
     },
+    {
+      flag: '--api-key <key>',
+      description: 'API key only; Token Plan (sk-cp) and pay-as-you-go (sk-api) keys are not interchangeable',
+    },
     { flag: '--all', description: 'Configure every supported agent' },
-    { flag: '--model <model>', description: 'Model ID (currently MiniMax-M3 only)' },
-    { flag: '--skip-verify', description: 'Skip the live MiniMax API verification' },
+    {
+      flag: '--model <model>',
+      description: `Default model (${MINIMAX_MODELS.map(model => model.id).join(', ')})`,
+    },
   ],
   examples: [
     'mmx agent setup',
@@ -198,9 +291,10 @@ export default defineCommand({
   ],
   async run(config: Config, flags: GlobalFlags) {
     const detectedAgents = detectAgentsOnPath();
-    const options = isInteractiveInvocation(flags)
+    const interactive = isInteractiveInvocation(flags);
+    const options = interactive
       ? await interactiveOptions(config, detectedAgents)
-      : nonInteractiveOptions(config, flags);
+      : nonInteractiveOptions(flags);
 
     let verification: AgentVerification = {
       region: options.region,
@@ -208,28 +302,33 @@ export default defineCommand({
       endpoint: '',
       status: 'skipped',
     };
-    if (!flags.skipVerify && !config.dryRun) {
-      verification = await verifyAgentCredential({
+    if (!config.dryRun) {
+      const verify = () => verifyAgentCredential({
         apiKey: options.apiKey,
         region: options.region,
         model: options.model,
         timeoutSeconds: Math.min(config.timeout, 60),
       });
+      verification = interactive ? await withPromptSpinner({
+        message: 'Verifying API key with MiniMax...',
+        successMessage: 'API key verified.',
+        errorMessage: 'API key verification failed.',
+      }, verify) : await verify();
     }
 
     const prepared = prepareAgentConfigurations(options);
     const files = applyAgentConfigurations(prepared, config.dryRun);
     const format = detectOutputFormat(config.output);
-    console.log(formatOutput({
+    console.log(formatAgentSetupResult({
       verification,
       agents: options.agents,
       files,
-    }, format));
+    }, format, interactive && !config.noColor));
     const notDetected = options.agents.filter((agent) => !detectedAgents.has(agent));
-    if (notDetected.length > 0 && !config.quiet) {
+    if (!interactive && notDetected.length > 0 && !config.quiet) {
       process.stderr.write(
         `Warning: Not detected on PATH: ${notDetected.map((agent) => AGENT_LABELS[agent]).join(', ')}. `
-        + 'mmx only manages configuration; it does not install or launch agents.\n',
+        + 'mmx can write configuration files for them, but will not download or install them for you.\n',
       );
     }
   },

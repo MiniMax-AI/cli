@@ -32,7 +32,6 @@ const NO_AUTH_SETUP = [
   ['config', 'show'],
   ['config', 'set'],
   ['config', 'export-schema'],
-  ['agent', 'setup'],
   ['update'],
 ];
 
@@ -51,6 +50,7 @@ async function main() {
       ...GLOBAL_OPTIONS,
       ...(agentSetupCommand.options ?? []),
     ]);
+    if (commandPath.length === 1) commandPath.push('setup');
   }
 
   // Proxy: env vars take precedence over config file
@@ -92,8 +92,9 @@ async function main() {
   }
 
   const { command, extra } = registry.resolve(commandPath);
+  const isAgentSetup = command.name === 'agent setup';
   const flagOptions = [...GLOBAL_OPTIONS, ...(command.options ?? [])];
-  if (command.name === 'agent setup') {
+  if (isAgentSetup) {
     const optionError = findOptionError(argv, flagOptions);
     if (optionError) {
       throw new CLIError(
@@ -105,26 +106,26 @@ async function main() {
   }
   const flags = parseFlags(argv, flagOptions);
 
-  const separatorIndex = command.name === 'agent setup' ? argv.indexOf('--') : -1;
+  const separatorIndex = isAgentSetup ? argv.indexOf('--') : -1;
   const positionals = separatorIndex >= 0
     ? [...extra, ...argv.slice(separatorIndex + 1)]
     : extra;
   if (positionals.length > 0) (flags as Record<string, unknown>)._positional = positionals;
-  if (command.name === 'agent setup') {
+  if (isAgentSetup) {
     (flags as Record<string, unknown>)._hasExplicitOptions = positionals.length > 0
       || argv.some((arg) => arg.startsWith('-'));
   }
 
   const config = loadConfig(flags);
 
-  const needsAuthSetup = !NO_AUTH_SETUP.some(
+  const needsAuthSetup = !isAgentSetup && !NO_AUTH_SETUP.some(
     (cmd) => cmd.every((c, i) => commandPath[i] === c),
   );
   if (needsAuthSetup) {
     await ensureAuth(config);
   }
 
-  if (config.needsRegionDetection && command.name !== 'agent setup') {
+  if (config.needsRegionDetection && !isAgentSetup) {
     const apiKey = config.apiKey || config.fileApiKey;
     if (apiKey) {
       const detected = await detectRegion(apiKey);
@@ -135,7 +136,7 @@ async function main() {
     }
   }
 
-  const updateCheckPromise = command.name === 'agent setup' && config.dryRun
+  const updateCheckPromise = isAgentSetup && config.dryRun
     ? Promise.resolve()
     : checkForUpdate(CLI_VERSION).catch(() => {});
 

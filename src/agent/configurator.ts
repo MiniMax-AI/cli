@@ -1,8 +1,6 @@
 import {
   chmodSync,
   closeSync,
-  constants as fsConstants,
-  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -28,16 +26,36 @@ import { parseDocument } from 'yaml';
 
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
-import type {
-  AgentId,
-  AgentSetupOptions,
-  AppliedAgentFile,
-  PreparedAgentFile,
+import {
+  MINIMAX_MODELS,
+  type AgentId,
+  type AgentSetupOptions,
+  type AppliedAgentFile,
+  type MiniMaxModelId,
+  type PreparedAgentFile,
 } from './types';
 
 const JSON_FORMATTING = { insertSpaces: true, tabSize: 2, eol: '\n' };
 const TOML_KEY_PATTERN = /^[A-Za-z0-9_-]+$/;
+const CODEX_MODEL_CATALOG_FILENAME = 'mmx-model-catalog.json';
+const CODEX_MODEL_CATALOG_OWNER = 'mmx agent setup';
 const INVALID_CONFIG_HINT = 'Fix the existing configuration file and retry. No files were changed.';
+
+function minimaxModel(modelId: MiniMaxModelId) {
+  const model = MINIMAX_MODELS.find(candidate => candidate.id === modelId);
+  if (!model) throw new CLIError(`Unsupported MiniMax model: ${modelId}`, ExitCode.USAGE);
+  return model;
+}
+
+function claudeModelId(modelId: MiniMaxModelId): string {
+  return modelId === 'MiniMax-M3' ? `${modelId}[1m]` : modelId;
+}
+
+function grokModelProfile(modelId: MiniMaxModelId): string {
+  return modelId === 'MiniMax-M3'
+    ? 'minimax'
+    : modelId.toLowerCase().replaceAll('.', '-');
+}
 
 export function endpointsForRegion(region: AgentSetupOptions['region']) {
   const host = region === 'cn' ? 'https://api.minimaxi.com' : 'https://api.minimax.io';
@@ -66,7 +84,7 @@ function configPathsForAgent(
     }
     case 'codex': {
       const dir = pathFromOverride(env.CODEX_HOME, join(home, '.codex'), home);
-      return [join(dir, 'config.toml')];
+      return [join(dir, 'config.toml'), join(dir, CODEX_MODEL_CATALOG_FILENAME)];
     }
     case 'grok':
       return [join(pathFromOverride(env.GROK_HOME, join(home, '.grok'), home), 'config.toml')];
@@ -89,8 +107,7 @@ function configPathsForAgent(
       return [existsSync(jsoncPath) ? jsoncPath : jsonPath];
     }
     case 'hermes': {
-      const defaultDir = join(home, '.hermes');
-      const dir = pathFromOverride(env.HERMES_HOME, defaultDir, home);
+      const dir = pathFromOverride(env.HERMES_HOME, join(home, '.hermes'), home);
       return [join(dir, 'config.yaml'), join(dir, '.env')];
     }
     case 'pi': {
@@ -319,7 +336,7 @@ function updateToml(
 function updateHermesYaml(
   before: string | null,
   provider: 'minimax' | 'minimax-cn',
-  model: string,
+  model: MiniMaxModelId,
   baseUrl: string,
 ): string {
   const document = parseDocument(before ?? '{}\n');
@@ -332,17 +349,75 @@ function updateHermesYaml(
   }
   const root = document.toJS() as unknown;
   assertObjectRoot(root, 'Hermes config.yaml');
-  if (root.model !== undefined) {
+  if (typeof root.model === 'string') {
+    document.deleteIn(['model']);
+  } else if (root.model !== undefined) {
     assertObject(
       root.model,
       'Hermes config.yaml model section must be an object.',
     );
   }
+  if (root.providers !== undefined) {
+    assertObject(
+      root.providers,
+      'Hermes config.yaml providers section must be an object.',
+    );
+  }
+  const providerConfig = (root.providers as Record<string, unknown> | undefined)?.[provider];
+  if (providerConfig !== undefined) {
+    assertObject(
+      providerConfig,
+      `Hermes config.yaml providers.${provider} section must be an object.`,
+    );
+  }
+  const configuredModels = (providerConfig as Record<string, unknown> | undefined)?.models;
+  if (configuredModels !== undefined
+    && !Array.isArray(configuredModels)
+    && (typeof configuredModels !== 'object' || configuredModels === null)) {
+    throw new CLIError(
+      `Hermes config.yaml providers.${provider}.models must be an object or array.`,
+      ExitCode.GENERAL,
+      INVALID_CONFIG_HINT,
+    );
+  }
+  if (Array.isArray(configuredModels)) {
+    const configuredIds = new Set(configuredModels.flatMap((entry) => {
+      if (typeof entry === 'string') return [entry];
+      if (typeof entry === 'object' && entry !== null && !Array.isArray(entry)) {
+        const id = (entry as Record<string, unknown>).id;
+        return typeof id === 'string' ? [id] : [];
+      }
+      return [];
+    }));
+    for (const candidate of MINIMAX_MODELS) {
+      if (!configuredIds.has(candidate.id)) {
+        document.addIn(
+          ['providers', provider, 'models'],
+          { id: candidate.id, context_length: candidate.contextWindow },
+        );
+      }
+    }
+  } else {
+    const modelMap = configuredModels as Record<string, unknown> | undefined;
+    for (const candidate of MINIMAX_MODELS) {
+      if (modelMap?.[candidate.id] !== undefined) {
+        assertObject(
+          modelMap[candidate.id],
+          `Hermes model definition for ${candidate.id} must be an object.`,
+        );
+      }
+      document.setIn(
+        ['providers', provider, 'models', candidate.id, 'context_length'],
+        candidate.contextWindow,
+      );
+    }
+  }
+  const selectedModel = minimaxModel(model);
   document.setIn(['model', 'default'], model);
   document.setIn(['model', 'provider'], provider);
   document.setIn(['model', 'base_url'], baseUrl);
-  document.setIn(['model', 'context_length'], 1000000);
-  document.setIn(['model', 'max_tokens'], 512000);
+  document.setIn(['model', 'context_length'], selectedModel.contextWindow);
+  document.setIn(['model', 'max_tokens'], selectedModel.maxTokens);
   return document.toString();
 }
 
@@ -371,74 +446,196 @@ function updateDotenv(before: string | null, key: string, value: string): string
 
 function prepareClaude(options: AgentSetupOptions, path: string): PreparedAgentFile[] {
   const prepared = readPrepared(path);
+  const parsed = parseJsoncObject(prepared.before ?? '{}', 'Claude Code settings.json');
+  const existingPicker = parsed.modelPicker;
+  if (existingPicker !== undefined) {
+    assertObject(
+      existingPicker,
+      'Claude Code settings.json modelPicker section must be an object.',
+    );
+  }
+  const existingPickerOptions = existingPicker?.options;
+  if (existingPickerOptions !== undefined && !Array.isArray(existingPickerOptions)) {
+    throw new CLIError(
+      'Claude Code settings.json modelPicker.options must be an array.',
+      ExitCode.GENERAL,
+      INVALID_CONFIG_HINT,
+    );
+  }
+  const existingReplaceBuiltIns = existingPicker?.replaceBuiltInOptions;
+  if (existingReplaceBuiltIns !== undefined && typeof existingReplaceBuiltIns !== 'boolean') {
+    throw new CLIError(
+      'Claude Code settings.json modelPicker.replaceBuiltInOptions must be a boolean.',
+      ExitCode.GENERAL,
+      INVALID_CONFIG_HINT,
+    );
+  }
   const endpoints = endpointsForRegion(options.region);
-  const model = options.model === 'MiniMax-M3' ? 'MiniMax-M3[1m]' : options.model;
+  const model = claudeModelId(options.model);
+  const pickerOptions = MINIMAX_MODELS.map(candidate => ({
+    model: claudeModelId(candidate.id),
+    label: candidate.id,
+    description: candidate.id.endsWith('-highspeed')
+      ? '204.8K context · faster inference'
+      : `${candidate.contextWindow === 1000000 ? '1M' : '204.8K'} context`,
+  }));
+  const managedPickerModels = new Set(MINIMAX_MODELS.flatMap(candidate => [
+    candidate.id,
+    claudeModelId(candidate.id),
+  ]));
+  const pickerUpdates: Array<{ path: Array<string | number>; value: unknown }> = [];
+  if (existingPickerOptions === undefined) {
+    pickerUpdates.push({ path: ['modelPicker', 'options'], value: pickerOptions });
+  } else {
+    const managedIndexes = existingPickerOptions.flatMap((entry, index) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return [];
+      const entryModel = (entry as Record<string, unknown>).model;
+      return typeof entryModel === 'string' && managedPickerModels.has(entryModel) ? [index] : [];
+    });
+    for (const index of managedIndexes.reverse()) {
+      pickerUpdates.push({ path: ['modelPicker', 'options', index], value: undefined });
+    }
+    const firstNewIndex = existingPickerOptions.length - managedIndexes.length;
+    pickerOptions.forEach((value, index) => {
+      pickerUpdates.push({ path: ['modelPicker', 'options', firstNewIndex + index], value });
+    });
+  }
   const env = {
     ANTHROPIC_BASE_URL: endpoints.anthropic,
     ANTHROPIC_AUTH_TOKEN: options.apiKey,
     API_TIMEOUT_MS: '3000000',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-    CLAUDE_CODE_AUTO_COMPACT_WINDOW: '1000000',
-    CLAUDE_CODE_MAX_OUTPUT_TOKENS: '512000',
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(minimaxModel(options.model).contextWindow),
     ANTHROPIC_MODEL: model,
-    ANTHROPIC_DEFAULT_SONNET_MODEL: model,
-    ANTHROPIC_DEFAULT_OPUS_MODEL: model,
-    ANTHROPIC_DEFAULT_HAIKU_MODEL: model,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: claudeModelId('MiniMax-M2.7'),
+    ANTHROPIC_DEFAULT_OPUS_MODEL: claudeModelId('MiniMax-M3'),
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: claudeModelId('MiniMax-M2.7-highspeed'),
   };
   return [{
     agent: 'claude-code',
     path,
     ...prepared,
-    after: updateJsonc(prepared.before, 'Claude Code settings.json', Object.entries(env).map(
-      ([key, value]) => ({ path: ['env', key], value }),
-    )),
+    after: updateJsonc(prepared.before, 'Claude Code settings.json', [
+      ...Object.entries(env).map(([key, value]) => ({ path: ['env', key], value })),
+      ...pickerUpdates,
+      {
+        path: ['modelPicker', 'replaceBuiltInOptions'],
+        value: existingReplaceBuiltIns ?? true,
+      },
+    ]),
   }];
 }
 
-function prepareCodex(options: AgentSetupOptions, path: string): PreparedAgentFile[] {
-  const prepared = readPrepared(path);
+function codexModelCatalog(): string {
+  return `${JSON.stringify({
+    _managed_by: CODEX_MODEL_CATALOG_OWNER,
+    models: MINIMAX_MODELS.map((model, priority) => ({
+      slug: model.id,
+      display_name: model.id,
+      description: 'MiniMax',
+      default_reasoning_level: 'high',
+      supported_reasoning_levels: [
+        { effort: 'none', description: 'Think-Off' },
+        { effort: 'high', description: 'Deep' },
+      ],
+      shell_type: 'shell_command',
+      visibility: 'list',
+      supported_in_api: true,
+      priority,
+      base_instructions: `You are Codex, a coding agent based on ${model.id}. You and the user share the same workspace and collaborate to achieve the user's goals.`,
+      supports_reasoning_summaries: true,
+      default_reasoning_summary: 'none',
+      support_verbosity: false,
+      truncation_policy: { mode: 'bytes', limit: 10000 },
+      supports_parallel_tool_calls: true,
+      experimental_supported_tools: [],
+      context_window: model.contextWindow,
+      max_context_window: model.contextWindow,
+      input_modalities: [...model.input],
+    })),
+  }, null, 2)}\n`;
+}
+
+function prepareCodex(options: AgentSetupOptions, paths: string[]): PreparedAgentFile[] {
+  const [configPath, catalogPath] = paths;
+  if (!configPath || !catalogPath) {
+    throw new CLIError('Codex paths are incomplete.', ExitCode.GENERAL);
+  }
+  const config = readPrepared(configPath);
   const endpoints = endpointsForRegion(options.region);
-  return [{
-    agent: 'codex',
-    path,
-    ...prepared,
-    after: updateToml(prepared.before, 'Codex config.toml', {
-      model: options.model,
-      model_provider: 'minimax',
-      model_context_window: 1000000,
-    }, [{
-      name: 'model_providers.minimax',
-      entries: {
-        name: 'MiniMax',
-        base_url: endpoints.openai,
-        experimental_bearer_token: options.apiKey,
-        wire_api: 'responses',
-      },
-    }]),
-  }];
+  let configAfter = updateToml(config.before, 'Codex config.toml', {
+    model: options.model,
+    model_provider: 'minimax',
+  }, [{
+    name: 'model_providers.minimax',
+    entries: {
+      name: 'MiniMax',
+      base_url: endpoints.openai,
+      experimental_bearer_token: options.apiKey,
+      wire_api: 'responses',
+    },
+  }]);
+  const configuredCatalog = parseToml(configAfter).model_catalog_json;
+  if (configuredCatalog !== undefined && configuredCatalog !== CODEX_MODEL_CATALOG_FILENAME) {
+    throw new CLIError(
+      'Codex config.toml already uses a user-managed model catalog.',
+      ExitCode.GENERAL,
+      'Remove model_catalog_json to let mmx manage a MiniMax-only catalog, or configure Codex manually. No files were changed.',
+    );
+  }
+
+  const catalog = readPrepared(catalogPath);
+  if (catalog.before !== null) {
+    const root = parseJsoncObject(catalog.before, 'Codex mmx-model-catalog.json');
+    if (root._managed_by !== CODEX_MODEL_CATALOG_OWNER) {
+      throw new CLIError(
+        `Codex ${CODEX_MODEL_CATALOG_FILENAME} is not managed by mmx.`,
+        ExitCode.GENERAL,
+        'Rename or remove that file, then retry. No files were changed.',
+      );
+    }
+  }
+  configAfter = upsertTomlRoot(configAfter, {
+    model_catalog_json: CODEX_MODEL_CATALOG_FILENAME,
+  });
+  return [
+    {
+      agent: 'codex',
+      path: configPath,
+      ...config,
+      after: configAfter,
+    },
+    {
+      agent: 'codex',
+      path: catalogPath,
+      ...catalog,
+      after: codexModelCatalog(),
+    },
+  ];
 }
 
 function prepareGrok(options: AgentSetupOptions, path: string): PreparedAgentFile[] {
   const prepared = readPrepared(path);
   const endpoints = endpointsForRegion(options.region);
+  const sections = MINIMAX_MODELS.map(model => ({
+    name: `model.${grokModelProfile(model.id)}`,
+    entries: {
+      model: model.id,
+      base_url: endpoints.openai,
+      name: model.id,
+      api_key: options.apiKey,
+      api_backend: 'chat_completions',
+      context_window: model.contextWindow,
+      max_completion_tokens: model.maxTokens,
+    },
+  }));
   return [{
     agent: 'grok',
     path,
     ...prepared,
     after: updateToml(prepared.before, 'Grok config.toml', {}, [
-      { name: 'models', entries: { default: 'minimax' } },
-      {
-        name: 'model.minimax',
-        entries: {
-          model: options.model,
-          base_url: endpoints.openai,
-          name: 'MiniMax',
-          api_key: options.apiKey,
-          api_backend: 'chat_completions',
-          context_window: 1000000,
-          max_completion_tokens: 512000,
-        },
-      },
+      { name: 'models', entries: { default: grokModelProfile(options.model) } },
+      ...sections,
     ]),
   }];
 }
@@ -460,23 +657,66 @@ function prepareOpenCode(options: AgentSetupOptions, path: string): PreparedAgen
       'OpenCode opencode.json provider.minimax section must be an object.',
     );
   }
-  for (const [key, label] of [['options', 'options'], ['models', 'models']] as const) {
+  for (const key of ['options', 'models'] as const) {
     const value = minimax?.[key];
     if (value !== undefined) {
       assertObject(
         value,
-        `OpenCode opencode.json provider.minimax.${label} section must be an object.`,
+        `OpenCode opencode.json provider.minimax.${key} section must be an object.`,
       );
     }
   }
-  const existingModel = (minimax?.models as Record<string, unknown> | undefined)?.[options.model];
-  if (existingModel !== undefined) {
-    assertObject(
-      existingModel,
-      `OpenCode model definition for ${options.model} must be an object.`,
-    );
+  const configuredModels = minimax?.models as Record<string, unknown> | undefined;
+  for (const model of MINIMAX_MODELS) {
+    const configuredModel = configuredModels?.[model.id];
+    if (configuredModel !== undefined) {
+      assertObject(
+        configuredModel,
+        `OpenCode model definition for ${model.id} must be an object.`,
+      );
+    }
+    const limit = (configuredModel as Record<string, unknown> | undefined)?.limit;
+    if (limit !== undefined) {
+      assertObject(
+        limit,
+        `OpenCode model definition for ${model.id} limit must be an object.`,
+      );
+    }
+    const modalities = (configuredModel as Record<string, unknown> | undefined)?.modalities;
+    if (modalities !== undefined) {
+      assertObject(
+        modalities,
+        `OpenCode model definition for ${model.id} modalities must be an object.`,
+      );
+    }
   }
   const endpoints = endpointsForRegion(options.region);
+  const modelUpdates = MINIMAX_MODELS.flatMap((model) => {
+    const input: Array<'text' | 'image'> = [...model.input];
+    return [
+      { path: ['provider', 'minimax', 'models', model.id, 'name'], value: model.id },
+      {
+        path: ['provider', 'minimax', 'models', model.id, 'attachment'],
+        value: input.includes('image'),
+      },
+      {
+        path: ['provider', 'minimax', 'models', model.id, 'modalities', 'input'],
+        value: input,
+      },
+      {
+        path: ['provider', 'minimax', 'models', model.id, 'modalities', 'output'],
+        value: ['text'],
+      },
+      {
+        path: ['provider', 'minimax', 'models', model.id, 'limit', 'context'],
+        value: model.contextWindow,
+      },
+      {
+        path: ['provider', 'minimax', 'models', model.id, 'limit', 'output'],
+        value: model.maxTokens,
+      },
+    ];
+  });
   return [{
     agent: 'opencode',
     path,
@@ -487,9 +727,7 @@ function prepareOpenCode(options: AgentSetupOptions, path: string): PreparedAgen
       { path: ['provider', 'minimax', 'options', 'baseURL'], value: endpoints.openai },
       { path: ['provider', 'minimax', 'options', 'apiKey'], value: options.apiKey },
       { path: ['provider', 'minimax', 'options', 'setCacheKey'], value: true },
-      { path: ['provider', 'minimax', 'models', options.model, 'name'], value: options.model },
-      { path: ['provider', 'minimax', 'models', options.model, 'limit', 'context'], value: 1000000 },
-      { path: ['provider', 'minimax', 'models', options.model, 'limit', 'output'], value: 512000 },
+      ...modelUpdates,
       { path: ['model'], value: `minimax/${options.model}` },
     ]),
   }];
@@ -527,15 +765,6 @@ function preparePi(options: AgentSetupOptions, paths: string[]): PreparedAgentFi
   const parsed = parseJsoncObject(models.before ?? '{}', 'Pi models.json');
   const endpoints = endpointsForRegion(options.region);
   const providerId = options.region === 'cn' ? 'minimax-cn' : 'minimax';
-  const modelDefinition = {
-    id: options.model,
-    name: options.model,
-    reasoning: true,
-    input: ['text', 'image'],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 1000000,
-    maxTokens: 512000,
-  };
   const providers = parsed.providers;
   if (providers !== undefined) {
     assertObject(
@@ -558,43 +787,52 @@ function preparePi(options: AgentSetupOptions, paths: string[]): PreparedAgentFi
       INVALID_CONFIG_HINT,
     );
   }
-  const modelIndex = (existingModels as unknown[] | undefined)?.findIndex(
-    (value) => typeof value === 'object'
-      && value !== null
-      && !Array.isArray(value)
-      && (value as Record<string, unknown>).id === options.model,
-  ) ?? -1;
-  const modelPath: Array<string | number> = [
-    'providers',
-    providerId,
-    'models',
-    modelIndex >= 0 ? modelIndex : (existingModels as unknown[] | undefined)?.length ?? 0,
-  ];
-  const existingModel = modelIndex >= 0
-    ? (existingModels as Array<Record<string, unknown>>)[modelIndex]
-    : undefined;
-  const existingCost = existingModel?.cost;
-  if (existingCost !== undefined) {
-    assertObject(
-      existingCost,
-      `Pi model definition for ${options.model} cost must be an object.`,
-    );
-  }
   const providerUpdates: Array<{ path: Array<string | number>; value: unknown }> = [
     { path: ['providers', providerId, 'name'], value: 'MiniMax' },
-    { path: ['providers', providerId, 'baseUrl'], value: endpoints.openai },
+    { path: ['providers', providerId, 'baseUrl'], value: endpoints.anthropic },
     { path: ['providers', providerId, 'apiKey'], value: options.apiKey },
-    { path: ['providers', providerId, 'api'], value: 'openai-completions' },
+    { path: ['providers', providerId, 'api'], value: 'anthropic-messages' },
   ];
-  if (modelIndex >= 0) {
-    for (const [key, value] of Object.entries(modelDefinition)) {
-      if (key !== 'cost') providerUpdates.push({ path: [...modelPath, key], value });
-    }
-    for (const [key, value] of Object.entries(modelDefinition.cost)) {
-      providerUpdates.push({ path: [...modelPath, 'cost', key], value });
-    }
+  const modelDefinitions = MINIMAX_MODELS.map(model => ({
+    id: model.id,
+    name: model.id,
+    reasoning: true,
+    input: [...model.input],
+    contextWindow: model.contextWindow,
+    maxTokens: model.maxTokens,
+  }));
+  if (existingModels === undefined) {
+    providerUpdates.push({
+      path: ['providers', providerId, 'models'],
+      value: modelDefinitions,
+    });
   } else {
-    providerUpdates.push({ path: modelPath, value: modelDefinition });
+    let appendIndex = existingModels.length;
+    for (const definition of modelDefinitions) {
+      const modelIndex = existingModels.findIndex(
+        entry => typeof entry === 'object'
+          && entry !== null
+          && !Array.isArray(entry)
+          && (entry as Record<string, unknown>).id === definition.id,
+      );
+      const modelPath: Array<string | number> = [
+        'providers',
+        providerId,
+        'models',
+        modelIndex >= 0 ? modelIndex : appendIndex++,
+      ];
+      if (modelIndex < 0) {
+        providerUpdates.push({ path: modelPath, value: definition });
+        continue;
+      }
+      assertObject(
+        existingModels[modelIndex],
+        `Pi model definition for ${definition.id} must be an object.`,
+      );
+      for (const [key, value] of Object.entries(definition)) {
+        if (key !== 'id') providerUpdates.push({ path: [...modelPath, key], value });
+      }
+    }
   }
   return [
     {
@@ -624,7 +862,7 @@ export function prepareAgentConfigurations(options: AgentSetupOptions): Prepared
         prepared.push(...prepareClaude(options, paths[0]!));
         break;
       case 'codex':
-        prepared.push(...prepareCodex(options, paths[0]!));
+        prepared.push(...prepareCodex(options, paths));
         break;
       case 'grok':
         prepared.push(...prepareGrok(options, paths[0]!));
@@ -643,12 +881,22 @@ export function prepareAgentConfigurations(options: AgentSetupOptions): Prepared
   return prepared;
 }
 
-function atomicWritePrivate(path: string, contents: string): void {
+function atomicWritePrivate(path: string, contents: string, logicalPath: string): void {
   const parent = dirname(path);
   mkdirSync(parent, { recursive: true, mode: 0o700 });
   const temporary = join(parent, `.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`);
+  const assertTarget = () => {
+    if (writeTarget(logicalPath) !== path) {
+      throw new CLIError(
+        `Configuration path changed while mmx was writing it: ${logicalPath}`,
+        ExitCode.GENERAL,
+      );
+    }
+  };
   try {
+    assertTarget();
     writeFileSync(temporary, contents, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    assertTarget();
     renameSync(temporary, path);
   } catch (error) {
     rmSync(temporary, { force: true });
@@ -656,12 +904,11 @@ function atomicWritePrivate(path: string, contents: string): void {
   }
 }
 
-function createBackup(path: string, timestamp: string): string {
+function createBackup(path: string, contents: string, timestamp: string): string {
   for (let suffix = 0; ; suffix += 1) {
     const backup = `${path}.bak.${timestamp}${suffix === 0 ? '' : `.${suffix}`}`;
     try {
-      copyFileSync(path, backup, fsConstants.COPYFILE_EXCL);
-      chmodSync(backup, 0o600);
+      writeFileSync(backup, contents, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
       return backup;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') continue;
@@ -760,18 +1007,17 @@ export function applyAgentConfigurations(
   const releaseLock = dryRun ? undefined : acquireAgentSetupLock();
   try {
     const changed = prepared.filter((file) => file.before !== file.after);
-    const targetOwners = new Map<string, string>();
+    const targets = new Set<string>();
     for (const file of prepared) {
       const target = file.targetPath;
-      const owner = targetOwners.get(target);
-      if (owner && owner !== file.path) {
+      if (targets.has(target)) {
         throw new CLIError(
           `Multiple agent configuration paths resolve to ${target}.`,
           ExitCode.GENERAL,
           'No files were changed. Use distinct configuration paths and retry.',
         );
       }
-      targetOwners.set(target, file.path);
+      targets.add(target);
     }
     const originalModes = new Map<PreparedAgentFile, number>();
     const permissionOnly = new Map<PreparedAgentFile, number>();
@@ -817,7 +1063,7 @@ export function applyAgentConfigurations(
       for (const file of changed) {
         if (file.before !== null) {
           assertStillCurrent(file, 'No files were changed. Retry the command.');
-          backups.set(file.path, createBackup(file.targetPath, timestamp));
+          backups.set(file.path, createBackup(file.targetPath, file.before, timestamp));
         }
       }
       for (const file of prepared) {
@@ -827,7 +1073,7 @@ export function applyAgentConfigurations(
       }
       for (const file of changed) {
         assertStillCurrent(file, 'The completed writes were rolled back. Retry the command.');
-        atomicWritePrivate(file.targetPath, file.after);
+        atomicWritePrivate(file.targetPath, file.after, file.path);
         written.push({ file, target: file.targetPath });
       }
     } catch (error) {
@@ -842,7 +1088,7 @@ export function applyAgentConfigurations(
           if (file.before === null) {
             rmSync(target, { force: true });
           } else {
-            atomicWritePrivate(target, file.before);
+            atomicWritePrivate(target, file.before, file.path);
             const mode = originalModes.get(file);
             if (mode !== undefined) chmodSync(target, mode);
           }
