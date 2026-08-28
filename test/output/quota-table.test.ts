@@ -130,6 +130,33 @@ describe('renderQuotaTable', () => {
     expect(output).not.toContain('0 / 3');
   });
 
+  it('renders the reset countdown in a boxed column with the window duration tag', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(createCodingPlanModels(), { ...createConfig(), noColor: true });
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+
+    // general: 2-hour rolling window; video: daily window.
+    expect(output).toContain('| 2h Reset 2h 0m |');
+    expect(output).toContain('| 1d Reset 6h 0m |');
+    // Every data row carries the column divider before the reset cell.
+    const dataRows = lines.filter(l => l.includes('Reset'));
+    expect(dataRows.length).toBe(2);
+    for (const row of dataRows) {
+      expect(row.split('|').length).toBe(4);
+    }
+  });
+
   it('applies weekly_boost_permille (1500 ⇒ up to 150%) when rendering weekly percent', () => {
     const lines: string[] = [];
     const originalLog = console.log;

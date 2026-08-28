@@ -53,6 +53,19 @@ function formatDuration(ms: number, nowLabel: string): string {
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
+// Compact tag for the quota window length shown next to the reset countdown,
+// e.g. a 5-hour rolling window ⇒ "5h", a daily window ⇒ "1d", weekly ⇒ "1w".
+function formatWindow(ms: number): string {
+  const WEEK = 7 * 24 * 3600000;
+  const DAY = 24 * 3600000;
+  const HOUR = 3600000;
+  if (ms <= 0) return '';
+  if (ms % WEEK === 0) return `${ms / WEEK}w`;
+  if (ms % DAY === 0) return `${ms / DAY}d`;
+  if (ms >= HOUR) return `${Math.round(ms / HOUR)}h`;
+  return `${Math.max(1, Math.round(ms / 60000))}m`;
+}
+
 function formatDate(epochMs: number): string {
   return new Date(epochMs).toISOString().slice(0, 10);
 }
@@ -173,8 +186,15 @@ function renderUnavailableMetric(label: string, unavailableLabel: string, color:
   return `${label} [${'.'.repeat(COMPACT_BAR_WIDTH)}] ${unavailableLabel}`;
 }
 
-function boxLine(w: number, l: string, f: string, r: string, c: boolean): string {
-  return c ? `${D}${l}${f.repeat(w)}${r}${R}` : `+${'-'.repeat(w)}+`;
+// `div` is a 1-based offset (in display cells) of an optional column divider,
+// so the reset column can be boxed off: ├────┬────┤ / ├────┼────┤ / ╰────┴────╯.
+function boxLine(w: number, l: string, f: string, r: string, c: boolean, div?: number, divChar?: string): string {
+  if (div === undefined || divChar === undefined) {
+    return c ? `${D}${l}${f.repeat(w)}${r}${R}` : `+${'-'.repeat(w)}+`;
+  }
+  return c
+    ? `${D}${l}${f.repeat(div - 1)}${divChar}${f.repeat(w - div)}${r}${R}`
+    : `+${'-'.repeat(div - 1)}+${'-'.repeat(w - div)}+`;
 }
 
 function boxRow(content: string, innerW: number, visLen: number, color: boolean): string {
@@ -210,9 +230,12 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
         isUnweekly(m.current_weekly_status),
         config.region === 'cn' ? UNLIMITED_LABEL_CN : UNLIMITED_LABEL_EN,
       );
-    const reset = unavailable
-      ? `${L.resetsIn} —`
-      : `${L.resetsIn} ${formatDuration(m.remains_time, L.now)}`;
+    // The reset countdown lives in its own boxed column; the dim window tag
+    // ("5h", "1w", …) tells which quota window the countdown applies to.
+    const windowTag = unavailable ? '' : formatWindow(m.end_time - m.start_time);
+    const resetLabel = windowTag ? `${windowTag} ${L.resetsIn}` : L.resetsIn;
+    const resetValue = unavailable ? '—' : formatDuration(m.remains_time, L.now);
+    const reset = useColor ? `${D}${resetLabel}${R} ${resetValue}` : `${resetLabel} ${resetValue}`;
     return { displayName, current, weekly, reset };
   });
 
@@ -220,7 +243,16 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
   const currentWidth = Math.max(...rows.map(r => displayWidth(r.current)), 18);
   const weeklyWidth = Math.max(...rows.map(r => displayWidth(r.weekly)), 18);
   const resetWidth = Math.max(...rows.map(r => displayWidth(r.reset)), 10);
-  const W = Math.max(72, nameWidth + 2 + currentWidth + 2 + weeklyWidth + 2 + resetWidth + 4);
+  // Left section holds name + current + weekly; the reset column sits to the
+  // right of the divider. Keep the historical 72-cell minimum by widening the
+  // left section when the natural width falls short.
+  let leftWidth = nameWidth + 2 + currentWidth + 2 + weeklyWidth;
+  let W = leftWidth + 3 + resetWidth + 2;
+  if (W < 72) {
+    leftWidth += 72 - W;
+    W = 72;
+  }
+  const divOffset = leftWidth + 3;
 
   const weekRange = models.length > 0
     ? `${formatDate(models[0]!.weekly_start_time)} — ${formatDate(models[0]!.weekly_end_time)}`
@@ -244,17 +276,18 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
     return;
   }
 
-  for (const row of rows) {
-    console.log(boxLine(W, '├', '─', '┤', useColor));
+  rows.forEach((row, i) => {
+    console.log(boxLine(W, '├', '─', '┤', useColor, divOffset, i === 0 ? '┬' : '┼'));
 
     const name = useColor ? `${B}${row.displayName}${R}` : row.displayName;
-    const line = `${name}${' '.repeat(Math.max(1, nameWidth - displayWidth(row.displayName) + 2))}` +
+    const left = `${name}${' '.repeat(Math.max(1, nameWidth - displayWidth(row.displayName) + 2))}` +
       `${row.current}${' '.repeat(Math.max(1, currentWidth - displayWidth(row.current) + 2))}` +
-      `${row.weekly}${' '.repeat(Math.max(1, weeklyWidth - displayWidth(row.weekly) + 2))}` +
-      row.reset;
+      row.weekly;
+    const divider = useColor ? `${D}│${R}` : '|';
+    const line = `${left}${' '.repeat(Math.max(0, leftWidth - displayWidth(left)))} ${divider} ${row.reset}`;
     console.log(boxRow(line, W, displayWidth(line), useColor));
-  }
+  });
 
-  console.log(boxLine(W, '╰', '─', '╯', useColor));
+  console.log(boxLine(W, '╰', '─', '╯', useColor, divOffset, '┴'));
   console.log('');
 }
