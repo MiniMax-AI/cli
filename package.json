@@ -40,6 +40,7 @@
     "test:watch": "bun test --watch"
   },
   "dependencies": {
+    "@clack/core": "^0.3.5",
     "@clack/prompts": "^0.7.0",
     "bun-plugin-dts": "^0.4.0",
     "es-toolkit": "^1.46.1",

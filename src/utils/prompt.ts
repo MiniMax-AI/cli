@@ -10,6 +10,8 @@
  * case explicitly.
  */
 
+import { PasswordPrompt } from '@clack/core';
+
 import { isInteractive } from './env.js';
 import { CLIError } from '../errors/base.js';
 import { ExitCode } from '../errors/codes';
@@ -59,13 +61,35 @@ export async function promptConfirm(options: {
   return val as boolean;
 }
 
-export async function promptPassword(options: {
-  message: string;
-}): Promise<string | undefined> {
+const PASSWORD_MASK_PREVIEW_LENGTH = 12;
+const PROMPT_THEME = '\x1b[38;2;248;103;58m'; // #F8673A
+const RESET_COLOR = '\x1b[0m';
+
+function themed(value: string): string {
+  return process.env.NO_COLOR ? value : `${PROMPT_THEME}${value}${RESET_COLOR}`;
+}
+
+export function passwordMaskPreview(length: number): string {
+  const mask = '•'.repeat(Math.min(length, PASSWORD_MASK_PREVIEW_LENGTH));
+  return length > PASSWORD_MASK_PREVIEW_LENGTH ? `${mask}… (${length} chars)` : mask;
+}
+
+export async function promptPassword(options: { message: string }): Promise<string | undefined> {
   if (!isInteractive()) return undefined;
 
-  const inquirer = await import('@clack/prompts');
-  const val = await inquirer.password({ message: options.message, mask: '•' });
+  const val = await new PasswordPrompt({
+    mask: '•',
+    render() {
+      const length = typeof this.value === 'string' ? this.value.length : 0;
+      const preview = passwordMaskPreview(length);
+      if (this.state === 'submit') {
+        return `${themed('│')}\n${themed('◇')}  ${options.message}\n${themed('│')}  ${preview}`;
+      }
+      if (this.state === 'cancel') return `${themed('│')}\n■  ${options.message}\n│  Cancelled`;
+      return `${themed('│')}\n${themed('◆')}  ${options.message}\n`
+        + `${themed('│')}  ${preview}${themed('_')}\n${themed('└')}`;
+    },
+  }).prompt();
   if (typeof val === 'symbol') return undefined;
   return val;
 }
