@@ -1,15 +1,12 @@
 import { defineCommand } from '../../command';
 import { requestJson } from '../../client/http';
-import { quotaEndpoint, usageEndpoint } from '../../client/endpoints';
+import { selectUsageEndpoint } from '../../client/endpoints';
+import { resolveCredential } from '../../auth/resolver';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { renderUsage } from '../../output/usage';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { AccountBalanceResponse, QuotaModelRemain } from '../../types/api';
-
-interface QuotaApiResponse {
-  model_remains: QuotaModelRemain[];
-}
+import type { AccountBalanceResponse, QuotaResponse } from '../../types/api';
 
 export default defineCommand({
   name: 'quota show',
@@ -26,21 +23,20 @@ export default defineCommand({
     }
 
     const format = detectOutputFormat(flags.output as string | undefined);
-    const apiKey = config.apiKey || config.fileApiKey;
+    const credential = await resolveCredential(config);
+    const endpoint = selectUsageEndpoint(config.baseUrl, credential);
 
-    if (apiKey && apiKey.startsWith('sk-api-')) {
-      const url = usageEndpoint(config.baseUrl, apiKey);
-      const response = await requestJson<AccountBalanceResponse>(config, { url });
+    if (endpoint.kind === 'account-balance') {
+      const response = await requestJson<AccountBalanceResponse>(config, { url: endpoint.url });
       if (format !== 'text') {
         console.log(formatOutput(response, format));
         return;
       }
-      renderUsage(response, config, apiKey);
+      renderUsage(response, config, credential.token);
       return;
     }
 
-    const url = quotaEndpoint(config.baseUrl);
-    const response = await requestJson<QuotaApiResponse>(config, { url });
+    const response = await requestJson<QuotaResponse>(config, { url: endpoint.url });
     const models = response.model_remains || [];
 
     if (format !== 'text') {

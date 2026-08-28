@@ -148,9 +148,23 @@ for (const item of results.organic) {
 ### Quota
 
 ```typescript
+import {
+  isAccountBalanceResponse,
+  isQuotaResponse,
+} from 'mmx-cli/sdk';
+
 const quota = await sdk.quota.info();
-console.log(quota);
+
+if (isQuotaResponse(quota)) {
+  console.log(quota.model_remains);
+} else if (isAccountBalanceResponse(quota)) {
+  console.log(quota.available_amount);
+}
 ```
+
+Token Plan credentials and OAuth return `QuotaResponse`. API secret keys with
+the `sk-api-` prefix return `AccountBalanceResponse`. The type guards above
+narrow the `QuotaInfoResponse` union without changing the raw API response.
 
 ## Custom Base URL
 

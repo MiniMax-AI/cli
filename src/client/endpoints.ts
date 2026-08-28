@@ -54,10 +54,37 @@ export function isSecretApiKey(apiKey: string): boolean {
   return apiKey.startsWith('sk-api-');
 }
 
+export type UsageEndpointKind = 'quota' | 'account-balance';
+
+export interface UsageCredential {
+  token: string;
+  method: 'api-key' | 'oauth';
+}
+
+export interface UsageEndpointSelection {
+  url: string;
+  kind: UsageEndpointKind;
+}
+
+export function selectUsageEndpoint(
+  baseUrl: string,
+  credential: UsageCredential,
+): UsageEndpointSelection {
+  if (credential.method === 'api-key' && isSecretApiKey(credential.token)) {
+    return {
+      url: accountBalanceEndpoint(baseUrl),
+      kind: 'account-balance',
+    };
+  }
+
+  return {
+    url: quotaEndpoint(baseUrl),
+    kind: 'quota',
+  };
+}
+
 export function usageEndpoint(baseUrl: string, apiKey: string): string {
-  return isSecretApiKey(apiKey)
-    ? accountBalanceEndpoint(baseUrl)
-    : quotaEndpoint(baseUrl);
+  return selectUsageEndpoint(baseUrl, { token: apiKey, method: 'api-key' }).url;
 }
 
 export function fileUploadEndpoint(baseUrl: string): string {
