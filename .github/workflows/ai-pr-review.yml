@@ -76,7 +76,7 @@ jobs:
       - name: Run Claude Code review
         uses: anthropics/claude-code-action@v1.0.102
         env:
-          ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
+          ANTHROPIC_BASE_URL: https://api.minimaxi.com/anthropic
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_URL: ${{ github.event.pull_request.html_url }}
@@ -90,7 +90,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           use_sticky_comment: true
           claude_args: |
-            --model MiniMax-M2.7-highspeed
+            --model MiniMax-M3
             --max-turns 300
             --allowed-tools Read,Glob,Grep
           prompt: |
