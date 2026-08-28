@@ -47,9 +47,9 @@ export async function promptText(options: {
 const API_KEY_VISIBLE_LENGTH = 30;
 
 export function apiKeyPreview(value: string): string {
+  if (value.length <= API_KEY_VISIBLE_LENGTH) return value;
   const visible = value.slice(0, API_KEY_VISIBLE_LENGTH);
-  const ellipsis = value.length > API_KEY_VISIBLE_LENGTH ? '....' : '';
-  return `${visible}${ellipsis} (${value.length} chars)`;
+  return `${visible}.... (${value.length} chars)`;
 }
 
 export async function promptApiKey(options: { message: string }): Promise<string | undefined> {
