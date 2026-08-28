@@ -17,13 +17,13 @@ export default defineCommand({
     'mmx quota show',
     'mmx quota show --output json',
   ],
-  async run(config: Config, flags: GlobalFlags) {
+  async run(config: Config, _flags: GlobalFlags) {
     if (config.dryRun) {
       console.log('Would fetch quota information.');
       return;
     }
 
-    const format = detectOutputFormat(flags.output as string | undefined);
+    const format = detectOutputFormat(config.output);
     const credential = await resolveCredential(config);
     const endpoint = selectUsageEndpoint(config.baseUrl, credential);
 

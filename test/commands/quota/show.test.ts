@@ -62,6 +62,39 @@ describe('quota show command', () => {
     }
   });
 
+  it('honors JSON output resolved from config without an output flag', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/token_plan/remains': () => jsonResponse({
+          model_remains: [],
+          base_resp: { status_code: 0, status_msg: 'ok' },
+        }),
+      },
+    });
+
+    const output: string[] = [];
+    const originalLog = console.log;
+    const ttyDescriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    console.log = (message?: unknown) => { output.push(String(message ?? '')); };
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+
+    try {
+      await showCommand.execute(
+        { ...baseConfig, baseUrl: server.url, output: 'json' },
+        { ...baseFlags, output: undefined },
+      );
+    } finally {
+      console.log = originalLog;
+      if (ttyDescriptor) {
+        Object.defineProperty(process.stdout, 'isTTY', ttyDescriptor);
+      } else {
+        delete (process.stdout as unknown as Record<string, unknown>).isTTY;
+      }
+    }
+
+    expect(JSON.parse(output.join('\n'))).toMatchObject({ model_remains: [] });
+  });
+
   it('uses account/query_balance for sk-api keys', async () => {
     server = createMockServer({
       routes: {
