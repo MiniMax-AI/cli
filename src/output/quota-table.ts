@@ -1,3 +1,4 @@
+import { resolveQuotaCounts } from '../utils/quota';
 import type { Config } from '../config/schema';
 import type { QuotaModelRemain } from '../types/api';
 
@@ -151,7 +152,7 @@ const UNLIMITED_LABEL_EN = 'unlimited';
 
 function renderMetric(
   label: string,
-  remaining: number,
+  reportedCount: number,
   total: number,
   percent: number | undefined | null,
   color: boolean,
@@ -169,10 +170,11 @@ function renderMetric(
     const bar = `[${'█'.repeat(COMPACT_BAR_WIDTH)}]`;
     return `${label} ${bar} ${ulStr}`;
   }
-  const pct = remainingPct(percent, remaining, total, boostPermille);
-  const bar = renderBar(pct, color, COMPACT_BAR_WIDTH, total <= 0);
-  if (total > 0) {
-    const count = `${remaining.toLocaleString()} / ${total.toLocaleString()}`;
+  const pct = remainingPct(percent, reportedCount, total, boostPermille);
+  const counts = resolveQuotaCounts(reportedCount, total, percent);
+  const bar = renderBar(pct, color, COMPACT_BAR_WIDTH, counts === undefined);
+  if (counts) {
+    const count = `${counts.remaining.toLocaleString()} / ${counts.total.toLocaleString()}`;
     return color ? `${D}${label}${R} ${bar} ${remainingColors(pct)[0]}${count}${R}` : `${label} ${bar} ${count}`;
   }
   return `${label} ${bar}`;
