@@ -130,6 +130,71 @@ describe('renderQuotaTable', () => {
     expect(output).not.toContain('0 / 3');
   });
 
+  it('uses remaining percent to disambiguate newer used-count responses', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [
+          {
+            ...createModel(),
+            model_name: 'video',
+            current_interval_total_count: 5,
+            current_interval_usage_count: 0,
+            current_interval_remaining_percent: 100,
+            current_weekly_total_count: 35,
+            current_weekly_usage_count: 0,
+            current_weekly_remaining_percent: 100,
+          },
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+    expect(output).toContain('5 / 5');
+    expect(output).toContain('35 / 35');
+    expect(output).not.toContain('0 / 5');
+    expect(output).not.toContain('0 / 35');
+  });
+
+  it('falls back to the authoritative percent when counts cannot be reconciled', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [
+          {
+            ...createModel(),
+            current_interval_total_count: 10,
+            current_interval_usage_count: 7,
+            current_interval_remaining_percent: 40,
+          },
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+    expect(output).toContain('Left [████......]  40%');
+    expect(output).not.toContain('7 / 10');
+    expect(output).not.toContain('3 / 10');
+  });
+
   it('renders the reset countdown in a boxed column with the window duration tag', () => {
     const lines: string[] = [];
     const originalLog = console.log;

@@ -108,4 +108,56 @@ describe('quota show command', () => {
     }
   });
 
+  it('normalizes ambiguous quota counts in quiet output', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/token_plan/remains': () => jsonResponse({
+          model_remains: [
+            {
+              model_name: 'legacy-video',
+              current_interval_total_count: 3,
+              current_interval_usage_count: 3,
+              current_interval_remaining_percent: 100,
+            },
+            {
+              model_name: 'current-video',
+              current_interval_total_count: 5,
+              current_interval_usage_count: 0,
+              current_interval_remaining_percent: 100,
+            },
+            {
+              model_name: 'general',
+              current_interval_total_count: 0,
+              current_interval_usage_count: 0,
+              current_interval_remaining_percent: 99,
+            },
+          ],
+        }),
+      },
+    });
+
+    const output: string[] = [];
+    const origLog = console.log;
+    console.log = (msg: string) => { output.push(msg); };
+
+    try {
+      await showCommand.execute(
+        {
+          ...baseConfig,
+          baseUrl: server.url,
+          quiet: true,
+        },
+        { ...baseFlags, quiet: true },
+      );
+    } finally {
+      console.log = origLog;
+    }
+
+    expect(output).toEqual([
+      'legacy-video\t0\t3\t3',
+      'current-video\t0\t5\t5',
+      'general\t-\t0\t99%',
+    ]);
+  });
+
 });
