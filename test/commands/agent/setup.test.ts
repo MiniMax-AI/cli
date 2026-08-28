@@ -15,7 +15,7 @@ function testConfig(overrides: Partial<Config> = {}): Config {
     output: 'json',
     timeout: 30,
     verbose: false,
-    quiet: false,
+    quiet: true,
     noColor: true,
     yes: false,
     dryRun: true,
@@ -163,6 +163,40 @@ describe('agent setup command', () => {
         region: 'cn',
       }),
     )).rejects.toThrow('Unsupported agent "typo"');
+  });
+
+  it('warns on stderr when a selected agent is not detected on PATH', async () => {
+    const originalPath = process.env.PATH;
+    const originalLog = console.log;
+    const originalWrite = process.stderr.write.bind(process.stderr);
+    let stderr = '';
+    process.env.PATH = home;
+    console.log = () => {};
+    (process.stderr as NodeJS.WriteStream).write = (chunk: unknown) => {
+      stderr += String(chunk);
+      return true;
+    };
+
+    try {
+      await setupCommand.execute(
+        testConfig({ quiet: false }),
+        testFlags({
+          agent: ['pi'],
+          apiKey: 'sk-test-secret',
+          region: 'cn',
+        }),
+      );
+    } finally {
+      if (originalPath === undefined) delete process.env.PATH;
+      else process.env.PATH = originalPath;
+      console.log = originalLog;
+      (process.stderr as NodeJS.WriteStream).write = originalWrite;
+    }
+
+    expect(stderr).toBe(
+      'Warning: Not detected on PATH: Pi. '
+      + 'mmx only manages configuration; it does not install or launch agents.\n',
+    );
   });
 
 });

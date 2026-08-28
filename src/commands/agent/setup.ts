@@ -3,6 +3,7 @@ import {
   applyAgentConfigurations,
   prepareAgentConfigurations,
 } from '../../agent/configurator';
+import { detectAgentsOnPath } from '../../agent/availability';
 import {
   AGENT_IDS,
   type AgentId,
@@ -44,6 +45,7 @@ const AGENT_LABELS: Record<AgentId, string> = {
   hermes: 'Hermes Agent',
   pi: 'Pi',
 };
+const DEFAULT_INTERACTIVE_AGENTS: AgentId[] = ['claude-code', 'codex'];
 
 function uniqueAgents(values: string[]): AgentId[] {
   const result: AgentId[] = [];
@@ -69,11 +71,17 @@ function isInteractiveInvocation(flags: GlobalFlags): boolean {
 
 async function interactiveOptions(
   config: Config,
+  detectedAgents: Set<AgentId>,
 ): Promise<AgentSetupOptions> {
   const selectedAgents = await promptMultiSelect({
     message: 'Select agents to configure',
-    choices: AGENT_IDS.map((agent) => ({ value: agent, label: AGENT_LABELS[agent] })),
-    initialValues: ['claude-code', 'codex'],
+    choices: AGENT_IDS.map((agent) => ({
+      value: agent,
+      label: detectedAgents.has(agent)
+        ? AGENT_LABELS[agent]
+        : `${AGENT_LABELS[agent]} (not detected on PATH)`,
+    })),
+    initialValues: DEFAULT_INTERACTIVE_AGENTS.filter((agent) => detectedAgents.has(agent)),
     required: true,
   });
   if (!selectedAgents?.length) {
@@ -105,9 +113,13 @@ async function interactiveOptions(
   }
   if (!apiKey) throw new CLIError('An API key is required.', ExitCode.USAGE);
 
-  const confirmed = await promptConfirm({
-    message: `Configure ${agents.map((agent) => AGENT_LABELS[agent]).join(', ')}?`,
-  });
+  const notDetected = agents.filter((agent) => !detectedAgents.has(agent));
+  let message = `Configure ${agents.map((agent) => AGENT_LABELS[agent]).join(', ')}? `
+    + 'mmx will only write configuration files; it will not install or launch agents.';
+  if (notDetected.length > 0) {
+    message += ` Not detected on PATH: ${notDetected.map((agent) => AGENT_LABELS[agent]).join(', ')}.`;
+  }
+  const confirmed = await promptConfirm({ message });
   if (!confirmed) throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
 
   return { agents, apiKey, region: selectedRegion, model: 'MiniMax-M3' };
@@ -166,7 +178,7 @@ function nonInteractiveOptions(
 
 export default defineCommand({
   name: 'agent setup',
-  description: 'Configure MiniMax for external coding agents',
+  description: 'Configure external coding agents (does not install or launch them)',
   usage: 'mmx agent setup [--agent <name> ... | --all] [--api-key <key>] [--region <region>]',
   options: [
     {
@@ -185,8 +197,9 @@ export default defineCommand({
     'mmx agent setup --agent opencode --api-key <key> --region cn --dry-run',
   ],
   async run(config: Config, flags: GlobalFlags) {
+    const detectedAgents = detectAgentsOnPath();
     const options = isInteractiveInvocation(flags)
-      ? await interactiveOptions(config)
+      ? await interactiveOptions(config, detectedAgents)
       : nonInteractiveOptions(config, flags);
 
     let verification: AgentVerification = {
@@ -212,5 +225,12 @@ export default defineCommand({
       agents: options.agents,
       files,
     }, format));
+    const notDetected = options.agents.filter((agent) => !detectedAgents.has(agent));
+    if (notDetected.length > 0 && !config.quiet) {
+      process.stderr.write(
+        `Warning: Not detected on PATH: ${notDetected.map((agent) => AGENT_LABELS[agent]).join(', ')}. `
+        + 'mmx only manages configuration; it does not install or launch agents.\n',
+      );
+    }
   },
 });

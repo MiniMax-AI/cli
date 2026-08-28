@@ -190,7 +190,7 @@ mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" -
 mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
 ```
 
-The command verifies the key and selected region before writing. Existing files are backed up when changed; use `--dry-run` to preview or `--skip-verify` to skip the live request.
+The command verifies the key and selected region before writing. Existing files are backed up when changed; use `--dry-run` to preview or `--skip-verify` to skip the live request. Agent setup only writes configuration files; it does not install or launch the selected agents.
 
 ### `mmx update`
 
