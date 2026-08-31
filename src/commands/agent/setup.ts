@@ -4,8 +4,14 @@ import { defineCommand } from '../../command';
 import {
   applyAgentConfigurations,
   prepareAgentConfigurations,
+  withAgentSetupLock,
 } from '../../agent/configurator';
 import { detectAgentsOnPath } from '../../agent/availability';
+import {
+  getAgentInstallCommand,
+  getAgentInstallIssue,
+  installAgent,
+} from '../../agent/installer';
 import {
   AGENT_IDS,
   DEFAULT_MINIMAX_MODEL,
@@ -53,7 +59,37 @@ const AGENT_LABELS: Record<AgentId, string> = {
 };
 const DEFAULT_INTERACTIVE_AGENTS: AgentId[] = ['claude-code', 'codex'];
 
+interface SelectedAgentSetup extends AgentSetupOptions {
+  agentsToInstall: AgentId[];
+}
+
 type ApiKeyKind = 'token-plan' | 'paygo';
+
+interface AgentInstallationDependencies {
+  getCommand(agent: AgentId): ReturnType<typeof getAgentInstallCommand>;
+  install(agent: AgentId): Promise<void>;
+  note(options: { title: string; message: string }): Promise<void>;
+  confirm(options: { message: string }): Promise<boolean | undefined>;
+}
+
+interface MissingAgentSelectionDependencies {
+  select: typeof promptMultiSelect;
+  note: typeof promptNote;
+  getIssue(agent: AgentId): string | undefined;
+}
+
+const AGENT_INSTALLATION_DEPENDENCIES: AgentInstallationDependencies = {
+  getCommand: getAgentInstallCommand,
+  install: installAgent,
+  note: promptNote,
+  confirm: promptConfirm,
+};
+
+const MISSING_AGENT_SELECTION_DEPENDENCIES: MissingAgentSelectionDependencies = {
+  select: promptMultiSelect,
+  note: promptNote,
+  getIssue: getAgentInstallIssue,
+};
 
 const API_KEY_CHOICES: Array<{
   value: ApiKeyKind;
@@ -139,10 +175,76 @@ function isInteractiveInvocation(flags: GlobalFlags): boolean {
   return Object.values(flags).every((value) => value === undefined || value === false);
 }
 
+export async function selectMissingAgentInstallations(
+  agents: AgentId[],
+  detectedAgents: Set<AgentId>,
+  dependencies: MissingAgentSelectionDependencies = MISSING_AGENT_SELECTION_DEPENDENCIES,
+): Promise<AgentId[]> {
+  const missingAgents = agents.filter((agent) => !detectedAgents.has(agent));
+  if (missingAgents.length === 0) return [];
+
+  const unavailable = missingAgents.flatMap((agent) => {
+    const issue = dependencies.getIssue(agent);
+    return issue ? [{ agent, issue }] : [];
+  });
+  if (unavailable.length > 0) {
+    await dependencies.note({
+      title: 'Unavailable installers',
+      message: unavailable.map(({ agent, issue }) => `${AGENT_LABELS[agent]}: ${issue}`).join('\n')
+        + '\n\nThese agents will remain configuration-only.',
+    });
+  }
+  const installableAgents = missingAgents.filter(
+    (agent) => !unavailable.some(candidate => candidate.agent === agent),
+  );
+  if (installableAgents.length === 0) return [];
+
+  const selected = await dependencies.select({
+    message: 'Select missing agents to install',
+    choices: installableAgents.map((agent) => ({
+      value: agent,
+      label: AGENT_LABELS[agent],
+    })),
+    initialValues: installableAgents,
+    required: false,
+  });
+  if (selected === undefined) {
+    throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
+  }
+  return uniqueAgents(selected);
+}
+
+export async function installSelectedAgents(
+  agents: AgentId[],
+  detectedAgents: Set<AgentId>,
+  dependencies: AgentInstallationDependencies = AGENT_INSTALLATION_DEPENDENCIES,
+): Promise<void> {
+  for (const agent of agents) {
+    const command = dependencies.getCommand(agent);
+    await dependencies.note({
+      title: `Install ${AGENT_LABELS[agent]}`,
+      message: `$ ${command.display}`,
+    });
+    try {
+      await dependencies.install(agent);
+      detectedAgents.add(agent);
+    } catch (error) {
+      const detail = error instanceof CLIError
+        ? `${error.message}${error.hint ? `\n\n${error.hint}` : ''}`
+        : error instanceof Error ? error.message : String(error);
+      await dependencies.note({ title: 'Installation failed', message: detail });
+      const continueSetup = await dependencies.confirm({
+        message: `Continue and configure ${AGENT_LABELS[agent]} without installing it?`,
+      });
+      if (!continueSetup) throw error;
+    }
+  }
+}
+
 async function interactiveOptions(
   config: Config,
   detectedAgents: Set<AgentId>,
-): Promise<AgentSetupOptions> {
+): Promise<SelectedAgentSetup> {
   const selectedAgents = await promptMultiSelect({
     message: 'Select agents to configure',
     choices: AGENT_IDS.map((agent) => ({
@@ -158,6 +260,9 @@ async function interactiveOptions(
     throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
   }
   const agents = uniqueAgents(selectedAgents);
+
+  const notDetected = agents.filter((agent) => !detectedAgents.has(agent));
+  const agentsToInstall = await selectMissingAgentInstallations(agents, detectedAgents);
 
   const selectedRegion = await promptSelect({
     message: 'Select your MiniMax service region',
@@ -200,20 +305,29 @@ async function interactiveOptions(
     throw new CLIError('A MiniMax API key is required.', ExitCode.USAGE);
   }
 
-  const notDetected = agents.filter((agent) => !detectedAgents.has(agent));
   let message = `Configure ${agents.map((agent) => AGENT_LABELS[agent]).join(', ')}? `
     + 'mmx will write configuration files.';
-  if (notDetected.length > 0) {
-    message += ` Not detected on PATH: ${notDetected.map((agent) => AGENT_LABELS[agent]).join(', ')}. `
-      + 'mmx will still write configuration files for them, but will not download or install them for you.';
+  if (agentsToInstall.length > 0) {
+    message += ` It will first install ${agentsToInstall.map((agent) => AGENT_LABELS[agent]).join(', ')} `
+      + 'from their official npm packages.';
+  }
+  const configurationOnly = notDetected.filter((agent) => !agentsToInstall.includes(agent));
+  if (configurationOnly.length > 0) {
+    message += ` Configuration only: ${configurationOnly.map((agent) => AGENT_LABELS[agent]).join(', ')}.`;
   }
   const confirmed = await promptConfirm({ message });
   if (!confirmed) throw new CLIError('Agent setup cancelled.', ExitCode.GENERAL);
 
-  return { agents, apiKey, region: selectedRegion, model: DEFAULT_MINIMAX_MODEL };
+  return {
+    agents,
+    agentsToInstall,
+    apiKey,
+    region: selectedRegion,
+    model: DEFAULT_MINIMAX_MODEL,
+  };
 }
 
-function nonInteractiveOptions(flags: GlobalFlags): AgentSetupOptions {
+function nonInteractiveOptions(flags: GlobalFlags): SelectedAgentSetup {
   const positional = flags._positional as string[] | undefined;
   if (positional?.length) {
     throw new CLIError(
@@ -260,12 +374,18 @@ function nonInteractiveOptions(flags: GlobalFlags): AgentSetupOptions {
       `Supported models: ${MINIMAX_MODELS.map(candidate => candidate.id).join(', ')}`,
     );
   }
-  return { agents: selected, apiKey, region: flags.region, model: supportedModel };
+  return {
+    agents: selected,
+    agentsToInstall: [],
+    apiKey,
+    region: flags.region,
+    model: supportedModel,
+  };
 }
 
 export default defineCommand({
   name: 'agent setup',
-  description: 'Configure external coding agents using a MiniMax API key (does not install or launch them)',
+  description: 'Configure coding agents using a MiniMax API key and optionally install missing agents',
   usage: 'mmx agent setup [--agent <name> ... | --all] [--api-key <key>] [--region <region>]',
   options: [
     {
@@ -316,8 +436,17 @@ export default defineCommand({
       }, verify) : await verify();
     }
 
-    const prepared = prepareAgentConfigurations(options);
-    const files = applyAgentConfigurations(prepared, config.dryRun);
+    const configure = async (lockHeld = false) => {
+      const prepared = prepareAgentConfigurations(options);
+      if (!config.dryRun) {
+        await installSelectedAgents(options.agentsToInstall, detectedAgents);
+      }
+      return applyAgentConfigurations(prepared, config.dryRun, lockHeld);
+    };
+    const installsAgents = !config.dryRun && options.agentsToInstall.length > 0;
+    const files = installsAgents
+      ? await withAgentSetupLock(() => configure(true))
+      : await configure();
     const format = detectOutputFormat(config.output);
     console.log(formatAgentSetupResult({
       verification,

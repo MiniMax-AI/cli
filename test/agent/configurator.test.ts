@@ -4,7 +4,9 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -12,6 +14,7 @@ import {
 } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { join } from 'path';
+import { pathToFileURL } from 'url';
 
 import { parse as parseToml } from 'smol-toml';
 import { parse as parseYaml } from 'yaml';
@@ -392,13 +395,42 @@ describe('agent configurator', () => {
 
   it('rejects duplicate targets before creating files or backups', () => {
     const shared = join(home, 'shared-agent-config');
-    const prepared = prepareAgentConfigurations(setupOptions(
+    expect(() => prepareAgentConfigurations(setupOptions(
       ['claude-code', 'pi'],
       { env: { CLAUDE_CONFIG_DIR: shared, PI_CODING_AGENT_DIR: shared } },
-    ));
-
-    expect(() => applyAgentConfigurations(prepared)).toThrow('Multiple agent configuration paths');
+    ))).toThrow('Multiple agent configuration paths');
     expect(existsSync(shared)).toBe(false);
+  });
+
+  it('removes the setup lock when SIGINT exits during a long-running task', async () => {
+    const lockDirectory = mkdtempSync(join(tmpdir(), 'mmx-agent-lock-'));
+    const moduleUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/configurator.ts')).href;
+    const child = Bun.spawn({
+      cmd: [
+        process.execPath,
+        '-e',
+        `import { withAgentSetupLock } from ${JSON.stringify(moduleUrl)};`
+          + "process.on('SIGINT', () => process.exit(130));"
+          + 'await withAgentSetupLock(async () => {'
+          + 'setInterval(() => {}, 1000); await new Promise(() => {}); });',
+      ],
+      env: { ...process.env, TMPDIR: lockDirectory },
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    try {
+      for (let attempt = 0; attempt < 100 && readdirSync(lockDirectory).length === 0; attempt += 1) {
+        await Bun.sleep(10);
+      }
+      expect(readdirSync(lockDirectory)).toHaveLength(1);
+      child.kill(2);
+      expect(await child.exited).toBe(130);
+      expect(readdirSync(lockDirectory)).toHaveLength(0);
+    } finally {
+      child.kill();
+      await child.exited;
+      rmSync(lockDirectory, { recursive: true, force: true });
+    }
   });
 
   it('preserves comments on unrelated Claude model picker entries', () => {

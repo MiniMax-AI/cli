@@ -166,7 +166,7 @@ mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" -
 mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
 ```
 
-写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览且不会发起联网请求。该命令只管理配置文件，不会安装或启动所选 Agent。
+写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览且不会发起联网请求。在交互式向导中，兼容且未在 `PATH` 中检测到的 Agent 会出现在第二个安装多选列表，并通过官方 npm 包安装；没有配置安全安装方式的 Agent 会说明原因并保持仅配置。非交互调用仍只写配置，且该命令不会启动 Agent。
 
 ### `mmx update`
 

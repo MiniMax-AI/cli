@@ -878,6 +878,7 @@ export function prepareAgentConfigurations(options: AgentSetupOptions): Prepared
         break;
     }
   }
+  assertDistinctConfigurationTargets(prepared);
   return prepared;
 }
 
@@ -954,6 +955,20 @@ function hasWeakPermissions(mode: number): boolean {
   return process.platform !== 'win32' && (mode & 0o077) !== 0;
 }
 
+function assertDistinctConfigurationTargets(prepared: PreparedAgentFile[]): void {
+  const targets = new Set<string>();
+  for (const file of prepared) {
+    if (targets.has(file.targetPath)) {
+      throw new CLIError(
+        `Multiple agent configuration paths resolve to ${file.targetPath}.`,
+        ExitCode.GENERAL,
+        'No files were changed. Use distinct configuration paths and retry.',
+      );
+    }
+    targets.add(file.targetPath);
+  }
+}
+
 function isProcessRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -979,7 +994,10 @@ function acquireAgentSetupLock(): () => void {
       if (readExisting(lockPath)?.trim() === token) rmSync(lockPath, { force: true });
       throw error;
     }
+    let released = false;
     return () => {
+      if (released) return;
+      released = true;
       closeSync(descriptor);
       if (readExisting(lockPath)?.trim() === token) rmSync(lockPath, { force: true });
     };
@@ -1000,25 +1018,26 @@ function acquireAgentSetupLock(): () => void {
   }
 }
 
+export async function withAgentSetupLock<T>(task: () => Promise<T>): Promise<T> {
+  const releaseLock = acquireAgentSetupLock();
+  process.once('exit', releaseLock);
+  try {
+    return await task();
+  } finally {
+    process.off('exit', releaseLock);
+    releaseLock();
+  }
+}
+
 export function applyAgentConfigurations(
   prepared: PreparedAgentFile[],
   dryRun = false,
+  lockHeld = false,
 ): AppliedAgentFile[] {
-  const releaseLock = dryRun ? undefined : acquireAgentSetupLock();
+  const releaseLock = dryRun || lockHeld ? undefined : acquireAgentSetupLock();
   try {
     const changed = prepared.filter((file) => file.before !== file.after);
-    const targets = new Set<string>();
-    for (const file of prepared) {
-      const target = file.targetPath;
-      if (targets.has(target)) {
-        throw new CLIError(
-          `Multiple agent configuration paths resolve to ${target}.`,
-          ExitCode.GENERAL,
-          'No files were changed. Use distinct configuration paths and retry.',
-        );
-      }
-      targets.add(target);
-    }
+    assertDistinctConfigurationTargets(prepared);
     const originalModes = new Map<PreparedAgentFile, number>();
     const permissionOnly = new Map<PreparedAgentFile, number>();
     for (const file of prepared) {
