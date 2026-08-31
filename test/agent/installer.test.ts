@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -13,16 +13,24 @@ import {
 } from '../../src/agent/installer';
 
 describe('agent installer', () => {
-  it('uses the official npm packages without invoking an agent', () => {
+  it('uses official packages and installer scripts without invoking an agent', () => {
     expect(getAgentInstallCommand('claude-code', 'linux')).toEqual({
-      executable: 'npm',
-      args: ['install', '-g', '@anthropic-ai/claude-code@latest'],
-      display: 'npm install -g @anthropic-ai/claude-code@latest',
+      executable: 'bash',
+      args: ['-c', 'set -o pipefail; curl -fsSL https://claude.ai/install.sh | bash'],
+      display: 'curl -fsSL https://claude.ai/install.sh | bash',
     });
-    expect(() => getAgentInstallCommand('grok', 'linux'))
-      .toThrow('grok has no configuration-safe automated installer');
-    expect(() => getAgentInstallCommand('hermes', 'linux'))
-      .toThrow('hermes has no configuration-safe automated installer');
+    expect(getAgentInstallCommand('grok', 'linux')).toEqual({
+      executable: 'bash',
+      args: ['-c', 'set -o pipefail; curl -fsSL https://x.ai/cli/install.sh | bash'],
+      display: 'curl -fsSL https://x.ai/cli/install.sh | bash',
+    });
+    const hermes = getAgentInstallCommand('hermes', 'linux');
+    expect(hermes.executable).toBe('bash');
+    expect(hermes.args.join(' ')).toContain('https://hermes-agent.nousresearch.com/install.sh');
+    expect(hermes.args.join(' ')).toContain('python-deps');
+    expect(hermes.args.join(' ')).not.toContain('prerequisites');
+    expect(hermes.args.join(' ')).not.toContain('node-deps');
+    expect(hermes.args.join(' ')).toContain('--non-interactive');
   });
 
   it('uses each package official installation arguments', () => {
@@ -46,19 +54,34 @@ describe('agent installer', () => {
       args: ['/d', '/s', '/c', 'npm install -g @openai/codex'],
       display: 'npm install -g @openai/codex',
     });
+    const grokWindows = getAgentInstallCommand('grok', 'win32');
+    expect(grokWindows.executable).toBe('powershell.exe');
+    expect(grokWindows.args.join(' ')).toContain('https://x.ai/cli/install.ps1');
+    expect(grokWindows.args.join(' ')).toContain('DefaultWebProxy');
+    const claudeWindows = getAgentInstallCommand('claude-code', 'win32');
+    expect(claudeWindows.executable).toBe('powershell.exe');
+    expect(claudeWindows.args.join(' ')).toContain('https://claude.ai/install.ps1');
+    const hermesWindows = getAgentInstallCommand('hermes', 'win32');
+    expect(hermesWindows.executable).toBe('powershell.exe');
+    expect(hermesWindows.args.join(' ')).toContain("'dependencies'");
+    expect(hermesWindows.args.join(' ')).not.toContain("'system-packages'");
+    expect(hermesWindows.args.join(' ')).not.toContain("'node-deps'");
+    expect(hermesWindows.args.join(' ')).toContain('-NonInteractive -SkipComputerUse');
+    expect(hermesWindows.args.join(' ').match(/DefaultWebProxy/g)?.length).toBe(2);
   });
 
   it('verifies the installed executable without launching the agent', () => {
-    expect(getAgentVerificationCommand('claude-code', 'linux')).toEqual({
-      executable: 'claude',
-      args: ['--version'],
-      display: 'claude --version',
-    });
+    const claude = getAgentVerificationCommand('claude-code', 'linux');
+    expect(claude.executable).toBe('bash');
+    expect(claude.args.join(' ')).toContain('$HOME/.local/bin/claude');
+    expect(claude.display).toBe('claude --version');
     expect(getAgentVerificationCommand('pi', 'win32')).toEqual({
       executable: 'cmd.exe',
       args: ['/d', '/s', '/c', 'pi --version'],
       display: 'pi --version',
     });
+    expect(getAgentVerificationCommand('grok', 'linux').display).toBe('grok --version');
+    expect(getAgentVerificationCommand('hermes', 'win32').display).toBe('hermes --version');
   });
 
   it('preflights platform, architecture, commands, and Node requirements', () => {
@@ -81,12 +104,38 @@ describe('agent installer', () => {
     })).toContain('riscv64');
     expect(getAgentInstallIssue('claude-code', {
       commandExists: () => false,
-    })).toContain('npm');
+    })).toContain('bash');
+    expect(getAgentInstallIssue('claude-code', {
+      ...commandsExist,
+      nodeVersion: '18.20.8',
+    })).toBeUndefined();
     expect(getAgentInstallIssue('codex', {
       commandExists: () => false,
     })).toContain('npm');
-    expect(getAgentInstallIssue('hermes', commandsExist)).toContain('changes shell configuration');
-    expect(getAgentInstallIssue('grok', commandsExist)).toContain('changes Grok configuration');
+    expect(getAgentInstallIssue('hermes', commandsExist)).toBeUndefined();
+    expect(getAgentInstallIssue('hermes', {
+      ...commandsExist,
+      platform: 'darwin',
+      arch: 'x64',
+    })).toContain('Apple Silicon only');
+    expect(getAgentInstallIssue('hermes', {
+      ...commandsExist,
+      platform: 'darwin',
+      arch: 'arm64',
+    })).toBeUndefined();
+    expect(getAgentInstallIssue('grok', commandsExist)).toBeUndefined();
+    expect(getAgentInstallIssue('grok', {
+      platform: 'linux',
+      commandExists: executable => executable !== 'curl',
+    })).toContain('curl');
+    expect(getAgentInstallIssue('hermes', {
+      platform: 'linux',
+      commandExists: executable => executable !== 'bash',
+    })).toContain('bash');
+    expect(getAgentInstallIssue('hermes', {
+      platform: 'linux',
+      commandExists: executable => executable !== 'git',
+    })).toContain('git');
   });
 
   it('does not run an installer that fails preflight', async () => {
@@ -116,6 +165,23 @@ describe('agent installer', () => {
     expect(received).toEqual([
       getAgentInstallCommand('codex', 'linux'),
       getAgentVerificationCommand('codex', 'linux'),
+    ]);
+  });
+
+  it('installs and verifies an official script-based agent', async () => {
+    const received: AgentInstallCommand[] = [];
+    await installAgent('grok', {
+      platform: 'linux',
+      commandExists: () => true,
+      runner: async (command) => {
+        received.push(command);
+        return 0;
+      },
+    });
+
+    expect(received).toEqual([
+      getAgentInstallCommand('grok', 'linux'),
+      getAgentVerificationCommand('grok', 'linux'),
     ]);
   });
 
@@ -179,6 +245,170 @@ describe('agent installer', () => {
       expect(await stderrPromise).toContain('codex output');
     } finally {
       rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('passes a configured proxy to installers without overriding an environment proxy', async () => {
+    if (process.platform === 'win32') return;
+    const directory = mkdtempSync(join(tmpdir(), 'mmx-installer-proxy-'));
+    const capture = join(directory, 'proxy.txt');
+    try {
+      const npm = join(directory, 'npm');
+      const codex = join(directory, 'codex');
+      writeFileSync(
+        npm,
+        '#!/bin/sh\nprintf "%s\\n%s\\n" "$HTTPS_PROXY" "$HTTP_PROXY" > "$MMX_PROXY_CAPTURE"\n',
+      );
+      writeFileSync(codex, '#!/bin/sh\nexit 0\n');
+      chmodSync(npm, 0o755);
+      chmodSync(codex, 0o755);
+      const moduleUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/installer.ts')).href;
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        PATH: `${directory}:${process.env.PATH ?? ''}`,
+        MMX_PROXY_CAPTURE: capture,
+      };
+      for (const key of [
+        'HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy',
+      ]) delete env[key];
+      const child = Bun.spawn({
+        cmd: [
+          process.execPath,
+          '-e',
+          `import { installAgent } from ${JSON.stringify(moduleUrl)}; `
+            + "await installAgent('codex', { proxy: 'http://config-proxy.example:8080' });",
+        ],
+        env,
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      expect(await child.exited).toBe(0);
+      expect(readFileSync(capture, 'utf8')).toBe(
+        'http://config-proxy.example:8080\nhttp://config-proxy.example:8080\n',
+      );
+
+      env.HTTPS_PROXY = 'http://environment-proxy.example:8080';
+      const precedenceChild = Bun.spawn({
+        cmd: [
+          process.execPath,
+          '-e',
+          `import { installAgent } from ${JSON.stringify(moduleUrl)}; `
+            + "await installAgent('codex', { proxy: 'http://config-proxy.example:8080' });",
+        ],
+        env,
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      expect(await precedenceChild.exited).toBe(0);
+      expect(readFileSync(capture, 'utf8').split('\n')[0]).toBe(
+        'http://environment-proxy.example:8080',
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('times out and terminates the installer process tree', async () => {
+    if (process.platform === 'win32') return;
+    const directory = mkdtempSync(join(tmpdir(), 'mmx-installer-timeout-'));
+    const pidPath = join(directory, 'child.pid');
+    try {
+      const npm = join(directory, 'npm');
+      writeFileSync(
+        npm,
+        '#!/bin/sh\ntrap \'\' TERM\nsleep 30 &\nprintf "%s" "$!" > "$MMX_CHILD_PID"\nwait\n',
+      );
+      chmodSync(npm, 0o755);
+      const moduleUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/installer.ts')).href;
+      const child = Bun.spawn({
+        cmd: [
+          process.execPath,
+          '-e',
+          `import { installAgent } from ${JSON.stringify(moduleUrl)}; `
+            + "try { await installAgent('codex', { commandExists: () => true, installTimeoutMs: 200 }); process.exit(2); } "
+            + 'catch (error) { if (error?.exitCode !== 5 || !error?.hint?.includes('
+            + "'installer was stopped')) process.exit(3); }",
+        ],
+        env: {
+          ...process.env,
+          PATH: `${directory}:${process.env.PATH ?? ''}`,
+          MMX_CHILD_PID: pidPath,
+        },
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      expect(await child.exited).toBe(0);
+      expect(existsSync(pidPath)).toBe(true);
+      const descendantPid = Number(readFileSync(pidPath, 'utf8'));
+      let running = true;
+      for (let attempt = 0; attempt < 100 && running; attempt += 1) {
+        try {
+          process.kill(descendantPid, 0);
+          await Bun.sleep(10);
+        } catch {
+          running = false;
+        }
+      }
+      expect(running).toBe(false);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('terminates the installer process tree when setup receives an exit signal', async () => {
+    if (process.platform === 'win32') return;
+    for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as const) {
+      const directory = mkdtempSync(join(tmpdir(), `mmx-installer-${signal.toLowerCase()}-`));
+      const pidPath = join(directory, 'child.pid');
+      try {
+        const npm = join(directory, 'npm');
+        writeFileSync(
+          npm,
+          '#!/bin/sh\ntrap \'\' TERM\nsleep 30 &\nprintf "%s" "$!" > "$MMX_CHILD_PID"\nwait\n',
+        );
+        chmodSync(npm, 0o755);
+        const moduleUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/installer.ts')).href;
+        const sigintHandler = signal === 'SIGINT'
+          ? "process.on('SIGINT', () => process.exit(130)); "
+          : '';
+        const child = Bun.spawn({
+          cmd: [
+            process.execPath,
+            '-e',
+            `import { installAgent } from ${JSON.stringify(moduleUrl)}; `
+              + sigintHandler
+              + "await installAgent('codex', { commandExists: () => true });",
+          ],
+          env: {
+            ...process.env,
+            PATH: `${directory}:${process.env.PATH ?? ''}`,
+            MMX_CHILD_PID: pidPath,
+          },
+          stdout: 'ignore',
+          stderr: 'ignore',
+        });
+        for (let attempt = 0; attempt < 100 && !existsSync(pidPath); attempt += 1) {
+          await Bun.sleep(10);
+        }
+        expect(existsSync(pidPath)).toBe(true);
+        child.kill(signal);
+        const expectedExitCode = signal === 'SIGHUP' ? 129 : signal === 'SIGINT' ? 130 : 143;
+        expect(await child.exited).toBe(expectedExitCode);
+
+        const descendantPid = Number(readFileSync(pidPath, 'utf8'));
+        let running = true;
+        for (let attempt = 0; attempt < 100 && running; attempt += 1) {
+          try {
+            process.kill(descendantPid, 0);
+            await Bun.sleep(10);
+          } catch {
+            running = false;
+          }
+        }
+        expect(running).toBe(false);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
   });
 });

@@ -217,6 +217,36 @@ describe('agent configurator', () => {
     expect(configured.model).toMatchObject({ default: 'MiniMax-M3', provider: 'minimax' });
   });
 
+  it('preserves settings created by the Grok installer', () => {
+    mkdirSync(join(home, '.grok'), { recursive: true });
+    writeFileSync(
+      join(home, '.grok', 'config.toml'),
+      '[cli]\ninstaller = "internal"\nchannel = "stable"\n',
+    );
+
+    applyAgentConfigurations(prepareAgentConfigurations(setupOptions(['grok'])));
+
+    const configured = parseToml(readFileSync(join(home, '.grok', 'config.toml'), 'utf8'));
+    expect(configured.cli).toEqual({ installer: 'internal', channel: 'stable' });
+    expect((configured.models as Record<string, unknown>).default).toBe('minimax');
+  });
+
+  it('accepts the UTF-8 BOM written by the Windows Grok installer', () => {
+    mkdirSync(join(home, '.grok'), { recursive: true });
+    writeFileSync(
+      join(home, '.grok', 'config.toml'),
+      '\ufeff[cli]\ninstaller = "internal"\nchannel = "stable"\n',
+    );
+
+    applyAgentConfigurations(prepareAgentConfigurations(setupOptions(['grok'])));
+
+    const source = readFileSync(join(home, '.grok', 'config.toml'), 'utf8');
+    expect(source.startsWith('\ufeff')).toBe(false);
+    const configured = parseToml(source);
+    expect(configured.cli).toEqual({ installer: 'internal', channel: 'stable' });
+    expect((configured.models as Record<string, unknown>).default).toBe('minimax');
+  });
+
   it('is idempotent and does not create another backup for unchanged files', () => {
     const options = setupOptions([...AGENT_IDS]);
     applyAgentConfigurations(prepareAgentConfigurations(options));
@@ -403,6 +433,7 @@ describe('agent configurator', () => {
   });
 
   it('removes the setup lock when SIGINT exits during a long-running task', async () => {
+    if (process.platform === 'win32') return;
     const lockDirectory = mkdtempSync(join(tmpdir(), 'mmx-agent-lock-'));
     const moduleUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/configurator.ts')).href;
     const child = Bun.spawn({
@@ -423,7 +454,7 @@ describe('agent configurator', () => {
         await Bun.sleep(10);
       }
       expect(readdirSync(lockDirectory)).toHaveLength(1);
-      child.kill(2);
+      child.kill('SIGINT');
       expect(await child.exited).toBe(130);
       expect(readdirSync(lockDirectory)).toHaveLength(0);
     } finally {

@@ -68,7 +68,7 @@ type ApiKeyKind = 'token-plan' | 'paygo';
 
 interface AgentInstallationDependencies {
   getCommand(agent: AgentId): ReturnType<typeof getAgentInstallCommand>;
-  install(agent: AgentId): Promise<void>;
+  install(agent: AgentId, options: { proxy?: string }): Promise<void>;
   note(options: { title: string; message: string }): Promise<void>;
   confirm(options: { message: string }): Promise<boolean | undefined>;
 }
@@ -218,6 +218,7 @@ export async function selectMissingAgentInstallations(
 export async function installSelectedAgents(
   agents: AgentId[],
   detectedAgents: Set<AgentId>,
+  options: { proxy?: string } = {},
   dependencies: AgentInstallationDependencies = AGENT_INSTALLATION_DEPENDENCIES,
 ): Promise<void> {
   for (const agent of agents) {
@@ -227,7 +228,7 @@ export async function installSelectedAgents(
       message: `$ ${command.display}`,
     });
     try {
-      await dependencies.install(agent);
+      await dependencies.install(agent, options);
       detectedAgents.add(agent);
     } catch (error) {
       const detail = error instanceof CLIError
@@ -310,7 +311,7 @@ async function interactiveOptions(
     + 'mmx will write configuration files.';
   if (agentsToInstall.length > 0) {
     message += ` It will first install ${agentsToInstall.map((agent) => AGENT_LABELS[agent]).join(', ')} `
-      + 'from their official npm packages.';
+      + 'using their official installers.';
   }
   const configurationOnly = notDetected.filter((agent) => !agentsToInstall.includes(agent));
   if (configurationOnly.length > 0) {
@@ -416,6 +417,7 @@ export default defineCommand({
     const options = interactive
       ? await interactiveOptions(config, detectedAgents)
       : nonInteractiveOptions(flags);
+    const configuredProxy = readConfigFile().proxy;
 
     let verification: AgentVerification = {
       region: options.region,
@@ -429,7 +431,7 @@ export default defineCommand({
         region: options.region,
         model: options.model,
         timeoutSeconds: Math.min(config.timeout, 60),
-        proxy: readConfigFile().proxy,
+        proxy: configuredProxy,
       });
       verification = interactive ? await withPromptSpinner({
         message: 'Verifying API key with MiniMax...',
@@ -439,9 +441,14 @@ export default defineCommand({
     }
 
     const configure = async (lockHeld = false) => {
-      const prepared = prepareAgentConfigurations(options);
+      let prepared = prepareAgentConfigurations(options);
       if (!config.dryRun) {
-        await installSelectedAgents(options.agentsToInstall, detectedAgents);
+        await installSelectedAgents(options.agentsToInstall, detectedAgents, {
+          proxy: configuredProxy,
+        });
+        if (options.agentsToInstall.length > 0) {
+          prepared = prepareAgentConfigurations(options);
+        }
       }
       return applyAgentConfigurations(prepared, config.dryRun, lockHeld);
     };

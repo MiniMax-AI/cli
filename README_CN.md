@@ -166,7 +166,7 @@ mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" -
 mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
 ```
 
-写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览且不会发起联网请求。在交互式向导中，兼容且未在 `PATH` 中检测到的 Agent 会出现在第二个安装多选列表，并通过官方 npm 包安装；没有配置安全安装方式的 Agent 会说明原因并保持仅配置。非交互调用仍只写配置，且该命令不会启动 Agent。
+写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览且不会发起联网请求。在交互式向导中，兼容且未在 `PATH` 中检测到的 Agent 会出现在第二个安装多选列表，并通过官方软件包或安装脚本安装。Hermes 仅执行官方核心 CLI 安装阶段，跳过可选系统软件包、Node 工作区、浏览器、计算机控制、初始化和网关阶段。安装完成后，mmx 会保留安装器生成的其他设置并写入 MiniMax 配置。平台或依赖检查不通过的 Agent 会说明原因并保持仅配置。非交互调用仍只写配置，且该命令不会启动 Agent。
 
 ### `mmx update`
 

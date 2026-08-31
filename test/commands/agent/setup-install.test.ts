@@ -81,49 +81,46 @@ describe('agent setup installation flow', () => {
     expect(note).toContain('configuration-only');
   });
 
-  it('keeps unsafe installers out of the list and explains configuration-only fallback', async () => {
-    let note = '';
+  it('offers Grok and Hermes when their official installers are available', async () => {
     const selected = await selectMissingAgentInstallations(
       ['grok', 'hermes', 'codex'],
       new Set(),
       {
         select: async (options) => {
-          expect(options.choices.map(choice => choice.value)).toEqual(['codex']);
-          return ['codex'];
+          expect(options.choices.map(choice => choice.value)).toEqual(['grok', 'hermes', 'codex']);
+          return ['grok', 'hermes'];
         },
-        note: async ({ message }) => { note = message; },
-        getIssue: (agent) => {
-          if (agent === 'grok') return 'Installer changes Grok configuration.';
-          if (agent === 'hermes') return 'Installer changes shell configuration.';
-          return undefined;
-        },
+        note: async () => {},
+        getIssue: () => undefined,
       },
     );
 
-    expect(selected).toEqual(['codex']);
-    expect(note).toContain('Grok CLI (Grok Build): Installer changes Grok configuration.');
-    expect(note).toContain('Hermes Agent: Installer changes shell configuration.');
-    expect(note).toContain('configuration-only');
+    expect(selected).toEqual(['grok', 'hermes']);
   });
 
   it('installs only the chosen agents and marks only successful installs detected', async () => {
     const installed: AgentId[] = [];
     const detected = new Set<AgentId>();
-    await installSelectedAgents(['pi'], detected, {
+    let proxy: string | undefined;
+    await installSelectedAgents(['pi'], detected, { proxy: 'http://proxy.example:8080' }, {
       getCommand: () => ({ executable: 'npm', args: [], display: 'install pi' }),
-      install: async (agent) => { installed.push(agent); },
+      install: async (agent, options) => {
+        installed.push(agent);
+        proxy = options.proxy;
+      },
       note: async () => {},
       confirm: async () => false,
     });
 
     expect(installed).toEqual(['pi']);
+    expect(proxy).toBe('http://proxy.example:8080');
     expect(detected).toEqual(new Set(['pi']));
   });
 
   it('can continue configuration after an installation failure', async () => {
     const detected = new Set<AgentId>();
     let confirmation = '';
-    await installSelectedAgents(['codex'], detected, {
+    await installSelectedAgents(['codex'], detected, {}, {
       getCommand: () => ({ executable: 'npm', args: [], display: 'install codex' }),
       install: async () => { throw new CLIError('install failed'); },
       note: async () => {},
@@ -139,7 +136,7 @@ describe('agent setup installation flow', () => {
 
   it('stops configuration when the user declines after an installation failure', async () => {
     const failure = new CLIError('install failed');
-    await expect(installSelectedAgents(['codex'], new Set(), {
+    await expect(installSelectedAgents(['codex'], new Set(), {}, {
       getCommand: () => ({ executable: 'npm', args: [], display: 'install codex' }),
       install: async () => { throw failure; },
       note: async () => {},

@@ -297,6 +297,7 @@ function updateToml(
   sections: Array<{ name: string; entries: Record<string, string | number | boolean> }>,
 ): string {
   let source = before ?? '';
+  if (source.charCodeAt(0) === 0xfeff) source = source.slice(1);
   try {
     parseToml(source);
   } catch {
