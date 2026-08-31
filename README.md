@@ -190,7 +190,7 @@ mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" -
 mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
 ```
 
-The command verifies the key and selected region before writing. Existing files are backed up when changed; use `--dry-run` to preview without a live request. Agent setup only writes configuration files; it does not install or launch the selected agents.
+The command verifies the key and selected region before writing. Existing files are backed up when changed; use `--dry-run` to preview without a live request. In the interactive wizard, compatible agents that are missing from `PATH` can be installed from a second multi-select list using their official packages or installer scripts. The Hermes install uses its official core CLI stages and skips optional system packages, Node workspace, browser, computer-use, setup, and gateway stages. After installation, mmx applies the MiniMax configuration while preserving installer settings. Agents that fail a platform or prerequisite check are explained and left configuration-only. Non-interactive invocations remain configuration-only, and the command never launches an agent.
 
 ### `mmx update`
 
