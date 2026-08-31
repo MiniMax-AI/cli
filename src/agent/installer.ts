@@ -31,10 +31,14 @@ const WINDOWS_INSTALLER_URLS: Record<ScriptAgentId, string> = {
   hermes: 'https://hermes-agent.nousresearch.com/install.ps1',
 };
 
+// These mirror the official manifest's non-interactive stages. Setup, gateway,
+// and the opt-in desktop build are intentionally excluded.
 const HERMES_POSIX_STAGES = [
+  'prerequisites',
   'repository',
   'venv',
   'python-deps',
+  'node-deps',
   'path',
   'config',
   'complete',
@@ -44,11 +48,15 @@ const HERMES_WINDOWS_STAGES = [
   'uv',
   'python',
   'git',
+  'node',
+  'system-packages',
   'repository',
   'venv',
   'dependencies',
+  'node-deps',
   'path',
   'config-templates',
+  'platform-sdks',
   'bootstrap-marker',
 ];
 
@@ -121,9 +129,6 @@ export function getAgentInstallIssue(
   }
   if (agent !== 'pi' && !SUPPORTED_NATIVE_ARCHITECTURES.has(arch)) {
     return `Automated installation is not supported on ${platform}/${arch}.`;
-  }
-  if (agent === 'hermes' && platform === 'darwin' && arch !== 'arm64') {
-    return 'Hermes automated installation is supported on macOS Apple Silicon only.';
   }
   if (agent === 'pi') {
     const [major = 0, minor = 0] = nodeVersion.replace(/^v/, '').split('.').map(Number);

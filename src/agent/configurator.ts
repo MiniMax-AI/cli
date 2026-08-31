@@ -364,6 +364,20 @@ function updateHermesYaml(
       'Hermes config.yaml providers section must be an object.',
     );
   }
+  if (root.agent !== undefined) {
+    assertObject(
+      root.agent,
+      'Hermes config.yaml agent section must be an object.',
+    );
+  }
+  const reasoningOverrides = (root.agent as Record<string, unknown> | undefined)
+    ?.reasoning_overrides;
+  if (reasoningOverrides !== undefined) {
+    assertObject(
+      reasoningOverrides,
+      'Hermes config.yaml agent.reasoning_overrides section must be an object.',
+    );
+  }
   const providerConfig = (root.providers as Record<string, unknown> | undefined)?.[provider];
   if (providerConfig !== undefined) {
     assertObject(
@@ -419,6 +433,11 @@ function updateHermesYaml(
   document.setIn(['model', 'base_url'], baseUrl);
   document.setIn(['model', 'context_length'], selectedModel.contextWindow);
   document.setIn(['model', 'max_tokens'], selectedModel.maxTokens);
+  if ((reasoningOverrides as Record<string, unknown> | undefined)?.['MiniMax-M3'] === undefined) {
+    // Hermes currently serializes enabled MiniMax thinking with the legacy
+    // budget-based shape. Omitting thinking is the safe M3 default.
+    document.setIn(['agent', 'reasoning_overrides', 'MiniMax-M3'], 'none');
+  }
   return document.toString();
 }
 
@@ -535,10 +554,12 @@ function codexModelCatalog(): string {
       display_name: model.id,
       description: 'MiniMax',
       default_reasoning_level: 'high',
-      supported_reasoning_levels: [
-        { effort: 'none', description: 'Think-Off' },
-        { effort: 'high', description: 'Deep' },
-      ],
+      supported_reasoning_levels: model.id === 'MiniMax-M3'
+        ? [
+          { effort: 'none', description: 'Think-Off' },
+          { effort: 'high', description: 'Deep' },
+        ]
+        : [{ effort: 'high', description: 'Always on' }],
       shell_type: 'shell_command',
       visibility: 'list',
       supported_in_api: true,
@@ -798,6 +819,9 @@ function preparePi(options: AgentSetupOptions, paths: string[]): PreparedAgentFi
     id: model.id,
     name: model.id,
     reasoning: true,
+    ...(model.id === 'MiniMax-M3'
+      ? { compat: { forceAdaptiveThinking: true } }
+      : { thinkingLevelMap: { off: null } }),
     input: [...model.input],
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,
@@ -831,7 +855,21 @@ function preparePi(options: AgentSetupOptions, paths: string[]): PreparedAgentFi
         `Pi model definition for ${definition.id} must be an object.`,
       );
       for (const [key, value] of Object.entries(definition)) {
-        if (key !== 'id') providerUpdates.push({ path: [...modelPath, key], value });
+        if (key === 'id') continue;
+        if (key === 'compat' || key === 'thinkingLevelMap') {
+          const existing = existingModels[modelIndex][key];
+          if (existing !== undefined) {
+            assertObject(existing, `Pi ${key} for ${definition.id} must be an object.`);
+          }
+          for (const [nestedKey, nestedValue] of Object.entries(value)) {
+            providerUpdates.push({
+              path: [...modelPath, key, nestedKey],
+              value: nestedValue,
+            });
+          }
+          continue;
+        }
+        providerUpdates.push({ path: [...modelPath, key], value });
       }
     }
   }
@@ -1021,11 +1059,31 @@ function acquireAgentSetupLock(): () => void {
 
 export async function withAgentSetupLock<T>(task: () => Promise<T>): Promise<T> {
   const releaseLock = acquireAgentSetupLock();
+  const signalHandlers = new Map<NodeJS.Signals, () => void>();
+  const removeSignalHandlers = () => {
+    for (const [signal, handler] of signalHandlers) {
+      process.removeListener(signal, handler);
+    }
+  };
+  for (const [signal, exitCode] of [
+    ['SIGHUP', 129],
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ] as const) {
+    const handler = () => {
+      removeSignalHandlers();
+      releaseLock();
+      process.exit(exitCode);
+    };
+    signalHandlers.set(signal, handler);
+    process.once(signal, handler);
+  }
   process.once('exit', releaseLock);
   try {
     return await task();
   } finally {
     process.off('exit', releaseLock);
+    removeSignalHandlers();
     releaseLock();
   }
 }

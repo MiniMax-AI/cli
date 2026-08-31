@@ -27,10 +27,12 @@ describe('agent installer', () => {
     const hermes = getAgentInstallCommand('hermes', 'linux');
     expect(hermes.executable).toBe('bash');
     expect(hermes.args.join(' ')).toContain('https://hermes-agent.nousresearch.com/install.sh');
+    expect(hermes.args.join(' ')).toContain('prerequisites');
     expect(hermes.args.join(' ')).toContain('python-deps');
-    expect(hermes.args.join(' ')).not.toContain('prerequisites');
-    expect(hermes.args.join(' ')).not.toContain('node-deps');
+    expect(hermes.args.join(' ')).toContain('node-deps');
     expect(hermes.args.join(' ')).toContain('--non-interactive');
+    expect(hermes.args.join(' ')).not.toContain(' setup ');
+    expect(hermes.args.join(' ')).not.toContain(' gateway ');
   });
 
   it('uses each package official installation arguments', () => {
@@ -64,9 +66,12 @@ describe('agent installer', () => {
     const hermesWindows = getAgentInstallCommand('hermes', 'win32');
     expect(hermesWindows.executable).toBe('powershell.exe');
     expect(hermesWindows.args.join(' ')).toContain("'dependencies'");
-    expect(hermesWindows.args.join(' ')).not.toContain("'system-packages'");
-    expect(hermesWindows.args.join(' ')).not.toContain("'node-deps'");
+    expect(hermesWindows.args.join(' ')).toContain("'system-packages'");
+    expect(hermesWindows.args.join(' ')).toContain("'node-deps'");
+    expect(hermesWindows.args.join(' ')).toContain("'platform-sdks'");
     expect(hermesWindows.args.join(' ')).toContain('-NonInteractive -SkipComputerUse');
+    expect(hermesWindows.args.join(' ')).not.toContain("'configure'");
+    expect(hermesWindows.args.join(' ')).not.toContain("'gateway'");
     expect(hermesWindows.args.join(' ').match(/DefaultWebProxy/g)?.length).toBe(2);
   });
 
@@ -117,7 +122,7 @@ describe('agent installer', () => {
       ...commandsExist,
       platform: 'darwin',
       arch: 'x64',
-    })).toContain('Apple Silicon only');
+    })).toBeUndefined();
     expect(getAgentInstallIssue('hermes', {
       ...commandsExist,
       platform: 'darwin',

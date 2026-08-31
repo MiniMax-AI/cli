@@ -66,7 +66,8 @@ describe('agent configurator', () => {
       join(home, '.pi', 'agent', 'models.json'),
       '{"providers":{"minimax-cn":{"headers":{"x-keep":"yes"},"models":['
         + '{"id":"keep-model","name":"Keep"},'
-        + '{"id":"MiniMax-M3","custom":true,"cost":{"currency":"credits"}}]}}}\n',
+        + '{"id":"MiniMax-M3","custom":true,"cost":{"currency":"credits"},'
+        + '"compat":{"supportsStrictTools":true}}]}}}\n',
     );
   });
 
@@ -127,6 +128,10 @@ describe('agent configurator', () => {
       context_window: 1000000,
       max_context_window: 1000000,
       input_modalities: ['text', 'image'],
+      supported_reasoning_levels: [
+        { effort: 'none', description: 'Think-Off' },
+        { effort: 'high', description: 'Deep' },
+      ],
     });
     expect(codexCatalog.models[1]).toMatchObject({
       slug: 'MiniMax-M2.7',
@@ -134,8 +139,11 @@ describe('agent configurator', () => {
       context_window: 204800,
       max_context_window: 204800,
       input_modalities: ['text'],
+      supported_reasoning_levels: [{ effort: 'high', description: 'Always on' }],
     });
     expect(codexCatalog.models[2].slug).toBe('MiniMax-M2.7-highspeed');
+    expect(codexCatalog.models[2].supported_reasoning_levels)
+      .toEqual([{ effort: 'high', description: 'Always on' }]);
     expect(codexCatalog.models[0].apply_patch_tool_type).toBeUndefined();
 
     const grok = parseToml(readFileSync(join(home, '.grok', 'config.toml'), 'utf8'));
@@ -175,6 +183,7 @@ describe('agent configurator', () => {
     expect(hermes.model.provider).toBe('minimax-cn');
     expect(hermes.model.context_length).toBe(1000000);
     expect(hermes.model.max_tokens).toBe(128000);
+    expect(hermes.agent.reasoning_overrides['MiniMax-M3']).toBe('none');
     expect(Object.keys(hermes.providers['minimax-cn'].models))
       .toEqual(['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed']);
     expect(readFileSync(join(home, '.hermes', '.env'), 'utf8'))
@@ -192,6 +201,11 @@ describe('agent configurator', () => {
       contextWindow: 1000000,
       maxTokens: 128000,
     });
+    expect(piModels.providers['minimax-cn'].models[1].thinkingLevelMap).toBeUndefined();
+    expect(piModels.providers['minimax-cn'].models[1].compat)
+      .toEqual({ supportsStrictTools: true, forceAdaptiveThinking: true });
+    expect(piModels.providers['minimax-cn'].models[2].thinkingLevelMap).toEqual({ off: null });
+    expect(piModels.providers['minimax-cn'].models[3].thinkingLevelMap).toEqual({ off: null });
     expect(piModels.providers['minimax-cn'].api).toBe('anthropic-messages');
     expect(piModels.providers['minimax-cn'].baseUrl).toBe('https://api.minimaxi.com/anthropic');
     expect(piModels.providers['minimax-cn'].models.map((model: { id: string }) => model.id))
@@ -215,6 +229,22 @@ describe('agent configurator', () => {
 
     const configured = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
     expect(configured.model).toMatchObject({ default: 'MiniMax-M3', provider: 'minimax' });
+  });
+
+  it('preserves existing Hermes reasoning overrides', () => {
+    mkdirSync(join(home, '.hermes'), { recursive: true });
+    writeFileSync(
+      join(home, '.hermes', 'config.yaml'),
+      'agent:\n  reasoning_effort: high\n  reasoning_overrides:\n'
+        + '    keep-model: low\n    MiniMax-M3: none\nproviders: {}\n',
+    );
+
+    applyAgentConfigurations(prepareAgentConfigurations(setupOptions(['hermes'])));
+
+    const configured = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
+    expect(configured.agent.reasoning_effort).toBe('high');
+    expect(configured.agent.reasoning_overrides)
+      .toEqual({ 'keep-model': 'low', 'MiniMax-M3': 'none' });
   });
 
   it('preserves settings created by the Grok installer', () => {
@@ -432,35 +462,56 @@ describe('agent configurator', () => {
     expect(existsSync(shared)).toBe(false);
   });
 
-  it('removes the setup lock when SIGINT exits during a long-running task', async () => {
+  it('removes the setup lock when installation receives an exit signal', async () => {
     if (process.platform === 'win32') return;
-    const lockDirectory = mkdtempSync(join(tmpdir(), 'mmx-agent-lock-'));
-    const moduleUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/configurator.ts')).href;
-    const child = Bun.spawn({
-      cmd: [
-        process.execPath,
-        '-e',
-        `import { withAgentSetupLock } from ${JSON.stringify(moduleUrl)};`
-          + "process.on('SIGINT', () => process.exit(130));"
-          + 'await withAgentSetupLock(async () => {'
-          + 'setInterval(() => {}, 1000); await new Promise(() => {}); });',
-      ],
-      env: { ...process.env, TMPDIR: lockDirectory },
-      stdout: 'ignore',
-      stderr: 'ignore',
-    });
-    try {
-      for (let attempt = 0; attempt < 100 && readdirSync(lockDirectory).length === 0; attempt += 1) {
-        await Bun.sleep(10);
+    const configuratorUrl = pathToFileURL(
+      join(import.meta.dir, '../../src/agent/configurator.ts'),
+    ).href;
+    const installerUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/installer.ts')).href;
+    for (const [signal, expectedExitCode] of [
+      ['SIGHUP', 129],
+      ['SIGINT', 130],
+      ['SIGTERM', 143],
+    ] as const) {
+      const lockDirectory = mkdtempSync(join(tmpdir(), `mmx-agent-lock-${signal.toLowerCase()}-`));
+      const readyPath = join(lockDirectory, 'installer.ready');
+      const npm = join(lockDirectory, 'npm');
+      writeFileSync(npm, '#!/bin/sh\nprintf ready > "$MMX_INSTALL_READY"\nsleep 30\n');
+      chmodSync(npm, 0o755);
+      const child = Bun.spawn({
+        cmd: [
+          process.execPath,
+          '-e',
+          `import { withAgentSetupLock } from ${JSON.stringify(configuratorUrl)};`
+            + `import { installAgent } from ${JSON.stringify(installerUrl)};`
+            + 'await withAgentSetupLock(() => installAgent('
+            + "'codex', { commandExists: () => true }));",
+        ],
+        env: {
+          ...process.env,
+          TMPDIR: lockDirectory,
+          PATH: `${lockDirectory}:${process.env.PATH ?? ''}`,
+          MMX_INSTALL_READY: readyPath,
+        },
+        stdout: 'ignore',
+        stderr: 'ignore',
+      });
+      try {
+        for (let attempt = 0; attempt < 100 && !existsSync(readyPath); attempt += 1) {
+          await Bun.sleep(10);
+        }
+        expect(existsSync(readyPath)).toBe(true);
+        expect(readdirSync(lockDirectory).filter(name => name.startsWith('mmx-agent-setup-')))
+          .toHaveLength(1);
+        child.kill(signal);
+        expect(await child.exited).toBe(expectedExitCode);
+        expect(readdirSync(lockDirectory).filter(name => name.startsWith('mmx-agent-setup-')))
+          .toHaveLength(0);
+      } finally {
+        child.kill();
+        await child.exited;
+        rmSync(lockDirectory, { recursive: true, force: true });
       }
-      expect(readdirSync(lockDirectory)).toHaveLength(1);
-      child.kill('SIGINT');
-      expect(await child.exited).toBe(130);
-      expect(readdirSync(lockDirectory)).toHaveLength(0);
-    } finally {
-      child.kill();
-      await child.exited;
-      rmSync(lockDirectory, { recursive: true, force: true });
     }
   });
 
