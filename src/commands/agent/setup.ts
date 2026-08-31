@@ -22,6 +22,8 @@ import {
   type AppliedAgentFile,
 } from '../../agent/types';
 import { verifyAgentCredential } from '../../agent/verify';
+import { readConfigFile } from '../../config/loader';
+import { DOCS_HOSTS, type Config } from '../../config/schema';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
@@ -33,7 +35,6 @@ import {
   promptSelect,
   withPromptSpinner,
 } from '../../utils/prompt';
-import { DOCS_HOSTS, type Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 
 const AGENT_ALIASES: Record<string, AgentId> = {
@@ -428,6 +429,7 @@ export default defineCommand({
         region: options.region,
         model: options.model,
         timeoutSeconds: Math.min(config.timeout, 60),
+        proxy: readConfigFile().proxy,
       });
       verification = interactive ? await withPromptSpinner({
         message: 'Verifying API key with MiniMax...',

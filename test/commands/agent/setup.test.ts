@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 import setupCommand from '../../../src/commands/agent/setup';
+import { ExitCode } from '../../../src/errors/codes';
 import { registry } from '../../../src/registry';
 import type { Config } from '../../../src/config/schema';
 import type { GlobalFlags } from '../../../src/types/flags';
@@ -162,6 +163,55 @@ describe('agent setup command', () => {
     expect(stderr).toContain('Usage: mmx agent setup');
     expect(stderr).toContain('--api-key <key>');
     expect(stderr).toContain('not interchangeable');
+  });
+
+  it('reports an unreachable configured proxy and exits without a generic fetch error', async () => {
+    const configDir = join(home, '.mmx');
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(join(configDir, 'config.json'), JSON.stringify({
+      proxy: 'http://127.0.0.1:1',
+    }));
+    const child = Bun.spawn({
+      cmd: [
+        process.execPath,
+        'run',
+        'src/main.ts',
+        'agent',
+        'setup',
+        '--agent',
+        'codex',
+        '--api-key',
+        'sk-cp-test-only',
+        '--region',
+        'cn',
+        '--non-interactive',
+        '--timeout',
+        '1',
+      ],
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        HOME: home,
+        MMX_CONFIG_DIR: configDir,
+        MINIMAX_OUTPUT: 'text',
+        NO_COLOR: '1',
+        HTTPS_PROXY: '',
+        https_proxy: '',
+        HTTP_PROXY: '',
+        http_proxy: '',
+        ALL_PROXY: '',
+        all_proxy: '',
+      },
+      stdout: 'ignore',
+      stderr: 'pipe',
+    });
+    const stderr = await new Response(child.stderr).text();
+
+    const acceptableExitCodes: number[] = [ExitCode.NETWORK, ExitCode.TIMEOUT];
+    expect(acceptableExitCodes).toContain(await child.exited);
+    expect(stderr).toContain('configured proxy');
+    expect(stderr).toContain('No agent configuration files were changed.');
+    expect(stderr).not.toContain('fetch failed');
   });
 
   it('keeps non-interactive text output free of prompt colors', async () => {
