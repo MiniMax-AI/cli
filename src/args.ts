@@ -26,20 +26,57 @@ interface FlagSchema {
   booleans: Set<string>;
   numbers: Set<string>;
   arrays: Set<string>;
+  keys: Set<string>;
 }
 
 function buildSchema(options: OptionDef[]): FlagSchema {
   const booleans = new Set<string>();
   const numbers = new Set<string>();
   const arrays = new Set<string>();
+  const keys = new Set<string>();
   for (const opt of options) {
     const key = flagKey(opt);
     if (!key) continue;
+    keys.add(key);
     if (isBooleanDef(opt)) booleans.add(key);
     else if (opt.type === 'number') numbers.add(key);
     else if (opt.type === 'array') arrays.add(key);
   }
-  return { booleans, numbers, arrays };
+  return { booleans, numbers, arrays, keys };
+}
+
+/** Validate option names and values without changing parsing for existing commands. */
+export function findOptionError(argv: string[], options: OptionDef[]): string | undefined {
+  const schema = buildSchema(options);
+  let i = 0;
+  while (i < argv.length) {
+    const arg = argv[i]!;
+    if (arg === '--') break;
+    if (arg.startsWith('--')) {
+      const eqIdx = arg.indexOf('=');
+      const rawKey = eqIdx === -1 ? arg.slice(2) : arg.slice(2, eqIdx);
+      const key = kebabToCamel(rawKey);
+      if (!schema.keys.has(key)) return `Unknown option: --${rawKey}`;
+      if (eqIdx !== -1 && !schema.booleans.has(key) && arg.slice(eqIdx + 1).trim() === '') {
+        return `Option --${rawKey} requires a value.`;
+      }
+      if (eqIdx === -1 && !schema.booleans.has(key)) {
+        const value = argv[i + 1];
+        if (value === undefined || value.startsWith('-')) {
+          return `Option --${rawKey} requires a value.`;
+        }
+        i += 2;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    if (arg.startsWith('-') && arg !== '-h' && arg !== '-v') {
+      return `Unknown option: ${arg}`;
+    }
+    i += 1;
+  }
+  return undefined;
 }
 
 /**

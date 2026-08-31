@@ -26,6 +26,7 @@ import fileList from './commands/file/list';
 import fileDelete from './commands/file/delete';
 import update from './commands/update';
 import help from './commands/help';
+import agentSetup from './commands/agent/setup';
 
 export type { Command, OptionDef } from './command';
 
@@ -218,6 +219,7 @@ ${b('Resources:')}
   ${a('vision')}     ${d('Image understanding (describe)')}
   ${a('quota')}      ${d('Usage quotas (show)')}
   ${a('config')}     ${d('CLI configuration (show, set, export-schema)')}
+  ${a('agent')}      ${d('External coding agent integration (setup)')}
   ${a('file')}       ${d('File storage (upload, list, delete)')}
   ${a('update')}     ${d('Update mmx to a newer version')}
 
@@ -311,4 +313,5 @@ export const registry = new CommandRegistry({
   'file delete':          fileDelete,
   'update':               update,
   'help':                 help,
+  'agent setup':          agentSetup,
 });
