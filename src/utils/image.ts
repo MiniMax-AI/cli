@@ -2,10 +2,9 @@ import { readFileSync, existsSync, statSync } from 'fs';
 import { extname } from 'path';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
-import type { ContentBlock } from '../types/api';
 import { dataUriDecodedSize } from './media';
 
-type ImageBlock = Extract<ContentBlock, { type: 'image' }>;
+type ImageBlock = { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
 
 export const IMAGE_MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -46,6 +45,35 @@ export function resolveImageInput(input: string, maxBytes?: number): string {
 }
 
 const MAX_IMAGE_SIZE_BYTES = 50 * 1024 * 1024;
+
+async function readBodyWithLimit(res: Response, maxBytes: number): Promise<Buffer> {
+  if (!res.body) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.byteLength > maxBytes) throw tooLarge(buf.byteLength, maxBytes);
+    return buf;
+  }
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > maxBytes) {
+      await reader.cancel();
+      throw tooLarge(received, maxBytes);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
+function tooLarge(bytes: number, maxBytes: number): CLIError {
+  return new CLIError(
+    `Image too large (${(bytes / 1024 / 1024).toFixed(1)} MB received). Maximum is ${(maxBytes / 1024 / 1024).toFixed(0)} MB.`,
+    ExitCode.USAGE,
+  );
+}
 
 export async function toDataUri(image: string, opts?: ImageValidationOptions): Promise<string> {
   if (image.startsWith('data:')) {
@@ -93,14 +121,10 @@ export async function toDataUri(image: string, opts?: ImageValidationOptions): P
       }
     }
 
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > maxBytes) {
-      throw new CLIError(
-        `Image too large (${(buf.byteLength / 1024 / 1024).toFixed(1)} MB). Maximum is ${(maxBytes / 1024 / 1024).toFixed(0)} MB.`,
-        ExitCode.USAGE,
-      );
-    }
-    return `data:${mime};base64,${Buffer.from(buf).toString('base64')}`;
+    // content-length is advisory; enforce the cap on the bytes actually received and
+    // cancel the download the moment it is exceeded instead of buffering the whole body.
+    const buf = await readBodyWithLimit(res, maxBytes);
+    return `data:${mime};base64,${buf.toString('base64')}`;
   }
 
   if (!existsSync(image)) throw new CLIError(`File not found: ${image}`, ExitCode.USAGE);

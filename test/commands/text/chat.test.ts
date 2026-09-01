@@ -466,6 +466,59 @@ describe('text chat command', () => {
       ).rejects.toThrow(/too large/i);
     });
 
+    it('starts a new user turn when the assistant spoke last', async () => {
+      const request = await dryRunRequest(baseConfig, {
+        message: ['Describe the first one.', 'assistant:Sure — send it over.'],
+        image: [imgA],
+      });
+
+      expect(request.messages).toHaveLength(3);
+      expect(request.messages[0].role).toBe('user');
+      expect(request.messages[0].content).toBe('Describe the first one.');
+      expect(request.messages[1].role).toBe('assistant');
+      expect(request.messages[2].role).toBe('user');
+      expect(request.messages[2].content).toHaveLength(1);
+      expect(request.messages[2].content[0].type).toBe('image');
+    });
+
+    it('rejects a chunked remote image over 10 MB with no content-length', async () => {
+      // Stream 40 MB in 1 MB chunks with no Content-Length header, so the header
+      // pre-check cannot catch it and the cap has to be enforced on the bytes
+      // actually received. The server must not get to serve the whole body: the
+      // download has to be cancelled as soon as the cap is crossed.
+      let chunksServed = 0;
+      const imgServer = createMockServer({
+        routes: {
+          '/chunked.png': () => new Response(new ReadableStream({
+            pull(controller) {
+              if (chunksServed >= 40) { controller.close(); return; }
+              chunksServed++;
+              controller.enqueue(new Uint8Array(1024 * 1024));
+            },
+          }), { headers: { 'Content-Type': 'image/png' } }),
+        },
+      });
+
+      try {
+        await expect(
+          dryRunRequest(baseConfig, { message: ['hi'], image: [`${imgServer.url}/chunked.png`] }),
+        ).rejects.toThrow(/too large/i);
+        expect(chunksServed).toBeLessThan(40);
+      } finally {
+        imgServer.close();
+      }
+    });
+
+    it('rejects when the serialized request body exceeds 64 MB even if the images fit', async () => {
+      // 40 MB of double quotes is under the cap as raw text, but JSON-escapes to
+      // 80 MB on the wire; only a check on the serialized body catches that.
+      const system = '"'.repeat(40 * 1024 * 1024);
+
+      await expect(
+        dryRunRequest(baseConfig, { system, message: ['hi'], image: [imgA] }),
+      ).rejects.toThrow(/64 MB/);
+    });
+
     it('rejects when images cumulatively exceed the 64 MB request cap', async () => {
       // ~7.15 MB decoded each — under the 10 MB per-image cap, but seven of
       // them push the whole request past the 64 MB aggregate cap.

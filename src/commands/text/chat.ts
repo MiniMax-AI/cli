@@ -153,20 +153,20 @@ function parseMessages(flags: GlobalFlags): ParsedMessages {
 }
 
 /**
- * Attach image blocks to the last user message, promoting its content from a
+ * Attach image blocks to the final user message, promoting its content from a
  * bare string to a block array. Images land after the text so the model reads
- * the instruction first.
+ * the instruction first. If the conversation does not end with a user message
+ * (empty, or the assistant spoke last), the images become a new user turn rather
+ * than being spliced into an earlier one.
  */
 function attachImages(messages: ChatMessage[], images: ContentBlock[]): void {
-  let idx = messages.length - 1;
-  while (idx >= 0 && messages[idx]!.role !== 'user') idx--;
-
-  if (idx < 0) {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'user') {
     messages.push({ role: 'user', content: images });
     return;
   }
 
-  const target = messages[idx]!;
+  const target = last;
   const content = typeof target.content === 'string'
     ? (target.content ? [{ type: 'text' as const, text: target.content }] : [])
     : target.content;
@@ -187,7 +187,7 @@ export default defineCommand({
   usage: 'mmx text chat --message <text> [flags]',
   options: [
     { flag: '--model <model>', description: 'Model ID (default: MiniMax-M3)' },
-    { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
+    { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role; optional when --image or --messages-file is given)', type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
     { flag: '--image <path-or-url>',   description: 'Image to send with the message (repeatable, base64 encoded automatically)', type: 'array' },
@@ -293,6 +293,17 @@ export default defineCommand({
         }
       });
       body.tools = tools;
+    }
+
+    // The per-image accumulation above is a fast fail on a lower bound; this is the
+    // authoritative check on the bytes that actually go on the wire.
+    const wireBytes = Buffer.byteLength(JSON.stringify(body), 'utf-8');
+    if (wireBytes > CHAT_MAX_REQUEST_BYTES) {
+      throw new CLIError(
+        `Request body is ${(wireBytes / 1024 / 1024).toFixed(1)} MB; the API limit is ${CHAT_MAX_REQUEST_BYTES / 1024 / 1024} MB.`,
+        ExitCode.USAGE,
+        'Send fewer or smaller --image inputs, or shorten the message and system text.',
+      );
     }
 
     if (config.dryRun) {
