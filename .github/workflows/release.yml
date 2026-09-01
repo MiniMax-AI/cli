@@ -44,6 +44,7 @@ jobs:
           trap 'rm -rf "$staging_dir"' EXIT
 
           cp package.json "$staging_dir/package.json"
+          cp README.md "$staging_dir/README.md"
           cp -R dist "$staging_dir/dist"
           node -e '
             const fs = require("fs");
