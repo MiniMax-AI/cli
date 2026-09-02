@@ -6,7 +6,7 @@ import {
   prepareAgentConfigurations,
   withAgentSetupLock,
 } from '../../agent/configurator';
-import { detectAgentsOnPath } from '../../agent/availability';
+import { detectAvailableAgents } from '../../agent/availability';
 import {
   getAgentInstallCommand,
   getAgentInstallIssue,
@@ -412,7 +412,7 @@ export default defineCommand({
     'mmx agent setup --agent opencode --api-key <key> --region cn --dry-run',
   ],
   async run(config: Config, flags: GlobalFlags) {
-    const detectedAgents = detectAgentsOnPath();
+    const detectedAgents = detectAvailableAgents();
     const interactive = isInteractiveInvocation(flags);
     const options = interactive
       ? await interactiveOptions(config, detectedAgents)

@@ -36,3 +36,9 @@ export function detectAgentsOnPath(env: NodeJS.ProcessEnv = process.env): Set<Ag
     })),
   )));
 }
+
+export function detectAvailableAgents(env: NodeJS.ProcessEnv = process.env): Set<AgentId> {
+  const agents = detectAgentsOnPath(env);
+  if (env.CODEX_THREAD_ID?.trim()) agents.add('codex');
+  return agents;
+}
