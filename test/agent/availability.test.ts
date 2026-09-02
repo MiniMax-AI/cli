@@ -65,6 +65,17 @@ describe('agent availability', () => {
     expect(detectAvailableAgents({ CODEX_THREAD_ID: 'thread-id' })).toEqual(new Set(['codex']));
   });
 
+  it('recognizes supported agent runtimes from their exact markers', () => {
+    for (const [env, agent] of [
+      [{ CLAUDE_CODE_CHILD_SESSION: '1' }, 'claude-code'],
+      [{ OPENCODE_CLIENT: 'desktop' }, 'opencode'],
+      [{ HERMES_AGENT: 'true' }, 'hermes'],
+      [{ PI_CODING_AGENT: 'true' }, 'pi'],
+    ] as const) {
+      expect(detectAvailableAgents(env)).toEqual(new Set([agent]));
+    }
+  });
+
   it('keeps PATH detection when recognizing the active Codex runtime', () => {
     const root = executableDirectory('pi');
     expect(detectAvailableAgents({
@@ -81,5 +92,16 @@ describe('agent availability', () => {
   it('ignores empty and whitespace-only Codex runtime markers', () => {
     expect(detectAvailableAgents({ CODEX_THREAD_ID: '' })).toEqual(new Set());
     expect(detectAvailableAgents({ CODEX_THREAD_ID: '  ' })).toEqual(new Set());
+  });
+
+  it('does not infer runtimes from broad or near-match markers', () => {
+    expect(detectAvailableAgents({
+      CLAUDECODE: '1',
+      CLAUDE_CODE_CHILD_SESSION: 'true',
+      OPENCODE_CLIENT: 'cli',
+      HERMES_AGENT: '1',
+      PI_CODING_AGENT: '1',
+      AI_AGENT: 'pi',
+    })).toEqual(new Set());
   });
 });
