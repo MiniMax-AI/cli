@@ -12,6 +12,13 @@ const AGENT_EXECUTABLES: Record<AgentId, readonly string[]> = {
   pi: ['pi'],
 };
 
+const AGENT_RUNTIME_MARKERS: Partial<Record<AgentId, readonly [string, string]>> = {
+  'claude-code': ['CLAUDE_CODE_CHILD_SESSION', '1'],
+  opencode: ['OPENCODE_CLIENT', 'desktop'],
+  hermes: ['HERMES_AGENT', 'true'],
+  pi: ['PI_CODING_AGENT', 'true'],
+};
+
 export function detectAgentsOnPath(env: NodeJS.ProcessEnv = process.env): Set<AgentId> {
   const pathValue = process.platform === 'win32' ? env.PATH ?? env.Path : env.PATH;
   if (pathValue === undefined) return new Set();
@@ -40,5 +47,9 @@ export function detectAgentsOnPath(env: NodeJS.ProcessEnv = process.env): Set<Ag
 export function detectAvailableAgents(env: NodeJS.ProcessEnv = process.env): Set<AgentId> {
   const agents = detectAgentsOnPath(env);
   if (env.CODEX_THREAD_ID?.trim()) agents.add('codex');
+  for (const agent of AGENT_IDS) {
+    const marker = AGENT_RUNTIME_MARKERS[agent];
+    if (marker !== undefined && env[marker[0]] === marker[1]) agents.add(agent);
+  }
   return agents;
 }
