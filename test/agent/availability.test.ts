@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import { detectAgentsOnPath } from '../../src/agent/availability';
+import { detectAgentsOnPath, detectAvailableAgents } from '../../src/agent/availability';
 
 describe('agent availability', () => {
   const roots: string[] = [];
@@ -59,5 +59,27 @@ describe('agent availability', () => {
     const root = executableDirectory('pi');
 
     expect(detectAgentsOnPath({ Path: root })).toEqual(new Set());
+  });
+
+  it('recognizes the active Codex runtime without a Codex executable on PATH', () => {
+    expect(detectAvailableAgents({ CODEX_THREAD_ID: 'thread-id' })).toEqual(new Set(['codex']));
+  });
+
+  it('keeps PATH detection when recognizing the active Codex runtime', () => {
+    const root = executableDirectory('pi');
+    expect(detectAvailableAgents({
+      PATH: root,
+      PATHEXT: '.COM;.EXE;.BAT;.CMD',
+      CODEX_THREAD_ID: 'thread-id',
+    })).toEqual(new Set(['codex', 'pi']));
+  });
+
+  it('does not recognize a Codex runtime when its marker is missing', () => {
+    expect(detectAvailableAgents({})).toEqual(new Set());
+  });
+
+  it('ignores empty and whitespace-only Codex runtime markers', () => {
+    expect(detectAvailableAgents({ CODEX_THREAD_ID: '' })).toEqual(new Set());
+    expect(detectAvailableAgents({ CODEX_THREAD_ID: '  ' })).toEqual(new Set());
   });
 });

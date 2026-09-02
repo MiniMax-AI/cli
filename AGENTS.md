@@ -145,6 +145,13 @@ describe('auth/login', () => {
 - Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 - Keep commits atomic and focused
 
+### Blind Review
+
+- After implementation, send the full diff to two independent reviewers. Give them only the requirements, acceptance criteria, and task boundaries; do not reveal the implementation intent or the other reviewer's findings.
+- Fix confirmed issues with scoped changes, then repeat the two independent reviews.
+- Once reviews converge and only small corrections remain, use one blind reviewer.
+- If review and fixes stop converging, pause patching and reconsider the design as a whole. Stop and report the unresolved issue if redesign does not resolve it.
+
 ## Project Structure
 
 ```
