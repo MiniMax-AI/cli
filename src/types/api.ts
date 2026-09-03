@@ -134,6 +134,52 @@ export interface SpeechResponse {
   };
 }
 
+// ---- Speech / TTS (async + WebSocket) ----
+
+export interface SpeechVoiceModify {
+  pitch?: number;
+  intensity?: number;
+  timbre?: number;
+  sound_effects?: string;
+}
+
+export interface SpeechAsyncRequest {
+  model: string;
+  text?: string;
+  text_file_id?: string | number;
+  voice_setting?: SpeechRequest['voice_setting'];
+  audio_setting?: {
+    format?: string;
+    audio_sample_rate?: number;
+    bitrate?: number;
+    channel?: number;
+  };
+  language_boost?: string;
+  pronunciation_dict?: SpeechRequest['pronunciation_dict'];
+  voice_modify?: SpeechVoiceModify;
+}
+
+export interface SpeechAsyncResponse {
+  task_id: string | number;
+  task_token?: string;
+  file_id?: string | number;
+  usage_characters?: number;
+  base_resp: BaseResp;
+}
+
+export type SpeechAsyncStatus = 'Processing' | 'Success' | 'Failed' | 'Expired';
+
+export interface SpeechAsyncQueryRequest {
+  task_id: string | number;
+}
+
+export interface SpeechAsyncQueryResponse {
+  task_id: string | number;
+  status: SpeechAsyncStatus;
+  file_id?: string | number;
+  base_resp: BaseResp;
+}
+
 // ---- Voice List ----
 
 export interface SystemVoiceInfo {

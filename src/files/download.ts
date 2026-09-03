@@ -13,6 +13,7 @@ export interface DownloadOpts {
   quiet?: boolean;
   retries?: number;
   retryDelayMs?: number;
+  headers?: Record<string, string>;
   overallTimeoutMs?: number;
   idleTimeoutMs?: number;
   maxBytes?: number;
@@ -244,7 +245,8 @@ async function attemptDownload(
   downloadUrl: string,
   destPath: string,
   attempt: number,
-  opts: Required<Pick<DownloadOpts, 'quiet' | 'idleTimeoutMs' | 'maxBytes'>>,
+  opts: Required<Pick<DownloadOpts, 'quiet' | 'idleTimeoutMs' | 'maxBytes'>>
+    & Pick<DownloadOpts, 'headers'>,
   overallSignal: AbortSignal,
 ): Promise<{ size: number }> {
   const controller = new AbortController();
@@ -262,7 +264,7 @@ async function attemptDownload(
   try {
     try {
       response = await withIdleTimeout(
-        fetch(downloadUrl, { signal: controller.signal }),
+        fetch(downloadUrl, { headers: opts.headers, signal: controller.signal }),
         controller,
         opts.idleTimeoutMs,
         'waiting for response headers',
@@ -440,7 +442,7 @@ export async function downloadFile(
           downloadUrl,
           destPath,
           attempt,
-          { quiet, idleTimeoutMs, maxBytes },
+          { quiet, idleTimeoutMs, maxBytes, headers: opts?.headers },
           overallController.signal,
         );
       } catch (error) {
