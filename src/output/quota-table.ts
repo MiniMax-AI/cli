@@ -49,6 +49,7 @@ function displayModelName(name: string, region: string): string {
 
 function formatDuration(ms: number, nowLabel: string): string {
   if (ms <= 0) return nowLabel;
+  if (ms < 60000) return `${Math.max(1, Math.floor(ms / 1000))}s`;
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
