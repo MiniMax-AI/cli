@@ -222,6 +222,39 @@ describe('renderQuotaTable', () => {
     }
   });
 
+  it('renders seconds only for positive durations below one minute', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [
+          { ...createModel(), model_name: 'subsecond', remains_time: 1 },
+          { ...createModel(), model_name: 'seconds', remains_time: 59_999 },
+          { ...createModel(), model_name: 'minute', remains_time: 60_000 },
+          { ...createModel(), model_name: 'elapsed', remains_time: 0 },
+        ],
+        { ...createConfig(), noColor: true },
+      );
+      renderQuotaTable(
+        [{ ...createModel(), model_name: 'expired-cn', remains_time: -1 }],
+        { ...createConfig(), region: 'cn', noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(lines.find(line => line.includes('subsecond'))).toContain('12h Reset 1s');
+    expect(lines.find(line => line.includes('seconds'))).toContain('12h Reset 59s');
+    expect(lines.find(line => line.includes('minute'))).toContain('12h Reset 1m');
+    expect(lines.find(line => line.includes('elapsed'))).toContain('12h Reset now');
+    expect(lines.find(line => line.includes('expired-cn'))).toContain('12h 重置 即将');
+  });
+
   it('applies weekly_boost_permille (1500 ⇒ up to 150%) when rendering weekly percent', () => {
     const lines: string[] = [];
     const originalLog = console.log;
