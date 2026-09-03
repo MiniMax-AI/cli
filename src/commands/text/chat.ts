@@ -18,6 +18,13 @@ import { readFileSync } from 'fs';
 import { isInteractive } from '../../utils/env';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import { promptText, failIfMissing } from '../../utils/prompt';
+import { toImageBlock } from '../../utils/image';
+
+// MiniMax Anthropic API contract (platform.minimax.io/docs/api-reference/text-anthropic-api):
+// per-image cap, supported formats, and the whole-request-body cap.
+const CHAT_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const CHAT_IMAGE_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const CHAT_MAX_REQUEST_BYTES = 64 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Thinking indicator — dynamic spinner + color-cycling label
@@ -145,6 +152,27 @@ function parseMessages(flags: GlobalFlags): ParsedMessages {
   return { system, messages };
 }
 
+/**
+ * Attach image blocks to the final user message, promoting its content from a
+ * bare string to a block array. Images land after the text so the model reads
+ * the instruction first. If the conversation does not end with a user message
+ * (empty, or the assistant spoke last), the images become a new user turn rather
+ * than being spliced into an earlier one.
+ */
+function attachImages(messages: ChatMessage[], images: ContentBlock[]): void {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'user') {
+    messages.push({ role: 'user', content: images });
+    return;
+  }
+
+  const target = last;
+  const content = typeof target.content === 'string'
+    ? (target.content ? [{ type: 'text' as const, text: target.content }] : [])
+    : target.content;
+  target.content = [...content, ...images];
+}
+
 function extractText(content: ContentBlock[]): string {
   return content
     .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
@@ -159,9 +187,10 @@ export default defineCommand({
   usage: 'mmx text chat --message <text> [flags]',
   options: [
     { flag: '--model <model>', description: 'Model ID (default: MiniMax-M3)' },
-    { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
+    { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role; optional when --image or --messages-file is given)', type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
+    { flag: '--image <path-or-url>',   description: 'Image to send with the message (repeatable, base64 encoded automatically)', type: 'array' },
     { flag: '--max-tokens <n>',        description: 'Maximum tokens to generate (default: 4096)', type: 'number' },
     { flag: '--temperature <n>',       description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
     { flag: '--top-p <n>',             description: 'Nucleus sampling threshold', type: 'number' },
@@ -172,14 +201,17 @@ export default defineCommand({
     'mmx text chat --message "What is MiniMax?"',
     'mmx text chat --model MiniMax-M3 --system "You are a coding assistant." --message "Write fizzbuzz in Python"',
     'mmx text chat --message "Hello" --message "assistant:Hi!" --message "How are you?"',
+    'mmx text chat --image photo.jpg --message "What breed is this dog?"',
+    'mmx text chat --image before.png --image after.png --message "List every visual difference."',
     'cat conversation.json | mmx text chat --messages-file - --stream',
     'mmx text chat --message "Hello" --output json',
   ],
   async run(config: Config, flags: GlobalFlags) {
     const { system, messages: parsedMessages } = parseMessages(flags);
     let messages = parsedMessages;
+    const imageInputs = (flags.image as string[] | undefined) ?? [];
 
-    if (messages.length === 0) {
+    if (messages.length === 0 && imageInputs.length === 0) {
       if (isInteractive({ nonInteractive: config.nonInteractive })) {
         const hint = await promptText({
           message: 'Enter your message:',
@@ -194,8 +226,36 @@ export default defineCommand({
       }
     }
 
+    if (imageInputs.length > 0) {
+      const images: ContentBlock[] = [];
+      // Track the running request-body size so a run bails as soon as it's
+      // clear the request would exceed the cap, not after every image is
+      // fetched and encoded.
+      let requestBytes = Buffer.byteLength(JSON.stringify(messages), 'utf-8')
+        + Buffer.byteLength(system ?? '', 'utf-8');
+
+      for (const input of imageInputs) {
+        const block = await toImageBlock(input, {
+          maxBytes: CHAT_IMAGE_MAX_BYTES,
+          allowedMediaTypes: CHAT_IMAGE_ALLOWED_TYPES,
+        });
+        requestBytes += block.source.data.length;
+        if (requestBytes > CHAT_MAX_REQUEST_BYTES) {
+          throw new CLIError(
+            `Request body exceeds the ${CHAT_MAX_REQUEST_BYTES / 1024 / 1024} MB limit once this image is attached.`,
+            ExitCode.USAGE,
+            'Send fewer or smaller --image inputs.',
+          );
+        }
+        images.push(block);
+      }
+
+      attachImages(messages, images);
+    }
+
+    // Images require a multimodal model, so they override a text-only config default.
     const model = (flags.model as string)
-      || config.defaultTextModel
+      || (imageInputs.length > 0 ? 'MiniMax-M3' : config.defaultTextModel)
       || 'MiniMax-M3';
     const format = detectOutputFormat(config.output);
     const shouldStream = flags.stream === true || (
@@ -233,6 +293,17 @@ export default defineCommand({
         }
       });
       body.tools = tools;
+    }
+
+    // The per-image accumulation above is a fast fail on a lower bound; this is the
+    // authoritative check on the bytes that actually go on the wire.
+    const wireBytes = Buffer.byteLength(JSON.stringify(body), 'utf-8');
+    if (wireBytes > CHAT_MAX_REQUEST_BYTES) {
+      throw new CLIError(
+        `Request body is ${(wireBytes / 1024 / 1024).toFixed(1)} MB; the API limit is ${CHAT_MAX_REQUEST_BYTES / 1024 / 1024} MB.`,
+        ExitCode.USAGE,
+        'Send fewer or smaller --image inputs, or shorten the message and system text.',
+      );
     }
 
     if (config.dryRun) {

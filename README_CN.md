@@ -70,6 +70,8 @@ mmx text chat --model MiniMax-M3 --message "你好" --stream
 mmx text chat --system "你是编程助手" --message "用 Go 写 Fizzbuzz"
 mmx text chat --message "user:你好" --message "assistant:嗨！" --message "你叫什么名字？"
 cat messages.json | mmx text chat --messages-file - --output json
+mmx text chat --image photo.jpg --message "这是什么品种的狗？"
+mmx text chat --image before.png --image after.png --message "这两张图有什么不同？"
 ```
 
 ### `mmx image`
