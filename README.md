@@ -157,12 +157,13 @@ manual refresh via `mmx auth refresh`.
 Useful for CI/CD (`mmx auth login --api-key sk-xxxxx`), or pass per-command via `--api-key`.
 
 OAuth and API key are mutually exclusive — logging in with one clears the other.
-Credential priority: `--api-key` flag > OAuth (config) > `api_key` (config).
+Credential priority: `--api-key` flag > `MINIMAX_API_KEY` > OAuth (config) > `api_key` (config).
 
 ### Environment variables
 
 | Variable | Description |
 |---|---|
+| `MINIMAX_API_KEY` | API key for non-interactive use. Overridden by `--api-key`; overrides saved credentials. |
 | `MINIMAX_REGION` | `global` or `cn`. |
 | `MINIMAX_BASE_URL` | Override the API base URL. |
 | `MINIMAX_OUTPUT` | `text` or `json`. |

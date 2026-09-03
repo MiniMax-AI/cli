@@ -30,7 +30,11 @@ export function maybeShowStatusBar(config: Config, token: string, model?: string
 
   const filePath   = config.configPath ? tildePath(config.configPath) : '~/.mmx/config.json';
   const baseUrlStr = stripScheme(config.baseUrl);
-  const keySrc     = config.apiKey ? '(flag)' : '(file)';
+  const keySrc     = config.apiKeySource === 'env'
+    ? '(env)'
+    : config.apiKey
+      ? '(flag)'
+      : '(file)';
   const maskedKey  = maskToken(token);
   const modelStr   = model ? ` ${dim}|${reset} ${dim}Model:${reset} ${mmPurple}${model}${reset}` : '';
 

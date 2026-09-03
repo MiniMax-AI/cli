@@ -145,6 +145,8 @@ mmx auth logout
 都保存在 `~/.mmx/config.json` 里，**两者互斥** —— 用一种登录会清掉另一种。
 也可以每次通过 `--api-key` 直接传入。使用 API Key 登录时，会自动同时探测
 Global 与中国两个 region，选用能通过的那个。
+凭据优先级：`--api-key` 参数 > `MINIMAX_API_KEY` 环境变量 >
+OAuth（配置文件）> `api_key`（配置文件）。
 
 ### `mmx config` · `mmx quota`
 
