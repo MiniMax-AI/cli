@@ -68,6 +68,69 @@ describe('MiniMaxSDK.speech', () => {
     expect(voices).toHaveLength(1);
     expect(voices[0].voice_id).toBe('voice-1');
   });
+
+  it('should clone a voice successfully', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/voice_clone': async (req) => {
+          const body = await req.json() as Record<string, unknown>;
+          expect(body).toEqual({
+            file_id: 123,
+            voice_id: 'my_voice',
+          });
+          return jsonResponse({
+            input_sensitive: false,
+            input_sensitive_type: 0,
+            demo_audio: '',
+            extra_info: { audio_length: 1000 },
+            base_resp: { status_code: 0, status_msg: 'success' },
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    const result = await sdk.speech.clone({
+      file_id: 123,
+      voice_id: 'my_voice',
+    });
+
+    expect(result.input_sensitive).toBe(false);
+  });
+
+  it('should design a voice successfully', async () => {
+    server = createMockServer({
+      routes: {
+        '/v1/voice_design': async (req) => {
+          const body = await req.json() as Record<string, unknown>;
+          expect(body).toEqual({
+            prompt: 'Warm and clear narrator',
+            preview_text: 'Welcome to the show',
+          });
+          return jsonResponse({
+            trial_audio: 'hex-audio',
+            base_resp: { status_code: 0, status_msg: 'success' },
+          });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    const result = await sdk.speech.design({
+      prompt: 'Warm and clear narrator',
+      preview_text: 'Welcome to the show',
+    });
+
+    expect(result.trial_audio).toBe('hex-audio');
+  });
 });
 
 describe('SpeechSDK.save', () => {
