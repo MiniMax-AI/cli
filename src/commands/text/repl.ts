@@ -9,6 +9,7 @@ import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { ChatMessage, ChatRequest, StreamEvent } from '../../types/api';
 import { writeFileSync } from 'node:fs';
+import { resolveMaxTokens, resolveThinkingMode, resolveTemperature, type ThinkingMode } from '../../utils/model-defaults';
 
 // ---------------------------------------------------------------------------
 // ANSI helpers
@@ -58,6 +59,7 @@ interface ReplState {
   maxTokens: number;
   temperature: number | undefined;
   topP: number | undefined;
+  thinking: ThinkingMode | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -296,9 +298,10 @@ export default defineCommand({
   options: [
     { flag: '--model <model>',     description: 'Model ID (default: MiniMax-M3)' },
     { flag: '--system <text>',     description: 'System prompt' },
-    { flag: '--max-tokens <n>',    description: 'Maximum tokens per response (default: 4096)', type: 'number' },
-    { flag: '--temperature <n>',   description: 'Sampling temperature (0.0, 1.0]', type: 'number' },
-    { flag: '--top-p <n>',         description: 'Nucleus sampling threshold', type: 'number' },
+    { flag: '--max-tokens <n>',    description: 'Maximum tokens per response (default: 131072 for M3, 65536 for other models)', type: 'number' },
+    { flag: '--temperature <n>',   description: 'Sampling temperature [0, 2] (default: 1)', type: 'number' },
+    { flag: '--top-p <n>',         description: 'Nucleus sampling threshold (default: 0.95 for M3, 0.9 for M2.x per Messages API)', type: 'number' },
+    { flag: '--thinking <mode>',   description: 'Thinking mode for M3: enabled | disabled | adaptive (default: omitted — thinking disabled per Messages API contract)' },
   ],
   examples: [
     'mmx text repl',
@@ -321,14 +324,40 @@ export default defineCommand({
     const dim  = config.noColor ? '' : '\x1b[2m';
     const reset = config.noColor ? '' : '\x1b[0m';
 
+    // ---- Validate --thinking up-front (same surface as chat) ----
+    let thinkingMode: ThinkingMode | undefined;
+    try {
+      thinkingMode = resolveThinkingMode(flags.thinking);
+    } catch (err) {
+      throw new CLIError(
+        err instanceof Error ? err.message : String(err),
+        ExitCode.USAGE,
+      );
+    }
+
+    // ---- Validate --temperature up-front (same surface as chat) ----
+    let temperature: number | undefined;
+    try {
+      temperature = resolveTemperature(flags.temperature);
+    } catch (err) {
+      throw new CLIError(
+        err instanceof Error ? err.message : String(err),
+        ExitCode.USAGE,
+      );
+    }
+
     // ---- Initialize state ----
     const state: ReplState = {
       messages: [],
       system: flags.system as string | undefined,
       model: (flags.model as string) || config.defaultTextModel || 'MiniMax-M3',
-      maxTokens: (flags.maxTokens as number) ?? 4096,
-      temperature: flags.temperature !== undefined ? flags.temperature as number : undefined,
+      maxTokens: resolveMaxTokens(
+        (flags.model as string) || config.defaultTextModel || 'MiniMax-M3',
+        flags.maxTokens as number | undefined,
+      ),
+      temperature,
       topP: flags.topP !== undefined ? flags.topP as number : undefined,
+      thinking: thinkingMode,
     };
 
     const bold = config.noColor ? '' : '\x1b[1m';
@@ -368,6 +397,7 @@ export default defineCommand({
       if (state.system) body.system = state.system;
       if (state.temperature !== undefined) body.temperature = state.temperature;
       if (state.topP !== undefined) body.top_p = state.topP;
+      if (state.thinking !== undefined) body.thinking = { type: state.thinking };
 
       waitingForResponse = true;
       const url = chatEndpoint(config.baseUrl);
