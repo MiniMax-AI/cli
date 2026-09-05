@@ -106,8 +106,8 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     );
   }
 
-  // output sensitivity (HTTP 200, e.g. "output new_sensitive")
-  if (/new_sensitive/i.test(apiMsg) || /output.*sensitive/i.test(apiMsg)) {
+  // output sensitivity (status_code 1027, e.g. "output new_sensitive")
+  if (apiCode === 1027 || /new_sensitive/i.test(apiMsg) || /output.*sensitive/i.test(apiMsg)) {
     return new CLIError(
       `Output withheld by content moderation (${apiMsg}).`,
       ExitCode.CONTENT_FILTER,

@@ -83,6 +83,13 @@ describe('mapApiError', () => {
     expect(err.hint).toBeDefined();
   });
 
+  it('maps output sensitivity code 1027 to CONTENT_FILTER', () => {
+    const err = mapApiError(200, {
+      base_resp: { status_code: 1027, status_msg: '输出内容涉敏' },
+    });
+    expect(err.exitCode).toBe(ExitCode.CONTENT_FILTER);
+  });
+
   it('maps unknown errors to GENERAL', () => {
     const err = mapApiError(500, { base_resp: { status_code: 0, status_msg: 'internal error' } });
     expect(err.exitCode).toBe(ExitCode.GENERAL);
