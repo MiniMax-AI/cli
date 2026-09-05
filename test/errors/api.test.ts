@@ -73,6 +73,16 @@ describe('mapApiError', () => {
     expect(err.exitCode).toBe(ExitCode.QUOTA);
   });
 
+  it('maps output sensitivity (HTTP 200) to CONTENT_FILTER', () => {
+    const err = mapApiError(200, {
+      base_resp: { status_code: 2001, status_msg: 'output new_sensitive' },
+    });
+    expect(err.exitCode).toBe(ExitCode.CONTENT_FILTER);
+    expect(err.message).toContain('content moderation');
+    expect(err.message).toContain('output new_sensitive');
+    expect(err.hint).toBeDefined();
+  });
+
   it('maps unknown errors to GENERAL', () => {
     const err = mapApiError(500, { base_resp: { status_code: 0, status_msg: 'internal error' } });
     expect(err.exitCode).toBe(ExitCode.GENERAL);

@@ -106,6 +106,15 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     );
   }
 
+  // output sensitivity (HTTP 200, e.g. "output new_sensitive")
+  if (/new_sensitive/i.test(apiMsg) || /output.*sensitive/i.test(apiMsg)) {
+    return new CLIError(
+      `Output withheld by content moderation (${apiMsg}).`,
+      ExitCode.CONTENT_FILTER,
+      'Refine your query and try again.',
+    );
+  }
+
   return new CLIError(
     `API error: ${apiMsg} (HTTP ${status})`,
     ExitCode.GENERAL,

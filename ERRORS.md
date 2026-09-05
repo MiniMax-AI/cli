@@ -226,6 +226,7 @@ No error scenarios — prints a message directing users to run `npm update -g mm
 | HTTP 401 / 403 | `API key rejected (HTTP ${status}).` |
 | HTTP 429 | `Rate limit or quota exceeded. ${apiMsg}` |
 | `status_code` 1002 / 1039 (content filter) | `Input content flagged by sensitivity filter (${filterType}).` |
+| `status_msg` contains "new_sensitive" / output sensitivity (HTTP 200) | `Output withheld by content moderation (${apiMsg}).` |
 | `status_code` 1028 / 1030 (quota exhausted) | `Quota exhausted. ${apiMsg}` |
 | `status_code` 2061 (model not on plan) | `This model is not available on your current Token Plan. ${apiMsg}` |
 | Other API errors | `API error: ${apiMsg} (HTTP ${status})` |
