@@ -75,7 +75,7 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     (/sensitive content/i.test(apiMsg) || /(?:^|\D)1026(?:\D|$)/.test(apiMsg));
 
   // MiniMax content sensitivity filter
-  if (apiCode === 1002 || apiCode === 1039 || isV2ContentFilter) {
+  if (apiCode === 1002 || apiCode === 1039 || apiCode === 1026 || isV2ContentFilter) {
     const filterType =
       body.base_resp?.status_msg ||
       body.error?.message ||
@@ -107,7 +107,7 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
   }
 
   // output sensitivity (status_code 1027, e.g. "output new_sensitive")
-  if (apiCode === 1027 || /new_sensitive/i.test(apiMsg) || /output.*sensitive/i.test(apiMsg)) {
+  if (apiCode === 1027 || /output.*sensitive/i.test(apiMsg)) {
     return new CLIError(
       `Output withheld by content moderation (${apiMsg}).`,
       ExitCode.CONTENT_FILTER,

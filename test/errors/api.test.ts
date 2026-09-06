@@ -90,6 +90,15 @@ describe('mapApiError', () => {
     expect(err.exitCode).toBe(ExitCode.CONTENT_FILTER);
   });
 
+  it('maps input sensitivity code 1026 to CONTENT_FILTER (not output)', () => {
+    const err = mapApiError(200, {
+      base_resp: { status_code: 1026, status_msg: 'input new_sensitive' },
+    });
+    expect(err.exitCode).toBe(ExitCode.CONTENT_FILTER);
+    expect(err.message).toContain('Input');
+    expect(err.message).not.toContain('Output withheld');
+  });
+
   it('maps unknown errors to GENERAL', () => {
     const err = mapApiError(500, { base_resp: { status_code: 0, status_msg: 'internal error' } });
     expect(err.exitCode).toBe(ExitCode.GENERAL);
