@@ -75,7 +75,7 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     (/sensitive content/i.test(apiMsg) || /(?:^|\D)1026(?:\D|$)/.test(apiMsg));
 
   // MiniMax content sensitivity filter
-  if (apiCode === 1002 || apiCode === 1039 || isV2ContentFilter) {
+  if (apiCode === 1002 || apiCode === 1039 || apiCode === 1026 || isV2ContentFilter) {
     const filterType =
       body.base_resp?.status_msg ||
       body.error?.message ||
@@ -103,6 +103,15 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
       `This model is not available on your current Token Plan. ${apiMsg}`,
       ExitCode.QUOTA,
       `Check usage: mmx quota show${hint}\nUpgrade plan: ${upgradeUrl(url)}`,
+    );
+  }
+
+  // output sensitivity (status_code 1027, e.g. "output new_sensitive")
+  if (apiCode === 1027 || /output.*sensitive/i.test(apiMsg)) {
+    return new CLIError(
+      `Output withheld by content moderation (${apiMsg}).`,
+      ExitCode.CONTENT_FILTER,
+      'Refine your query and try again.',
     );
   }
 
