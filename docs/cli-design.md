@@ -20,7 +20,12 @@ mmx
 ├── text
 │   └── chat               Send a chat completion (M3)
 ├── speech
-│   └── synthesize         Synchronous TTS, ≤10k chars
+│   ├── synthesize         Synchronous TTS over HTTP, ≤10k chars
+│   ├── websocket          Synchronous TTS over WebSocket (streaming)
+│   ├── async              Create an asynchronous TTS task (long-form)
+│   ├── task
+│   │   └── get            Query an asynchronous TTS task status
+│   └── voices             List system voices
 ├── image
 │   └── generate           Generate images (image-01)
 ├── video

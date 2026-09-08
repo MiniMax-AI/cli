@@ -120,6 +120,24 @@ for await (const chunk of stream) {
 // List voices
 const voices = await sdk.speech.voices();
 const englishVoices = await sdk.speech.voices('en');
+
+// WebSocket TTS (streaming audio bytes)
+const wsStream = await sdk.speech.synthesizeWebSocket({
+  text: 'Stream me',
+  stream: true,
+});
+
+// WebSocket TTS (single buffer)
+const wsAudio = await sdk.speech.synthesizeWebSocket({ text: 'Hello, world!' });
+
+// Asynchronous TTS for long-form text
+const task = await sdk.speech.createAsync({ text: 'Long text...' });
+const status = await sdk.speech.queryAsync(task.task_id); // { status: 'Success', file_id }
+const saved = await sdk.speech.downloadAsyncFile(status.file_id, 'long.mp3');
+
+// Upload text for documents longer than the direct-text limit
+const uploaded = await sdk.file.upload('long.txt', 't2a_async_input');
+const longTask = await sdk.speech.createAsync({ text_file_id: uploaded.file.file_id });
 ```
 
 ### Vision

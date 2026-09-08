@@ -6,6 +6,22 @@ export function speechEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/t2a_v2`;
 }
 
+export function speechAsyncEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/t2a_async_v2`;
+}
+
+export function speechAsyncQueryEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/query/t2a_async_query_v2`;
+}
+
+export function speechAsyncFileEndpoint(baseUrl: string, fileId: string | number): string {
+  return `${baseUrl}/v1/files/retrieve_content?file_id=${fileId}`;
+}
+
+export function speechWsEndpoint(baseUrl: string): string {
+  return `${baseUrl.replace(/^http/, 'ws')}/ws/v1/t2a_v2`;
+}
+
 export function voicesEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/get_voice`;
 }
