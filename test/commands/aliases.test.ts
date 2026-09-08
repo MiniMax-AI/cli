@@ -26,6 +26,11 @@ describe('command aliases', () => {
     expect(registry.resolve(['file', 'list']).command.name).toBe('file list');
     expect(registry.resolve(['file', 'delete']).command.name).toBe('file delete');
   });
+
+  it('resolves speech voice commands', () => {
+    expect(registry.resolve(['speech', 'clone']).command.name).toBe('speech clone');
+    expect(registry.resolve(['speech', 'design']).command.name).toBe('speech design');
+  });
 });
 
 describe('text chat --prompt alias', () => {

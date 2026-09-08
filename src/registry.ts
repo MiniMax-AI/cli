@@ -11,6 +11,8 @@ import textChat from './commands/text/chat';
 import textRepl from './commands/text/repl';
 import speechSynthesize from './commands/speech/synthesize';
 import speechVoices from './commands/speech/voices';
+import speechClone from './commands/speech/clone';
+import speechDesign from './commands/speech/design';
 import imageGenerate from './commands/image/generate';
 import videoGenerate from './commands/video/generate';
 import videoTaskGet from './commands/video/task-get';
@@ -297,6 +299,8 @@ export const registry = new CommandRegistry({
   'speech synthesize': speechSynthesize,
   'speech generate':   speechSynthesize,
   'speech voices':     speechVoices,
+  'speech clone':      speechClone,
+  'speech design':     speechDesign,
   'image generate':    imageGenerate,
   'video generate':    videoGenerate,
   'video task get':    videoTaskGet,
