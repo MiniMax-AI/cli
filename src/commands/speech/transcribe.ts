@@ -79,6 +79,10 @@ export default defineCommand({
     validateSttResponseFormat(responseFormat);
     validateSttFileSize(fullPath, statSync(fullPath).size);
     validateSttStreaming(responseFormat, stream);
+    // --timestamp-level and --model are passed through, not validated here: the
+    // CLI never interprets them, and the API documents them as ignored (for
+    // timestamp_level with json) or server-validated, so a local allow-list
+    // would only go stale.
 
     if (stream && outPath) {
       throw new CLIError(
@@ -130,25 +134,31 @@ export default defineCommand({
       let duration: number | undefined;
       let finished = false;
       const toStdout = format !== 'json';
-      for await (const event of parseSSE(res)) {
-        if (event.data === '[DONE]') break;
-        let chunk: SpeechToTextStreamEvent;
-        try {
-          chunk = JSON.parse(event.data) as SpeechToTextStreamEvent;
-        } catch (err) {
-          // Warn but keep going — partial text beats failing the whole run.
-          process.stderr.write(`[warning] Failed to parse stream chunk: ${err instanceof Error ? err.message : String(err)}\n`);
-          continue;
+      try {
+        for await (const event of parseSSE(res)) {
+          if (event.data === '[DONE]') break;
+          let chunk: SpeechToTextStreamEvent;
+          try {
+            chunk = JSON.parse(event.data) as SpeechToTextStreamEvent;
+          } catch (err) {
+            // Warn but keep going — partial text beats failing the whole run.
+            process.stderr.write(`[warning] Failed to parse stream chunk: ${err instanceof Error ? err.message : String(err)}\n`);
+            continue;
+          }
+          if (chunk.delta) {
+            text += chunk.delta;
+            if (toStdout) process.stdout.write(chunk.delta);
+          }
+          if (chunk.finish) {
+            duration = chunk.duration;
+            finished = true;
+            break;
+          }
         }
-        if (chunk.delta) {
-          text += chunk.delta;
-          if (toStdout) process.stdout.write(chunk.delta);
-        }
-        if (chunk.finish) {
-          duration = chunk.duration;
-          finished = true;
-          break;
-        }
+      } finally {
+        // Stopping at the final event leaves the SSE body undrained, which keeps
+        // the connection (and the process) alive; release it either way.
+        await res.body?.cancel().catch(() => undefined);
       }
 
       if (!finished) {
