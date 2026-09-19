@@ -302,4 +302,457 @@ describe('text chat command', () => {
       console.log = originalLog;
     }
   });
+
+  it('defaults max_tokens to 131072 when no --max-tokens and no --model (M3 default)', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.model).toBe('MiniMax-M3');
+      expect(parsed.request.max_tokens).toBe(131072);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('defaults max_tokens to 65536 when --model MiniMax-M2.7 is passed without --max-tokens', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        model: 'MiniMax-M2.7',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.model).toBe('MiniMax-M2.7');
+      expect(parsed.request.max_tokens).toBe(65536);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('--max-tokens 100 overrides model-aware default', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        maxTokens: 100,
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.max_tokens).toBe(100);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('--thinking enabled sends thinking: { type: "enabled" }', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        thinking: 'enabled',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.thinking).toEqual({ type: 'enabled' });
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('--thinking disabled sends thinking: { type: "disabled" }', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        thinking: 'disabled',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.thinking).toEqual({ type: 'disabled' });
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('omits thinking field when --thinking is not provided', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect('thinking' in parsed.request).toBe(false);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('--thinking bogus throws CLIError', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    let caught: unknown;
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        thinking: 'bogus',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect((caught as { message?: string }).message).toMatch(/Invalid --thinking value "bogus"/);
+  });
+
+  it('--temperature 3 throws CLIError (above [0,2])', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    let caught: unknown;
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        temperature: 3,
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect((caught as { message?: string }).message).toMatch(/Must be in \[0, 2\]/);
+  });
+
+  it('--temperature -0.5 throws CLIError (below [0,2])', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    let caught: unknown;
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        temperature: -0.5,
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect((caught as { message?: string }).message).toMatch(/Must be in \[0, 2\]/);
+  });
+
+  it('--temperature 0.7 is forwarded to the request body', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        temperature: 0.7,
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      const parsed = JSON.parse(output);
+      expect(parsed.request.temperature).toBe(0.7);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('help text mentions the M3 default (131072) for --max-tokens', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+    const options = chatCommand.options!;
+    const maxTokensOpt = options.find(o => o.flag.includes('max-tokens'));
+    expect(maxTokensOpt).toBeDefined();
+    expect(maxTokensOpt!.description).toContain('131072');
+    expect(maxTokensOpt!.description).toContain('65536');
+  });
+
+  it('help text documents temperature [0, 2] range', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+    const options = chatCommand.options!;
+    const tempOpt = options.find(o => o.flag.includes('temperature'));
+    expect(tempOpt).toBeDefined();
+    expect(tempOpt!.description).toContain('[0, 2]');
+  });
+
+  it('help text documents top_p 0.95 default', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+    const options = chatCommand.options!;
+    const topPOpt = options.find(o => o.flag.includes('top-p'));
+    expect(topPOpt).toBeDefined();
+    expect(topPOpt!.description).toContain('0.95');
+  });
+
+  it('help text describes --thinking flag with all three modes', async () => {
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+    const options = chatCommand.options!;
+    const thinkingOpt = options.find(o => o.flag.includes('thinking'));
+    expect(thinkingOpt).toBeDefined();
+    expect(thinkingOpt!.description).toContain('enabled');
+    expect(thinkingOpt!.description).toContain('disabled');
+    expect(thinkingOpt!.description).toContain('adaptive');
+  });
 });

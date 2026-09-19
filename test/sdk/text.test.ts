@@ -88,3 +88,157 @@ describe('TextSDK.validateParams', () => {
     ).rejects.not.toThrow('At least one message');
   });
 });
+
+describe('TextSDK.validateParams (model-aware max_tokens + thinking)', () => {
+  it('defaults max_tokens to 131072 for M3 when caller omits it', async () => {
+    let body: Record<string, unknown> | undefined;
+    const server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': async (req) => {
+          body = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            id: 'msg-1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'ok' }],
+            model: 'MiniMax-M3',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          });
+        },
+      },
+    });
+    try {
+      const sdk = new MiniMaxSDK({ apiKey: 'sk-test', region: 'global', baseUrl: server.url });
+      await sdk.text.chat({
+        model: 'MiniMax-M3',
+        messages: [{ role: 'user', content: 'hi' }],
+      });
+      expect(body?.max_tokens).toBe(131072);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('defaults max_tokens to 65536 for M2.7 when caller omits it', async () => {
+    let body: Record<string, unknown> | undefined;
+    const server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': async (req) => {
+          body = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            id: 'msg-1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'ok' }],
+            model: 'MiniMax-M2.7',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          });
+        },
+      },
+    });
+    try {
+      const sdk = new MiniMaxSDK({ apiKey: 'sk-test', region: 'global', baseUrl: server.url });
+      await sdk.text.chat({
+        model: 'MiniMax-M2.7',
+        messages: [{ role: 'user', content: 'hi' }],
+      });
+      expect(body?.max_tokens).toBe(65536);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('caller-supplied max_tokens overrides the M3 default', async () => {
+    let body: Record<string, unknown> | undefined;
+    const server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': async (req) => {
+          body = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            id: 'msg-1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'ok' }],
+            model: 'MiniMax-M3',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          });
+        },
+      },
+    });
+    try {
+      const sdk = new MiniMaxSDK({ apiKey: 'sk-test', region: 'global', baseUrl: server.url });
+      await sdk.text.chat({
+        model: 'MiniMax-M3',
+        max_tokens: 100,
+        messages: [{ role: 'user', content: 'hi' }],
+      });
+      expect(body?.max_tokens).toBe(100);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('omits thinking field when caller does not pass it', async () => {
+    let body: Record<string, unknown> | undefined;
+    const server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': async (req) => {
+          body = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            id: 'msg-1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'ok' }],
+            model: 'MiniMax-M3',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          });
+        },
+      },
+    });
+    try {
+      const sdk = new MiniMaxSDK({ apiKey: 'sk-test', region: 'global', baseUrl: server.url });
+      await sdk.text.chat({
+        model: 'MiniMax-M3',
+        messages: [{ role: 'user', content: 'hi' }],
+      });
+      expect('thinking' in (body ?? {})).toBe(false);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('passes through thinking: { type: "enabled" } when caller sets it', async () => {
+    let body: Record<string, unknown> | undefined;
+    const server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': async (req) => {
+          body = await req.json() as Record<string, unknown>;
+          return jsonResponse({
+            id: 'msg-1',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'ok' }],
+            model: 'MiniMax-M3',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          });
+        },
+      },
+    });
+    try {
+      const sdk = new MiniMaxSDK({ apiKey: 'sk-test', region: 'global', baseUrl: server.url });
+      await sdk.text.chat({
+        model: 'MiniMax-M3',
+        messages: [{ role: 'user', content: 'hi' }],
+        thinking: { type: 'enabled' },
+      });
+      expect(body?.thinking).toEqual({ type: 'enabled' });
+    } finally {
+      server.close();
+    }
+  });
+});

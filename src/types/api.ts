@@ -27,6 +27,7 @@ export interface ChatRequest {
   stream?: boolean;
   tools?: ChatTool[];
   tool_choice?: { type: 'auto' | 'any' | 'tool'; name?: string };
+  thinking?: { type: 'enabled' | 'disabled' | 'adaptive' };
 }
 
 export interface ChatResponse {

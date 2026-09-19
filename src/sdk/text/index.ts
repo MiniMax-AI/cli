@@ -3,6 +3,7 @@ import { chatEndpoint } from "../../client/endpoints";
 import { ChatRequest, ChatResponse, StreamEvent } from "../../types/api";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
+import { resolveMaxTokens } from "../../utils/model-defaults";
 
 export class TextSDK extends Client {
   private async *chatStream(body: Partial<ChatRequest>): AsyncGenerator<StreamEvent> {
@@ -54,10 +55,22 @@ export class TextSDK extends Client {
       );
     }
 
-    return {
+    const model = params.model ?? 'MiniMax-M3';
+
+    const body: ChatRequest = {
       ...params,
-      model: params.model ?? 'MiniMax-M3',
-      max_tokens: params.max_tokens ?? 4096,
+      model,
+      max_tokens: resolveMaxTokens(model, params.max_tokens),
     } as ChatRequest;
+
+    // Pass thinking through only if explicitly provided; never auto-inject.
+    // Per Messages API contract, thinking is disabled by default when omitted.
+    if (params.thinking !== undefined) {
+      body.thinking = params.thinking;
+    } else {
+      delete body.thinking;
+    }
+
+    return body;
   }
 }
