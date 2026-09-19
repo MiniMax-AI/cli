@@ -1,11 +1,11 @@
-import { describe, it, expect, afterEach } from 'bun:test';
+import { describe, it, expect, expectTypeOf, afterEach } from 'bun:test';
 import { createMockServer, jsonResponse, sseResponse, type MockServer } from '../helpers/mock-server';
 import { MiniMaxSDK } from '../../src/sdk';
-import { SpeechSDK } from '../../src/sdk/speech';
+import { SpeechSDK, type TranscribeParams } from '../../src/sdk/speech';
 import { existsSync, mkdtempSync, rmSync, truncateSync, unlinkSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { SpeechResponse, SpeechToTextFormat, SpeechToTextStreamEvent } from '../../src/types/api';
+import type { SpeechResponse, SpeechToTextFormat, SpeechToTextResponse, SpeechToTextStreamEvent } from '../../src/types/api';
 import { STT_MAX_FILE_BYTES } from '../../src/utils/stt';
 import { withStubbedFetch } from '../helpers/fetch-stub';
 import { SDKError } from '../../src/errors/base';
@@ -204,6 +204,61 @@ describe('SpeechSDK.transcribe', () => {
       cleanup();
     }
   });
+
+  it('infers precise literal results and unions for dynamic transcription options', () => {
+    const inferResults = (params: TranscribeParams, stream: boolean, format: SpeechToTextFormat) => ({
+      json: sdk.transcribe({ file: 'audio.mp3' }),
+      verbose: sdk.transcribe({ file: 'audio.mp3', response_format: 'verbose_json', stream: false }),
+      subtitle: sdk.transcribe({ file: 'audio.mp3', response_format: 'srt' }),
+      stream: sdk.transcribe({ file: 'audio.mp3', stream: true }),
+      dynamic: sdk.transcribe(params),
+      dynamicStream: sdk.transcribe({ file: 'audio.mp3', stream }),
+      dynamicFormat: sdk.transcribe({ file: 'audio.mp3', response_format: format }),
+    });
+    type DynamicResult = Promise<SpeechToTextResponse | string | AsyncGenerator<SpeechToTextStreamEvent>>;
+    expectTypeOf(inferResults).returns.toEqualTypeOf<{
+      json: Promise<SpeechToTextResponse>;
+      verbose: Promise<SpeechToTextResponse>;
+      subtitle: Promise<string>;
+      stream: Promise<AsyncGenerator<SpeechToTextStreamEvent>>;
+      dynamic: DynamicResult;
+      dynamicStream: DynamicResult;
+      dynamicFormat: DynamicResult;
+    }>();
+  });
+
+  it('rejects a non-SSE stream response and releases its body', async () => {
+    let cancelled = false;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"text":"unexpected JSON"}'));
+      },
+      cancel() { cancelled = true; },
+    }), { headers: { 'Content-Type': 'application/json' } });
+
+    await withStubbedFetch(() => response, async () => {
+      const stream = await sdk.transcribe({ file: new Blob(['audio']), stream: true });
+      await expect(stream.next()).rejects.toBeInstanceOf(SDKError);
+      expect(cancelled).toBe(true);
+    });
+  });
+
+  for (const ending of ['eof', 'done'] as const) {
+    it(`rejects a stream ending with ${ending} before the final event`, async () => {
+      const partial = 'data: {"index":0,"delta":"partial","finish":false}\n\n';
+      const response = new Response(partial + (ending === 'done' ? 'data: [DONE]\n\n' : ''), {
+        headers: { 'Content-Type': 'text/event-stream; charset=utf-8' },
+      });
+      await withStubbedFetch(() => response, async () => {
+        const stream = await sdk.transcribe({ file: new Blob(['audio']), stream: true });
+        expect((await stream.next()).value?.delta).toBe('partial');
+        await expect(stream.next()).rejects.toMatchObject({
+          name: 'SDKError',
+          message: 'Stream ended before the final event; the transcript may be incomplete.',
+        });
+      });
+    });
+  }
 
   it('yields streamed events when stream is enabled', async () => {
     const { filePath, cleanup } = withTempAudio('streamed audio');

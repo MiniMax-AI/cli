@@ -33,11 +33,20 @@ export type TranscribeParams = ModelPartial<SpeechToTextRequest> & {
   language?: string;
 };
 
-export type TranscribeStreamParams = TranscribeParams & { stream: true };
+export type TranscribeStreamParams = TranscribeParams & {
+  stream: true;
+  response_format?: 'json';
+};
 
 /** Subtitle formats come back as documents, not as JSON. */
 export type TranscribeSubtitleParams = TranscribeParams & {
   response_format: Extract<SpeechToTextFormat, 'srt' | 'vtt'>;
+  stream?: false;
+};
+
+export type TranscribeJsonParams = TranscribeParams & {
+  response_format?: Extract<SpeechToTextFormat, 'json' | 'verbose_json'>;
+  stream?: false;
 };
 
 function hexToBuffer(hex: string): Buffer {
@@ -140,7 +149,8 @@ export class SpeechSDK extends Client {
    */
   async transcribe(params: TranscribeStreamParams): Promise<AsyncGenerator<SpeechToTextStreamEvent>>;
   async transcribe(params: TranscribeSubtitleParams): Promise<string>;
-  async transcribe(params: TranscribeParams): Promise<SpeechToTextResponse>;
+  async transcribe(params: TranscribeJsonParams): Promise<SpeechToTextResponse>;
+  async transcribe(params: TranscribeParams): Promise<SpeechToTextResponse | string | AsyncGenerator<SpeechToTextStreamEvent>>;
   async transcribe(
     params: TranscribeParams,
   ): Promise<SpeechToTextResponse | string | AsyncGenerator<SpeechToTextStreamEvent>> {
@@ -188,10 +198,22 @@ export class SpeechSDK extends Client {
    */
   private async *transcribeStream(res: Response): AsyncGenerator<SpeechToTextStreamEvent> {
     try {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.split(';', 1)[0]!.trim().toLowerCase() !== 'text/event-stream') {
+        throw new SDKError(
+          `Expected SSE stream but got content-type "${contentType}". Server may be experiencing issues.`,
+          ExitCode.GENERAL,
+        );
+      }
+
       for await (const event of this.streamSSE<SpeechToTextStreamEvent>(res)) {
         yield event;
-        if (event.finish) break;
+        if (event.finish) return;
       }
+      throw new SDKError(
+        'Stream ended before the final event; the transcript may be incomplete.',
+        ExitCode.GENERAL,
+      );
     } finally {
       await res.body?.cancel().catch(() => undefined);
     }
