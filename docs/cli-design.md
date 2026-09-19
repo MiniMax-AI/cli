@@ -20,7 +20,8 @@ mmx
 ├── text
 │   └── chat               Send a chat completion (M3)
 ├── speech
-│   └── synthesize         Synchronous TTS, ≤10k chars
+│   ├── synthesize         Synchronous TTS, ≤10k chars
+│   └── transcribe         Speech-to-text, ≤50 MB / ≤500 s (asr-1.0)
 ├── image
 │   └── generate           Generate images (image-01)
 ├── video

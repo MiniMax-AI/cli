@@ -20,7 +20,7 @@
 - **文本对话** — 多轮对话、流式输出、系统提示词、JSON 格式输出
 - **图像生成** — 文生图，支持比例和批量控制
 - **视频生成** — 异步生成，进度追踪
-- **语音合成** — 30+ 音色、语速调节、流式播放
+- **语音** — 语音合成（30+ 音色、语速调节、流式播放）与语音识别（音频转文字，支持 json、verbose_json、srt、vtt）
 - **图像理解** — 图片描述与识别
 - **网络搜索** — MiniMax 搜索引擎
 - **双区域** — 国际版（`api.minimax.io`）和国内版（`api.minimaxi.com`）自动切换
@@ -54,6 +54,7 @@ mmx auth login --api-key sk-xxxxx
 mmx text chat --message "你好，MiniMax！"
 mmx image "一只穿宇航服的猫"
 mmx speech synthesize --text "你好！" --out hello.mp3
+mmx speech transcribe --file meeting.mp3
 mmx video generate --prompt "海浪拍打礁石"
 mmx search "MiniMax AI 最新动态"
 mmx vision photo.jpg
@@ -110,6 +111,20 @@ mmx speech synthesize --text "Hi" --voice English_magnetic_voiced_man --speed 1.
 echo "头条新闻" | mmx speech synthesize --text-file - --out news.mp3
 mmx speech voices
 ```
+
+```bash
+# 语音识别（asr-1.0）
+mmx speech transcribe --file meeting.mp3
+mmx speech transcribe --file call.mp3 --language zh
+mmx speech transcribe --file talk.mp3 --response-format verbose_json --output json
+mmx speech transcribe --file talk.mp3 --response-format srt --out talk.srt
+mmx speech transcribe --file long.mp3 --stream
+```
+
+`mmx speech transcribe` 支持 wav、aiff、flac、m4a、mp3、aac、opus、ogg 格式，音频不超过
+50 MB、时长不超过 500 秒；超出时会在上传前直接报错。不传 `--language` 时启用混合语言识别。
+`--response-format json`（默认）输出转写文本，`verbose_json` 附带说话人标识与分段
+时间戳，`srt` / `vtt` 直接返回字幕文档。`--stream` 逐段输出文本，仅支持 `json`。
 
 ### `mmx vision`
 

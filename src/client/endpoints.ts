@@ -6,6 +6,10 @@ export function speechEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/t2a_v2`;
 }
 
+export function speechToTextEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/speech_to_text`;
+}
+
 export function voicesEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/get_voice`;
 }

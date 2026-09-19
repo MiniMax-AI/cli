@@ -120,6 +120,19 @@ for await (const chunk of stream) {
 // List voices
 const voices = await sdk.speech.voices();
 const englishVoices = await sdk.speech.voices('en');
+
+// Speech-to-text
+const transcript = await sdk.speech.transcribe({
+  file: './meeting.mp3',
+  language: 'zh',
+});
+console.log(transcript.text, transcript.duration);
+
+// Speech-to-text, streamed
+const deltas = await sdk.speech.transcribe({ file: './meeting.mp3', stream: true });
+for await (const event of deltas) {
+  process.stdout.write(event.delta);
+}
 ```
 
 ### Vision

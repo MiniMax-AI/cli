@@ -134,6 +134,56 @@ export interface SpeechResponse {
   };
 }
 
+// ---- Speech / STT (speech-to-text) ----
+
+/**
+ * Result shape for `POST /v1/speech_to_text`.
+ * `json` → text + duration; `verbose_json` → adds `n_speakers` and `segments`
+ * (both also returned as SRT / VTT documents by the same endpoint).
+ */
+export type SpeechToTextFormat = 'json' | 'verbose_json' | 'srt' | 'vtt';
+
+/** Timestamp granularity for `verbose_json` / `srt` / `vtt` results. */
+export type SpeechToTextTimestampLevel = 'sentence' | 'word';
+
+/**
+ * Multipart body for `POST /v1/speech_to_text`. `file` is sent as a form part;
+ * unlike the other fields here, `language` travels as a request header — see
+ * `transcribe()` in `src/sdk/speech`.
+ */
+export interface SpeechToTextRequest {
+  model: string;
+  response_format?: SpeechToTextFormat;
+  timestamp_level?: SpeechToTextTimestampLevel;
+  stream?: boolean;
+}
+
+/** One timestamped unit (sentence, or word when `timestamp_level=word`). */
+export interface SpeechToTextSegment {
+  id: number;
+  start: number;
+  end: number;
+  speaker: string;
+  text: string;
+}
+
+export interface SpeechToTextResponse {
+  text: string;
+  duration: number;
+  n_speakers?: number;
+  segments?: SpeechToTextSegment[];
+  trace_id?: string;
+}
+
+/** One `data:` event of the `stream=true` SSE response. */
+export interface SpeechToTextStreamEvent {
+  index: number;
+  delta: string;
+  finish: boolean;
+  /** Total audio duration in seconds; only present on the final event. */
+  duration?: number;
+}
+
 // ---- Voice List ----
 
 export interface SystemVoiceInfo {

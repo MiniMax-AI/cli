@@ -1,13 +1,34 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, resolve, dirname } from 'node:path';
 import { Client } from "../client";
-import { speechEndpoint, voicesEndpoint } from "../../client/endpoints";
-import { SpeechRequest, SpeechResponse, VoiceListResponse } from "../../types/api";
+import { speechEndpoint, speechToTextEndpoint, voicesEndpoint } from "../../client/endpoints";
+import {
+  SpeechRequest,
+  SpeechResponse,
+  SpeechToTextRequest,
+  SpeechToTextResponse,
+  SpeechToTextStreamEvent,
+  VoiceListResponse,
+} from "../../types/api";
 import { filterByLanguage } from "../../commands/speech/voices";
 import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
 import { ModelPartial } from "../types";
+import { STT_DEFAULT_MODEL, sttStreamFormatConflict } from "../../utils/stt";
+
+export type TranscribeParams = ModelPartial<SpeechToTextRequest> & {
+  /** Local audio path, or a Blob/File to send as-is. */
+  file: string | Blob;
+  /**
+   * BCP-47 language hint (e.g. `zh`, `en`). Sent as the `language` request
+   * header: the API ignores it when passed as a form field, even though its
+   * curl example uses `-F "language=zh"`.
+   */
+  language?: string;
+};
+
+export type TranscribeStreamParams = TranscribeParams & { stream: true };
 
 function hexToBuffer(hex: string): Buffer {
   if (!/^[0-9a-fA-F]*$/.test(hex)) {
@@ -22,6 +43,20 @@ function hexToBuffer(hex: string): Buffer {
 function defaultFilename(prefix: string, ext: string): string {
   const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
   return `${prefix}_${ts}.${ext}`;
+}
+
+/** Resolve a transcription input into the multipart `file` part. */
+function prepareAudioUpload(file: string | Blob): { blob: Blob; filename: string } {
+  if (typeof file === 'string') {
+    const fullPath = resolve(file);
+    if (!existsSync(fullPath)) {
+      throw new SDKError(`File not found: ${fullPath}`, ExitCode.USAGE);
+    }
+    return { blob: new Blob([readFileSync(fullPath)]), filename: basename(fullPath) };
+  }
+
+  const name = (file as File).name;
+  return { blob: file, filename: typeof name === 'string' && name ? name : 'audio' };
 }
 
 export class SpeechSDK extends Client {
@@ -71,6 +106,53 @@ export class SpeechSDK extends Client {
       return filtered;
     }
     return voices;
+  }
+
+  /**
+   * Transcribe an audio file (speech-to-text).
+   *
+   * `json` and `verbose_json` resolve to a structured response; SRT and VTT are
+   * returned by the API as subtitle documents, so `response_format` is applied
+   * as-is and the raw body is surfaced by the caller. The audio is uploaded as
+   * `multipart/form-data`, and `language` travels as a request header — the API
+   * ignores it when sent as a form field.
+   */
+  async transcribe(params: TranscribeStreamParams): Promise<AsyncGenerator<SpeechToTextStreamEvent>>;
+  async transcribe(params: TranscribeParams): Promise<SpeechToTextResponse>;
+  async transcribe(
+    params: TranscribeParams,
+  ): Promise<SpeechToTextResponse | AsyncGenerator<SpeechToTextStreamEvent>> {
+    const { file, language, model, response_format, timestamp_level, stream } = params;
+
+    if (!file) {
+      throw new SDKError('file is required', ExitCode.USAGE);
+    }
+
+    const responseFormat = response_format ?? 'json';
+    const streamConflict = sttStreamFormatConflict(responseFormat, stream === true);
+    if (streamConflict) {
+      throw new SDKError(streamConflict, ExitCode.USAGE);
+    }
+
+    const { blob, filename } = prepareAudioUpload(file);
+
+    const form = new FormData();
+    form.append('model', model ?? STT_DEFAULT_MODEL);
+    form.append('file', blob, filename);
+    form.append('response_format', responseFormat);
+    if (timestamp_level) form.append('timestamp_level', timestamp_level);
+    if (stream) form.append('stream', 'true');
+
+    const url = speechToTextEndpoint(this.config.baseUrl);
+    const headers: Record<string, string> = {};
+    if (language) headers.language = language;
+
+    if (stream) {
+      const res = await this.request({ url, method: 'POST', body: form, headers, stream: true });
+      return this.streamSSE<SpeechToTextStreamEvent>(res);
+    }
+
+    return this.requestJson<SpeechToTextResponse>({ url, method: 'POST', body: form, headers });
   }
 
   /**

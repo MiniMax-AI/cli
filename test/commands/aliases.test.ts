@@ -21,6 +21,13 @@ describe('command aliases', () => {
     expect(generate.command).toBe(synthesize.command);
   });
 
+  it('resolves "speech recognize" same as "speech transcribe"', () => {
+    const recognize = registry.resolve(['speech', 'recognize']);
+    const transcribe = registry.resolve(['speech', 'transcribe']);
+    expect(recognize.command).toBe(transcribe.command);
+    expect(transcribe.command.name).toBe('speech transcribe');
+  });
+
   it('resolves file storage commands', () => {
     expect(registry.resolve(['file', 'upload']).command.name).toBe('file upload');
     expect(registry.resolve(['file', 'list']).command.name).toBe('file list');
