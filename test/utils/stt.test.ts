@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'bun:test';
+import { CLIError, SDKError } from '../../src/errors/base';
 import {
   STT_DEFAULT_MODEL,
   STT_MAX_FILE_BYTES,
@@ -83,6 +84,29 @@ describe('stt', () => {
     it('rejects a file above the limit', () => {
       expect(() => validateSttFileSize('clip.wav', STT_MAX_FILE_BYTES + 1))
         .toThrow(/at most 50 MB/);
+    });
+  });
+
+  describe('error class', () => {
+    it('defaults to CLIError', () => {
+      try {
+        validateSttResponseFormat('txt');
+        throw new Error('Expected validateSttResponseFormat to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(CLIError);
+        expect(error).not.toBeInstanceOf(SDKError);
+      }
+    });
+
+    it('raises the error class the caller passes, keeping message and exit code', () => {
+      try {
+        validateSttFileSize('clip.wav', STT_MAX_FILE_BYTES + 1, SDKError);
+        throw new Error('Expected validateSttFileSize to throw');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SDKError);
+        expect((error as SDKError).exitCode).toBe(2);
+        expect((error as SDKError).hint).toContain('Re-encode');
+      }
     });
   });
 });

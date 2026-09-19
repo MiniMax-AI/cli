@@ -69,6 +69,26 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     );
   }
 
+  // The speech-to-text API uses 422 specifically for sensitive audio (1026).
+  // Its message language varies, so key off the endpoint + status rather than
+  // message text; other endpoints keep the heuristic below.
+  if (status === 422 && url?.includes('/speech_to_text')) {
+    return new CLIError(
+      `Input audio flagged by sensitivity filter${apiMsg ? ` (${apiMsg})` : ''}.`,
+      ExitCode.CONTENT_FILTER,
+    );
+  }
+
+  // The server-side counterpart of the local 50 MB pre-upload check; reached
+  // only if the two limits ever disagree.
+  if (status === 413 && url?.includes('/speech_to_text')) {
+    return new CLIError(
+      `Audio file exceeds the speech-to-text size limit (HTTP 413). ${apiMsg}`,
+      ExitCode.USAGE,
+      'Re-encode to compressed mono audio (e.g. mp3 / aac) or split it into smaller files.',
+    );
+  }
+
   const isV2ContentFilter =
     status === 422 &&
     errorType === 'unprocessable_entity_error' &&

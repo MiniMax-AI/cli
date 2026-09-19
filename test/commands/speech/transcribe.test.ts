@@ -5,6 +5,7 @@ import { join } from 'path';
 import { default as transcribeCommand } from '../../../src/commands/speech/transcribe';
 import { STT_MAX_FILE_BYTES } from '../../../src/utils/stt';
 import { jsonResponse, sseResponse } from '../../helpers/mock-server';
+import { withStubbedFetch } from '../../helpers/fetch-stub';
 
 const baseConfig = {
   apiKey: 'test-key',
@@ -74,26 +75,6 @@ async function captureStderr(fn: () => Promise<void>): Promise<string> {
     return output;
   } finally {
     process.stderr.write = originalWrite;
-  }
-}
-
-/** Run `fn` against a stubbed fetch and hand back what the command sent. */
-async function withStubbedFetch(
-  respond: () => Response,
-  fn: (sent: { url: string; init: RequestInit | undefined }) => Promise<void>,
-): Promise<void> {
-  const originalFetch = globalThis.fetch;
-  const sent = { url: '', init: undefined as RequestInit | undefined };
-  globalThis.fetch = (async (input, init) => {
-    sent.url = String(input);
-    sent.init = init;
-    return respond();
-  }) as typeof fetch;
-
-  try {
-    await fn(sent);
-  } finally {
-    globalThis.fetch = originalFetch;
   }
 }
 
@@ -378,6 +359,33 @@ describe('speech transcribe command', () => {
     }
   });
 
+  it('saves an srt document byte-exact, without an injected trailing newline', async () => {
+    const { dir, filePath } = makeTempAudio();
+    const outPath = join(dir, 'talk.srt');
+    // Deliberately no trailing newline: the file must keep the API's own bytes.
+    const srt = '1\n00:00:00,080 --> 00:00:04,540\nhello';
+
+    try {
+      await withStubbedFetch(
+        () => new Response(srt, { status: 200, headers: { 'Content-Type': 'text/plain' } }),
+        async () => {
+          await captureLog(async () => {
+            await transcribeCommand.execute(baseConfig, {
+              ...baseFlags,
+              file: filePath,
+              responseFormat: 'srt',
+              out: outPath,
+            });
+          });
+
+          expect(readFileSync(outPath, 'utf-8')).toBe(srt);
+        },
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('streams incremental text events to stdout and reports the duration', async () => {
     const { dir, filePath } = makeTempAudio();
     const response = sseResponse([
@@ -464,6 +472,37 @@ describe('speech transcribe command', () => {
           const parsed = JSON.parse(captured);
           expect(parsed.text).toBe('partial');
           expect(parsed.duration).toBe(1.75);
+        },
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('assembles the transcript by index when events arrive out of order', async () => {
+    const { dir, filePath } = makeTempAudio();
+    const response = sseResponse([
+      { data: '{"index":1,"delta":"world","finish":false}' },
+      { data: '{"index":0,"delta":"hello ","finish":false}' },
+      { data: '{"index":2,"delta":"","finish":true,"duration":2}' },
+    ]);
+
+    try {
+      await withStubbedFetch(
+        () => response,
+        async () => {
+          let captured = '';
+          const stderr = await captureStderr(async () => {
+            captured = await captureStdout(async () => {
+              await transcribeCommand.execute(
+                { ...baseConfig, output: 'json' as const },
+                { ...baseFlags, file: filePath, stream: true },
+              );
+            });
+          });
+
+          expect(JSON.parse(captured).text).toBe('hello world');
+          expect(stderr).toContain('out of order');
         },
       );
     } finally {

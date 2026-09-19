@@ -127,6 +127,8 @@ This document lists all error scenarios and the messages users will see.
 | Audio file not found | `File not found: ${fullPath}` |
 | Invalid `--response-format` | `Invalid response format "${fmt}". Supported: json, verbose_json, srt, vtt` |
 | Audio file above 50 MB | `Audio file is ${size} MB; speech-to-text allows at most 50 MB: ${fullPath}` |
+| Server rejects the upload as too large (HTTP 413) | `Audio file exceeds the speech-to-text size limit (HTTP 413). ${message}` |
+| Audio flagged by the sensitivity filter (HTTP 422) | `Input audio flagged by sensitivity filter (${message})` |
 | `--stream` with a response format other than `json` | `response_format "${fmt}" cannot be combined with stream=true; streaming returns incremental json only.` |
 | `--stream` together with `--out` | `--stream and --out cannot be combined.` |
 | `--out` unwritable (permissions, missing directory) | `File system error: ${message}` |

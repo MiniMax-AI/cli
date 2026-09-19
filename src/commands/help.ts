@@ -12,7 +12,7 @@ interface ApiRef {
 const API_REFS: ApiRef[] = [
   { command: 'mmx text chat',            title: 'Text Generation (Chat Completion)',    path: '/docs/api-reference/text-post' },
   { command: 'mmx speech synthesize',    title: 'Speech T2A (Text-to-Audio)',           path: '/docs/api-reference/speech-t2a-http' },
-  { command: 'mmx speech transcribe',    title: 'Speech STT (Speech-to-Text)',           path: '/docs/api-reference/speech-to-text' },
+  { command: 'mmx speech transcribe',    title: 'Speech STT (Speech-to-Text)',          path: '/docs/api-reference/speech-to-text' },
   { command: 'mmx image generate',       title: 'Image Generation (T2I / I2I)',         path: '/docs/api-reference/image-generation-t2i' },
   { command: 'mmx video generate',       title: 'Video Generation (T2V / I2V / S2V)',   path: '/docs/api-reference/video-generation' },
   { command: 'mmx search query',         title: 'Web Search',                           path: '/docs/api-reference/web-search' },

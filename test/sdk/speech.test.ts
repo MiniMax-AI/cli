@@ -7,6 +7,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { SpeechResponse, SpeechToTextFormat, SpeechToTextStreamEvent } from '../../src/types/api';
 import { STT_MAX_FILE_BYTES } from '../../src/utils/stt';
+import { withStubbedFetch } from '../helpers/fetch-stub';
+import { SDKError } from '../../src/errors/base';
 
 function makeSpeechResponse(hexAudio?: string): SpeechResponse {
   return {
@@ -123,25 +125,6 @@ describe('SpeechSDK.validateParams', () => {
 describe('SpeechSDK.transcribe', () => {
   const sdk = new SpeechSDK({ apiKey: 'sk-test', baseUrl: 'https://api.mmx.io' });
 
-  async function withStubbedFetch(
-    respond: () => Response,
-    fn: (sent: { url: string; init: RequestInit | undefined }) => Promise<void>,
-  ): Promise<void> {
-    const originalFetch = globalThis.fetch;
-    const sent = { url: '', init: undefined as RequestInit | undefined };
-    globalThis.fetch = (async (input, init) => {
-      sent.url = String(input);
-      sent.init = init;
-      return respond();
-    }) as typeof fetch;
-
-    try {
-      await fn(sent);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  }
-
   function withTempAudio(contents: string): { filePath: string; cleanup: () => void } {
     const dir = mkdtempSync(join(tmpdir(), 'mmx-asr-sdk-'));
     const filePath = join(dir, 'clip.mp3');
@@ -244,6 +227,120 @@ describe('SpeechSDK.transcribe', () => {
           expect(events[1]!.duration).toBe(9.5);
         },
       );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('stops the stream at the final event, not at the end of the body', async () => {
+    const { filePath, cleanup } = withTempAudio('streamed audio');
+    // An event after `finish` (and the helper's trailing [DONE]) must never
+    // reach the consumer: the API terminates the stream at finish=true.
+    const response = sseResponse([
+      { data: '{"index":0,"delta":"done","finish":false}' },
+      { data: '{"index":1,"delta":"","finish":true,"duration":3.25}' },
+      { data: '{"index":2,"delta":"past the end","finish":false}' },
+    ]);
+
+    try {
+      await withStubbedFetch(
+        () => response,
+        async () => {
+          const events: SpeechToTextStreamEvent[] = [];
+          for await (const event of await sdk.transcribe({ file: filePath, stream: true })) {
+            events.push(event);
+          }
+
+          expect(events).toHaveLength(2);
+          expect(events.at(-1)!.finish).toBe(true);
+        },
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('releases the SSE body when the consumer breaks out early', async () => {
+    const { filePath, cleanup } = withTempAudio('streamed audio');
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(
+          'data: {"index":0,"delta":"first","finish":false}\n\n' +
+          'data: {"index":1,"delta":"","finish":true,"duration":1}\n\n',
+        ));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const response = new Response(body, {
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+
+    try {
+      await withStubbedFetch(
+        () => response,
+        async () => {
+          const seen: SpeechToTextStreamEvent[] = [];
+          for await (const event of await sdk.transcribe({ file: filePath, stream: true })) {
+            seen.push(event);
+            break; // consumer stops after the first event
+          }
+          expect(seen).toHaveLength(1);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          expect(cancelled).toBe(true);
+        },
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('raises SDKError, not CLIError, for an invalid response format', async () => {
+    const { filePath, cleanup } = withTempAudio('audio');
+
+    try {
+      try {
+        await sdk.transcribe({ file: filePath, response_format: 'txt' as SpeechToTextFormat });
+        throw new Error('Expected transcribe to reject');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SDKError);
+        expect((error as Error).message).toContain('Invalid response format "txt"');
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('raises SDKError when stream is combined with a subtitle format', async () => {
+    const { filePath, cleanup } = withTempAudio('audio');
+
+    try {
+      try {
+        await sdk.transcribe({ file: filePath, stream: true, response_format: 'srt' });
+        throw new Error('Expected transcribe to reject');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SDKError);
+        expect((error as Error).message).toContain('cannot be combined with stream=true');
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('raises SDKError for audio above the 50 MB limit', async () => {
+    const { filePath, cleanup } = withTempAudio('oversized');
+    truncateSync(filePath, STT_MAX_FILE_BYTES + 1);
+
+    try {
+      try {
+        await sdk.transcribe({ file: filePath });
+        throw new Error('Expected transcribe to reject');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SDKError);
+        expect((error as Error).message).toContain('at most 50 MB');
+      }
     } finally {
       cleanup();
     }

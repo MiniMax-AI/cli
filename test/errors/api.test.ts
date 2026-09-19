@@ -68,6 +68,35 @@ describe('mapApiError', () => {
     expect(err.exitCode).toBe(ExitCode.GENERAL);
   });
 
+  it('maps speech-to-text 422 to CONTENT_FILTER without relying on message text', () => {
+    // The ASR API documents 422 as sensitive audio (1026); the message language
+    // varies, so the mapping keys off the endpoint, not the text.
+    const err = mapApiError(422, {
+      error: {
+        type: 'unprocessable_entity_error',
+        message: '音频校验未通过',
+        http_code: '422',
+      },
+    }, 'https://api.minimax.cn/v1/speech_to_text');
+
+    expect(err.exitCode).toBe(ExitCode.CONTENT_FILTER);
+    expect(err.message).toContain('音频校验未通过');
+  });
+
+  it('maps speech-to-text 413 to USAGE with the size-limit hint', () => {
+    const err = mapApiError(413, {
+      error: {
+        type: 'invalid_request_error',
+        message: 'body over 52428800 bytes',
+        http_code: '413',
+      },
+    }, 'https://api.minimax.cn/v1/speech_to_text');
+
+    expect(err.exitCode).toBe(ExitCode.USAGE);
+    expect(err.message).toContain('size limit');
+    expect(err.hint).toContain('Re-encode');
+  });
+
   it('maps MiniMax quota code 1028', () => {
     const err = mapApiError(400, { base_resp: { status_code: 1028, status_msg: 'quota exhausted' } });
     expect(err.exitCode).toBe(ExitCode.QUOTA);

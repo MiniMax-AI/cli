@@ -131,8 +131,11 @@ console.log(transcript.text, transcript.duration);
 // Speech-to-text, streamed
 const deltas = await sdk.speech.transcribe({ file: './meeting.mp3', stream: true });
 for await (const event of deltas) {
-  process.stdout.write(event.delta);
+  process.stdout.write(event.delta); // concatenate delta values in `index` order
 }
+// The generator ends at the API's final event (finish: true) and releases the
+// connection, so breaking out of the loop early is safe. Unlike the CLI, which
+// warns and continues, the SDK throws SDKError on a malformed stream chunk.
 ```
 
 ### Vision

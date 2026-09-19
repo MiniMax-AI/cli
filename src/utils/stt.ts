@@ -1,6 +1,15 @@
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
-import type { SpeechToTextFormat, SpeechToTextTimestampLevel } from '../types/api';
+import { request, requestJson } from '../client/http';
+import type { Config } from '../config/schema';
+import type { SpeechToTextFormat, SpeechToTextResponse, SpeechToTextTimestampLevel } from '../types/api';
+
+/**
+ * The validators raise the caller's error class: the CLI passes nothing
+ * (defaults to `CLIError`), the SDK passes `SDKError` so consumers narrowing on
+ * it do not miss these.
+ */
+export type SttErrorCtor = new (message: string, exitCode: ExitCode, hint?: string) => CLIError;
 
 /** The only model `POST /v1/speech_to_text` exposes today. */
 export const STT_DEFAULT_MODEL = 'asr-1.0';
@@ -58,9 +67,9 @@ export function sttFormFields({
   return fields;
 }
 
-export function validateSttResponseFormat(format: string): void {
+export function validateSttResponseFormat(format: string, errorCtor: SttErrorCtor = CLIError): void {
   if (!(STT_RESPONSE_FORMATS as readonly string[]).includes(format)) {
-    throw new CLIError(
+    throw new errorCtor(
       `Invalid response format "${format}". Supported: ${STT_RESPONSE_FORMATS.join(', ')}`,
       ExitCode.USAGE,
     );
@@ -71,9 +80,13 @@ export function validateSttResponseFormat(format: string): void {
  * `stream=true` is only accepted together with `response_format=json`, so the
  * combination is rejected before the audio is uploaded.
  */
-export function validateSttStreaming(responseFormat: string, stream: boolean): void {
+export function validateSttStreaming(
+  responseFormat: string,
+  stream: boolean,
+  errorCtor: SttErrorCtor = CLIError,
+): void {
   if (stream && responseFormat !== STT_STREAM_FORMAT) {
-    throw new CLIError(
+    throw new errorCtor(
       `response_format "${responseFormat}" cannot be combined with stream=true; streaming returns incremental json only.`,
       ExitCode.USAGE,
     );
@@ -81,12 +94,62 @@ export function validateSttStreaming(responseFormat: string, stream: boolean): v
 }
 
 /** `source` is what the caller calls the audio: a path, or a Blob's filename. */
-export function validateSttFileSize(source: string, sizeBytes: number): void {
+export function validateSttFileSize(
+  source: string,
+  sizeBytes: number,
+  errorCtor: SttErrorCtor = CLIError,
+): void {
   if (sizeBytes > STT_MAX_FILE_BYTES) {
-    throw new CLIError(
+    throw new errorCtor(
       `Audio file is ${(sizeBytes / 1024 / 1024).toFixed(1)} MB; speech-to-text allows at most ${STT_MAX_FILE_BYTES / 1024 / 1024} MB: ${source}`,
       ExitCode.USAGE,
       'Re-encode to compressed mono audio (e.g. mp3 / aac) or split it into smaller files.',
     );
   }
+}
+
+/** The result of submitting a transcription, split by how the API replies. */
+export type SttSubmission =
+  | { kind: 'stream'; res: Response }
+  | { kind: 'subtitle'; document: string }
+  | { kind: 'json'; response: SpeechToTextResponse };
+
+export interface SttSubmissionOpts {
+  config: Config;
+  url: string;
+  form: FormData;
+  headers: Record<string, string>;
+  /** Already validated by the caller; decides how the reply is read. */
+  responseFormat: string;
+  stream: boolean;
+}
+
+/**
+ * Submit the multipart form once for the CLI and the SDK alike, so the
+ * three-way response handling (SSE / subtitle document / JSON) cannot drift
+ * between the two layers.
+ */
+export async function submitSttForm({
+  config,
+  url,
+  form,
+  headers,
+  responseFormat,
+  stream,
+}: SttSubmissionOpts): Promise<SttSubmission> {
+  if (stream) {
+    const res = await request(config, { url, method: 'POST', body: form, headers, stream: true });
+    return { kind: 'stream', res };
+  }
+  if (isSubtitleFormat(responseFormat)) {
+    const res = await request(config, { url, method: 'POST', body: form, headers });
+    return { kind: 'subtitle', document: await res.text() };
+  }
+  const response = await requestJson<SpeechToTextResponse>(config, {
+    url,
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  return { kind: 'json', response };
 }

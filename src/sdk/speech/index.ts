@@ -17,8 +17,8 @@ import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
 import { ModelPartial } from "../types";
 import {
-  isSubtitleFormat,
   sttFormFields,
+  submitSttForm,
   validateSttFileSize,
   validateSttResponseFormat,
   validateSttStreaming,
@@ -68,12 +68,12 @@ function prepareAudioUpload(file: string | Blob): { blob: Blob; filename: string
     if (!existsSync(fullPath)) {
       throw new SDKError(`File not found: ${fullPath}`, ExitCode.USAGE);
     }
-    validateSttFileSize(fullPath, statSync(fullPath).size);
+    validateSttFileSize(fullPath, statSync(fullPath).size, SDKError);
     return { blob: new Blob([readFileSync(fullPath)]), filename: basename(fullPath) };
   }
 
   const filename = blobFilename(file);
-  validateSttFileSize(filename, file.size);
+  validateSttFileSize(filename, file.size, SDKError);
   return { blob: file, filename };
 }
 
@@ -132,9 +132,11 @@ export class SpeechSDK extends Client {
    * `json` and `verbose_json` resolve to a structured response; `srt` and `vtt`
    * are returned by the API as subtitle documents and resolve to that document
    * as a string. `stream: true` resolves to a stream of incremental text events
-   * and is only valid with `response_format: 'json'`. The audio is uploaded as
-   * `multipart/form-data`, and `language` travels as a request header — the API
-   * accepts and ignores the same value as a form field.
+   * and is only valid with `response_format: 'json'`; the generator ends at the
+   * API's final event (`finish: true`) and releases the connection, so breaking
+   * out early is safe. Concatenate `delta` values in `index` order. The audio is
+   * uploaded as `multipart/form-data`, and `language` travels as a request
+   * header — the API accepts and ignores the same value as a form field.
    */
   async transcribe(params: TranscribeStreamParams): Promise<AsyncGenerator<SpeechToTextStreamEvent>>;
   async transcribe(params: TranscribeSubtitleParams): Promise<string>;
@@ -164,17 +166,35 @@ export class SpeechSDK extends Client {
     const headers: Record<string, string> = {};
     if (language) headers.language = language;
 
-    if (stream) {
-      const res = await this.request({ url, method: 'POST', body: form, headers, stream: true });
-      return this.streamSSE<SpeechToTextStreamEvent>(res);
-    }
+    const submission = await submitSttForm({
+      config: this.config,
+      url,
+      form,
+      headers,
+      responseFormat,
+      stream: stream === true,
+    });
 
-    if (isSubtitleFormat(responseFormat)) {
-      const res = await this.request({ url, method: 'POST', body: form, headers });
-      return await res.text();
-    }
+    if (submission.kind === 'stream') return this.transcribeStream(submission.res);
+    if (submission.kind === 'subtitle') return submission.document;
+    return submission.response;
+  }
 
-    return this.requestJson<SpeechToTextResponse>({ url, method: 'POST', body: form, headers });
+  /**
+   * Yield events until the API's final one. Stopping there leaves the SSE body
+   * undrained, which keeps the connection (and any open handles) alive; the
+   * `finally` releases it whether the stream ended on `finish` or the consumer
+   * broke out early.
+   */
+  private async *transcribeStream(res: Response): AsyncGenerator<SpeechToTextStreamEvent> {
+    try {
+      for await (const event of this.streamSSE<SpeechToTextStreamEvent>(res)) {
+        yield event;
+        if (event.finish) break;
+      }
+    } finally {
+      await res.body?.cancel().catch(() => undefined);
+    }
   }
 
   /**
@@ -235,8 +255,8 @@ export class SpeechSDK extends Client {
     stream: boolean,
   ): SpeechToTextFormat {
     const resolved = responseFormat ?? 'json';
-    validateSttResponseFormat(resolved);
-    validateSttStreaming(resolved, stream);
+    validateSttResponseFormat(resolved, SDKError);
+    validateSttStreaming(resolved, stream, SDKError);
     return resolved;
   }
 }

@@ -3,7 +3,6 @@ import { basename, resolve } from 'node:path';
 import { defineCommand } from '../../command';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
-import { request, requestJson } from '../../client/http';
 import { parseSSE } from '../../client/stream';
 import { speechToTextEndpoint } from '../../client/endpoints';
 import { resolveFileUploadPath } from '../../files/upload';
@@ -13,6 +12,7 @@ import {
   STT_RESPONSE_FORMATS,
   isSubtitleFormat,
   sttFormFields,
+  submitSttForm,
   validateSttFileSize,
   validateSttResponseFormat,
   validateSttStreaming,
@@ -22,12 +22,14 @@ import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type {
   SpeechToTextFormat,
-  SpeechToTextResponse,
   SpeechToTextStreamEvent,
   SpeechToTextTimestampLevel,
 } from '../../types/api';
 
-/** Results are emitted verbatim, only guaranteeing a final newline. */
+/**
+ * Stdout only gets a guaranteed final newline (terminal convention); subtitle
+ * documents written with `--out` are byte-exact, per the API's own bytes.
+ */
 function withTrailingNewline(value: string): string {
   return value.endsWith('\n') ? value : `${value}\n`;
 }
@@ -119,8 +121,11 @@ export default defineCommand({
 
     if (!config.quiet) process.stderr.write(`[Model: ${model}]\n`);
 
-    if (stream) {
-      const res = await request(config, { url, method: 'POST', body: form, headers, stream: true });
+    // One submission for every format; the reply shape decides how it is read.
+    const submission = await submitSttForm({ config, url, form, headers, responseFormat, stream });
+
+    if (submission.kind === 'stream') {
+      const res = submission.res;
 
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('text/event-stream')) {
@@ -130,7 +135,10 @@ export default defineCommand({
         );
       }
 
-      let text = '';
+      // The API numbers events from 0; deltas are concatenated by `index`, so a
+      // gap or repeat is surfaced instead of silently jumbling the transcript.
+      const parts: Array<{ index: number; delta: string }> = [];
+      let nextIndex = 0;
       let duration: number | undefined;
       let finished = false;
       const toStdout = format !== 'json';
@@ -145,8 +153,12 @@ export default defineCommand({
             process.stderr.write(`[warning] Failed to parse stream chunk: ${err instanceof Error ? err.message : String(err)}\n`);
             continue;
           }
+          if (typeof chunk.index === 'number' && chunk.index !== nextIndex) {
+            process.stderr.write(`[warning] Stream events arrived out of order (expected index ${nextIndex}, got ${chunk.index}).\n`);
+          }
+          if (typeof chunk.index === 'number') nextIndex = chunk.index + 1;
           if (chunk.delta) {
-            text += chunk.delta;
+            parts.push({ index: typeof chunk.index === 'number' ? chunk.index : parts.length, delta: chunk.delta });
             if (toStdout) process.stdout.write(chunk.delta);
           }
           if (chunk.finish) {
@@ -165,6 +177,10 @@ export default defineCommand({
         process.stderr.write('[warning] Stream ended before the final event; the transcript may be incomplete.\n');
       }
 
+      // Assembled by index, per the API's contract — arrival order only shows
+      // through on stdout, where deltas are printed as they come.
+      const text = parts.sort((a, b) => a.index - b.index).map((part) => part.delta).join('');
+
       if (toStdout) {
         process.stdout.write('\n');
       } else {
@@ -182,23 +198,22 @@ export default defineCommand({
     let payload: string;
     let duration: number | undefined;
 
-    if (isSubtitleFormat(responseFormat)) {
-      const res = await request(config, { url, method: 'POST', body: form, headers });
-      payload = await res.text();
+    if (submission.kind === 'subtitle') {
+      payload = submission.document;
     } else {
-      const response = await requestJson<SpeechToTextResponse>(config, {
-        url,
-        method: 'POST',
-        body: form,
-        headers,
-      });
-      duration = response.duration;
-      payload = format === 'json' ? formatOutput(response, format) : response.text;
+      duration = submission.response.duration;
+      payload = format === 'json' ? formatOutput(submission.response, format) : submission.response.text;
     }
 
     if (outPath) {
       try {
-        writeFileSync(outPath, withTrailingNewline(payload), 'utf-8');
+        // Subtitle documents are saved byte-exact; text transcripts keep the
+        // trailing-newline convention for plain-text files.
+        writeFileSync(
+          outPath,
+          isSubtitleFormat(responseFormat) ? payload : withTrailingNewline(payload),
+          'utf-8',
+        );
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code === 'ENOSPC') {
           throw new CLIError(
