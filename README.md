@@ -130,7 +130,9 @@ mmx speech transcribe --file long.mp3 --stream
 50 MB and 500 seconds; larger files are rejected locally before upload. Omitting
 `--language` enables mixed-language recognition. `--response-format json` (default) prints the
 transcript, `verbose_json` adds speakers and per-segment timestamps, and `srt` / `vtt` return
-subtitle documents. `--stream` prints incremental text and requires `json`.
+subtitle documents. `--stream` prints incremental text and requires `json`; when stdout is not
+a terminal it accumulates into a single JSON result unless `--output text` is passed.
+`mmx speech recognize` is an alias for `mmx speech transcribe`.
 
 ### `mmx vision`
 

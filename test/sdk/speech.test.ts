@@ -1,11 +1,12 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { createMockServer, jsonResponse, type MockServer } from '../helpers/mock-server';
+import { createMockServer, jsonResponse, sseResponse, type MockServer } from '../helpers/mock-server';
 import { MiniMaxSDK } from '../../src/sdk';
 import { SpeechSDK } from '../../src/sdk/speech';
-import { existsSync, mkdtempSync, rmSync, unlinkSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, truncateSync, unlinkSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { SpeechResponse, SpeechToTextStreamEvent } from '../../src/types/api';
+import { STT_MAX_FILE_BYTES } from '../../src/utils/stt';
 
 function makeSpeechResponse(hexAudio?: string): SpeechResponse {
   return {
@@ -153,10 +154,7 @@ describe('SpeechSDK.transcribe', () => {
 
     try {
       await withStubbedFetch(
-        () => new Response(JSON.stringify({ text: 'transcribed', duration: 2.5 }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
+        () => jsonResponse({ text: 'transcribed', duration: 2.5 }),
         async (sent) => {
           const result = await sdk.transcribe({ file: filePath, language: 'zh' });
 
@@ -184,10 +182,7 @@ describe('SpeechSDK.transcribe', () => {
 
   it('accepts a Blob instead of a path', async () => {
     await withStubbedFetch(
-      () => new Response(JSON.stringify({ text: 'blob input', duration: 1 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+      () => jsonResponse({ text: 'blob input', duration: 1 }),
       async (sent) => {
         const result = await sdk.transcribe({ file: new Blob(['blob audio']) });
 
@@ -197,19 +192,46 @@ describe('SpeechSDK.transcribe', () => {
     );
   });
 
-  it('yields streamed events when stream is enabled', async () => {
-    const { filePath, cleanup } = withTempAudio('streamed audio');
-    const sse = [
-      'data: {"index":0,"delta":"a","finish":false}',
-      '',
-      'data: {"index":1,"delta":"","finish":true,"duration":9.5}',
-      '',
-      '',
-    ].join('\n');
+  it('returns the subtitle document for srt, which the API sends as text', async () => {
+    const { filePath, cleanup } = withTempAudio('srt audio');
+    const srt = '1\n00:00:00,080 --> 00:00:04,540\nhello\n\n';
 
     try {
       await withStubbedFetch(
-        () => new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+        () => new Response(srt, { status: 200, headers: { 'Content-Type': 'text/plain' } }),
+        async (sent) => {
+          const document = await sdk.transcribe({ file: filePath, response_format: 'srt' });
+
+          expect((sent.init?.body as FormData).get('response_format')).toBe('srt');
+          expect(document).toBe(srt);
+        },
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('rejects audio above the documented 50 MB limit', async () => {
+    const { filePath, cleanup } = withTempAudio('oversized audio');
+
+    try {
+      truncateSync(filePath, STT_MAX_FILE_BYTES + 1);
+      await expect(sdk.transcribe({ file: filePath })).rejects.toThrow(/at most 50 MB/);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('yields streamed events when stream is enabled', async () => {
+    const { filePath, cleanup } = withTempAudio('streamed audio');
+    const response = sseResponse([
+      { data: '{"index":0,"delta":"a","finish":false}' },
+      { data: '{"index":1,"delta":"","finish":true,"duration":9.5}' },
+    ]);
+
+    try {
+      await withStubbedFetch(
+        () => response,
         async (sent) => {
           const events: SpeechToTextStreamEvent[] = [];
           for await (const event of await sdk.transcribe({ file: filePath, stream: true })) {

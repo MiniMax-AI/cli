@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { default as transcribeCommand } from '../../../src/commands/speech/transcribe';
 import { STT_MAX_FILE_BYTES } from '../../../src/utils/stt';
+import { jsonResponse, sseResponse } from '../../helpers/mock-server';
 
 const baseConfig = {
   apiKey: 'test-key',
@@ -60,6 +61,22 @@ async function captureLog(fn: () => Promise<void>): Promise<string> {
   }
 }
 
+async function captureStderr(fn: () => Promise<void>): Promise<string> {
+  const originalWrite = process.stderr.write;
+  let output = '';
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    output += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf-8');
+    return true;
+  }) as typeof process.stderr.write;
+
+  try {
+    await fn();
+    return output;
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+}
+
 /** Run `fn` against a stubbed fetch and hand back what the command sent. */
 async function withStubbedFetch(
   respond: () => Response,
@@ -78,13 +95,6 @@ async function withStubbedFetch(
   } finally {
     globalThis.fetch = originalFetch;
   }
-}
-
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
 }
 
 function makeTempAudio(contents = 'fake audio bytes'): { dir: string; filePath: string } {
@@ -127,7 +137,7 @@ describe('speech transcribe command', () => {
     try {
       await expect(
         transcribeCommand.execute(baseConfig, { ...baseFlags, file: filePath, responseFormat: 'txt' }),
-      ).rejects.toThrow(/Invalid audio format "txt"/);
+      ).rejects.toThrow(/Invalid response format "txt"/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -368,32 +378,33 @@ describe('speech transcribe command', () => {
     }
   });
 
-  it('streams incremental text events to stdout', async () => {
+  it('streams incremental text events to stdout and reports the duration', async () => {
     const { dir, filePath } = makeTempAudio();
-    const sse = [
-      'data: {"index":0,"delta":"你好","finish":false}',
-      '',
-      'data: {"index":1,"delta":"世界","finish":false}',
-      '',
-      'data: {"index":2,"delta":"","finish":true,"duration":2.25}',
-      '',
-      '',
-    ].join('\n');
+    const response = sseResponse([
+      { data: '{"index":0,"delta":"你好","finish":false}' },
+      { data: '{"index":1,"delta":"世界","finish":false}' },
+      { data: '{"index":2,"delta":"","finish":true,"duration":2.25}' },
+    ]);
 
     try {
       await withStubbedFetch(
-        () => new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+        () => response,
         async (sent) => {
-          const captured = await captureStdout(async () => {
-            await transcribeCommand.execute(baseConfig, {
-              ...baseFlags,
-              file: filePath,
-              stream: true,
+          let captured = '';
+          const stderr = await captureStderr(async () => {
+            captured = await captureStdout(async () => {
+              await transcribeCommand.execute(baseConfig, {
+                ...baseFlags,
+                file: filePath,
+                stream: true,
+              });
             });
           });
 
           expect((sent.init?.body as FormData).get('stream')).toBe('true');
           expect(captured).toBe('你好世界\n');
+          expect(stderr).toContain('[Model: asr-1.0]');
+          expect(stderr).toContain('[Duration: 2.25s]');
         },
       );
     } finally {
@@ -403,19 +414,15 @@ describe('speech transcribe command', () => {
 
   it('accumulates streamed text into a single json result under --output json', async () => {
     const { dir, filePath } = makeTempAudio();
-    const sse = [
-      'data: {"index":0,"delta":"par","finish":false}',
-      '',
-      'data: {"index":1,"delta":"tial","finish":false}',
-      '',
-      'data: {"index":2,"delta":"","finish":true,"duration":1.75}',
-      '',
-      '',
-    ].join('\n');
+    const response = sseResponse([
+      { data: '{"index":0,"delta":"par","finish":false}' },
+      { data: '{"index":1,"delta":"tial","finish":false}' },
+      { data: '{"index":2,"delta":"","finish":true,"duration":1.75}' },
+    ]);
 
     try {
       await withStubbedFetch(
-        () => new Response(sse, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }),
+        () => response,
         async () => {
           const captured = await captureStdout(async () => {
             await transcribeCommand.execute(

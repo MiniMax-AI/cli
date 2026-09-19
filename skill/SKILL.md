@@ -238,13 +238,21 @@ mmx speech transcribe --file talk.mp3 --response-format srt --out talk.srt
 # saves talk.srt; stdout: {"saved":".../talk.srt"}
 
 mmx speech transcribe --file long.mp3 --stream
-# stdout: text as it is recognized, no trailing metadata
+# stdout: text as it is recognized (add --output text when piping)
 ```
 
 Notes:
+- `mmx speech recognize` is an alias for `mmx speech transcribe`.
 - `--stream` cannot be combined with `--out`; redirect stdout instead.
+- `--stream` prints deltas only in text output mode. stdout that is not a terminal defaults to
+  `json` (as everywhere else in this CLI), which accumulates the streamed text into one JSON
+  result — pass `--output text` to pipe streamed text, e.g.
+  `mmx speech transcribe --file long.mp3 --stream --output text > transcript.txt`.
 - `srt` / `vtt` results are subtitle documents and are printed or saved verbatim.
 - Without `--out`, `--output json` prints the full API response for `json` / `verbose_json`.
+- Input validation (missing file, unsupported format, over 50 MB, `--stream` with a non-json
+  format) fails before anything is uploaded; the API stays the authority for the 500 s duration
+  limit and codec support.
 
 ---
 

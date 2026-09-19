@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { basename, resolve, dirname } from 'node:path';
 import { Client } from "../client";
 import { speechEndpoint, speechToTextEndpoint, voicesEndpoint } from "../../client/endpoints";
 import {
   SpeechRequest,
   SpeechResponse,
+  SpeechToTextFormat,
   SpeechToTextRequest,
   SpeechToTextResponse,
   SpeechToTextStreamEvent,
@@ -15,20 +16,28 @@ import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
 import { ModelPartial } from "../types";
-import { STT_DEFAULT_MODEL, sttStreamFormatConflict } from "../../utils/stt";
-
+import {
+  isSubtitleFormat,
+  sttFormFields,
+  validateSttFileSize,
+  validateSttStreaming,
+} from "../../utils/stt";
 export type TranscribeParams = ModelPartial<SpeechToTextRequest> & {
   /** Local audio path, or a Blob/File to send as-is. */
   file: string | Blob;
   /**
    * BCP-47 language hint (e.g. `zh`, `en`). Sent as the `language` request
-   * header: the API ignores it when passed as a form field, even though its
-   * curl example uses `-F "language=zh"`.
+   * header — the API accepts and ignores the same value as a form field.
    */
   language?: string;
 };
 
 export type TranscribeStreamParams = TranscribeParams & { stream: true };
+
+/** Subtitle formats come back as documents, not as JSON. */
+export type TranscribeSubtitleParams = TranscribeParams & {
+  response_format: Extract<SpeechToTextFormat, 'srt' | 'vtt'>;
+};
 
 function hexToBuffer(hex: string): Buffer {
   if (!/^[0-9a-fA-F]*$/.test(hex)) {
@@ -45,6 +54,12 @@ function defaultFilename(prefix: string, ext: string): string {
   return `${prefix}_${ts}.${ext}`;
 }
 
+/** The uploaded filename, preferring a real File name over a placeholder. */
+function blobFilename(file: Blob): string {
+  const name = (file as File).name;
+  return typeof name === 'string' && name ? name : 'audio';
+}
+
 /** Resolve a transcription input into the multipart `file` part. */
 function prepareAudioUpload(file: string | Blob): { blob: Blob; filename: string } {
   if (typeof file === 'string') {
@@ -52,11 +67,13 @@ function prepareAudioUpload(file: string | Blob): { blob: Blob; filename: string
     if (!existsSync(fullPath)) {
       throw new SDKError(`File not found: ${fullPath}`, ExitCode.USAGE);
     }
+    validateSttFileSize(fullPath, statSync(fullPath).size);
     return { blob: new Blob([readFileSync(fullPath)]), filename: basename(fullPath) };
   }
 
-  const name = (file as File).name;
-  return { blob: file, filename: typeof name === 'string' && name ? name : 'audio' };
+  const filename = blobFilename(file);
+  validateSttFileSize(filename, file.size);
+  return { blob: file, filename };
 }
 
 export class SpeechSDK extends Client {
@@ -111,17 +128,19 @@ export class SpeechSDK extends Client {
   /**
    * Transcribe an audio file (speech-to-text).
    *
-   * `json` and `verbose_json` resolve to a structured response; SRT and VTT are
-   * returned by the API as subtitle documents, so `response_format` is applied
-   * as-is and the raw body is surfaced by the caller. The audio is uploaded as
+   * `json` and `verbose_json` resolve to a structured response; `srt` and `vtt`
+   * are returned by the API as subtitle documents and resolve to that document
+   * as a string. `stream: true` resolves to a stream of incremental text events
+   * and is only valid with `response_format: 'json'`. The audio is uploaded as
    * `multipart/form-data`, and `language` travels as a request header — the API
-   * ignores it when sent as a form field.
+   * accepts and ignores the same value as a form field.
    */
   async transcribe(params: TranscribeStreamParams): Promise<AsyncGenerator<SpeechToTextStreamEvent>>;
+  async transcribe(params: TranscribeSubtitleParams): Promise<string>;
   async transcribe(params: TranscribeParams): Promise<SpeechToTextResponse>;
   async transcribe(
     params: TranscribeParams,
-  ): Promise<SpeechToTextResponse | AsyncGenerator<SpeechToTextStreamEvent>> {
+  ): Promise<SpeechToTextResponse | string | AsyncGenerator<SpeechToTextStreamEvent>> {
     const { file, language, model, response_format, timestamp_level, stream } = params;
 
     if (!file) {
@@ -129,19 +148,17 @@ export class SpeechSDK extends Client {
     }
 
     const responseFormat = response_format ?? 'json';
-    const streamConflict = sttStreamFormatConflict(responseFormat, stream === true);
-    if (streamConflict) {
-      throw new SDKError(streamConflict, ExitCode.USAGE);
-    }
+    validateSttStreaming(responseFormat, stream === true);
 
     const { blob, filename } = prepareAudioUpload(file);
 
     const form = new FormData();
-    form.append('model', model ?? STT_DEFAULT_MODEL);
+    for (const [field, value] of Object.entries(
+      sttFormFields({ model, response_format: responseFormat, timestamp_level, stream }),
+    )) {
+      form.append(field, value);
+    }
     form.append('file', blob, filename);
-    form.append('response_format', responseFormat);
-    if (timestamp_level) form.append('timestamp_level', timestamp_level);
-    if (stream) form.append('stream', 'true');
 
     const url = speechToTextEndpoint(this.config.baseUrl);
     const headers: Record<string, string> = {};
@@ -150,6 +167,11 @@ export class SpeechSDK extends Client {
     if (stream) {
       const res = await this.request({ url, method: 'POST', body: form, headers, stream: true });
       return this.streamSSE<SpeechToTextStreamEvent>(res);
+    }
+
+    if (isSubtitleFormat(responseFormat)) {
+      const res = await this.request({ url, method: 'POST', body: form, headers });
+      return await res.text();
     }
 
     return this.requestJson<SpeechToTextResponse>({ url, method: 'POST', body: form, headers });

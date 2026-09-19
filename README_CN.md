@@ -124,7 +124,9 @@ mmx speech transcribe --file long.mp3 --stream
 `mmx speech transcribe` 支持 wav、aiff、flac、m4a、mp3、aac、opus、ogg 格式，音频不超过
 50 MB、时长不超过 500 秒；超出时会在上传前直接报错。不传 `--language` 时启用混合语言识别。
 `--response-format json`（默认）输出转写文本，`verbose_json` 附带说话人标识与分段
-时间戳，`srt` / `vtt` 直接返回字幕文档。`--stream` 逐段输出文本，仅支持 `json`。
+时间戳，`srt` / `vtt` 直接返回字幕文档。`--stream` 逐段输出文本，仅支持 `json`；当 stdout
+不是终端时会汇总为单个 JSON 结果，除非显式传 `--output text`。
+`mmx speech recognize` 是 `mmx speech transcribe` 的别名。
 
 ### `mmx vision`
 

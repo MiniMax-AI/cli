@@ -8,22 +8,25 @@ import { parseSSE } from '../../client/stream';
 import { speechToTextEndpoint } from '../../client/endpoints';
 import { resolveFileUploadPath } from '../../files/upload';
 import { detectOutputFormat, dryRun, formatOutput } from '../../output/formatter';
-import { formatList, validateAudioFormat } from '../../utils/audio-formats';
+import { formatList } from '../../utils/audio-formats';
 import {
   STT_DEFAULT_MODEL,
   STT_RESPONSE_FORMATS,
-  sttStreamFormatConflict,
+  isSubtitleFormat,
+  sttFormFields,
   validateSttFileSize,
+  validateSttResponseFormat,
+  validateSttStreaming,
 } from '../../utils/stt';
 import { promptOrFail } from '../../utils/prompt';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
-import type { SpeechToTextResponse, SpeechToTextStreamEvent } from '../../types/api';
-
-/** srt/vtt come back as subtitle documents, not as JSON. */
-function isSubtitleFormat(responseFormat: string): boolean {
-  return responseFormat === 'srt' || responseFormat === 'vtt';
-}
+import type {
+  SpeechToTextFormat,
+  SpeechToTextResponse,
+  SpeechToTextStreamEvent,
+  SpeechToTextTimestampLevel,
+} from '../../types/api';
 
 /** Results are emitted verbatim, only guaranteeing a final newline. */
 function withTrailingNewline(value: string): string {
@@ -74,31 +77,34 @@ export default defineCommand({
     const stream = flags.stream === true;
     const outPath = flags.out ? resolve(flags.out as string) : undefined;
 
-    validateAudioFormat(responseFormat, STT_RESPONSE_FORMATS);
+    validateSttResponseFormat(responseFormat);
     validateSttFileSize(fullPath, statSync(fullPath).size);
+    validateSttStreaming(responseFormat, stream);
 
-    const streamConflict = sttStreamFormatConflict(responseFormat, stream);
-    if (streamConflict) throw new CLIError(streamConflict, ExitCode.USAGE);
     if (stream && outPath) {
       throw new CLIError(
         '--stream and --out cannot be combined.',
         ExitCode.USAGE,
-        'Redirect stdout instead: mmx speech transcribe --file <path> --stream > transcript.txt',
+        'Redirect stdout instead: mmx speech transcribe --file <path> --stream --output text > transcript.txt',
       );
     }
 
-    const preview: Record<string, unknown> = { model, response_format: responseFormat, file: fullPath };
+    // One source for the multipart text parts, so the dry-run preview and the
+    // request cannot drift apart.
+    const fields = sttFormFields({
+      model,
+      response_format: responseFormat as SpeechToTextFormat,
+      timestamp_level: timestampLevel as SpeechToTextTimestampLevel | undefined,
+      stream,
+    });
+
+    const preview: Record<string, unknown> = { ...fields, file: fullPath };
     if (language) preview.language = language;
-    if (timestampLevel) preview.timestamp_level = timestampLevel;
-    if (stream) preview.stream = true;
     if (dryRun(config, preview)) return;
 
     const form = new FormData();
-    form.append('model', model);
+    for (const [field, value] of Object.entries(fields)) form.append(field, value);
     form.append('file', new Blob([readFileSync(fullPath)]), basename(fullPath));
-    form.append('response_format', responseFormat);
-    if (timestampLevel) form.append('timestamp_level', timestampLevel);
-    if (stream) form.append('stream', 'true');
 
     // `language` only takes effect as a request header: the API accepts (and
     // ignores) the same value as a form field.
@@ -107,6 +113,8 @@ export default defineCommand({
 
     const url = speechToTextEndpoint(config.baseUrl);
     const format = detectOutputFormat(config.output);
+
+    if (!config.quiet) process.stderr.write(`[Model: ${model}]\n`);
 
     if (stream) {
       const res = await request(config, { url, method: 'POST', body: form, headers, stream: true });
@@ -139,6 +147,12 @@ export default defineCommand({
         if (chunk.finish) duration = chunk.duration;
       }
 
+      // Only the final event carries the audio duration, so it is reported once
+      // the stream is drained.
+      if (!config.quiet && duration !== undefined) {
+        process.stderr.write(`[Duration: ${duration}s]\n`);
+      }
+
       if (toStdout) {
         process.stdout.write('\n');
       } else {
@@ -146,8 +160,6 @@ export default defineCommand({
       }
       return;
     }
-
-    if (!config.quiet) process.stderr.write(`[Model: ${model}]\n`);
 
     let payload: string;
     let duration: number | undefined;
