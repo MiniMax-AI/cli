@@ -8,7 +8,6 @@ import { parseSSE } from '../../client/stream';
 import { speechToTextEndpoint } from '../../client/endpoints';
 import { resolveFileUploadPath } from '../../files/upload';
 import { detectOutputFormat, dryRun, formatOutput } from '../../output/formatter';
-import { formatList } from '../../utils/audio-formats';
 import {
   STT_DEFAULT_MODEL,
   STT_RESPONSE_FORMATS,
@@ -41,10 +40,10 @@ export default defineCommand({
   options: [
     { flag: '--file <path>',             description: 'Audio file to transcribe (mp3, wav, m4a, flac, aac, opus, ogg, aiff)', required: true },
     { flag: '--model <model>',           description: `Model ID (default: ${STT_DEFAULT_MODEL})` },
-    { flag: '--response-format <fmt>',   description: `Transcription format: ${formatList(STT_RESPONSE_FORMATS)} (default: json)` },
+    { flag: '--response-format <fmt>',   description: `Transcription format: ${STT_RESPONSE_FORMATS.join(', ')} (default: json)` },
     { flag: '--language <code>',         description: 'BCP-47 language hint (zh, en, ja, ...); omit for automatic detection' },
     { flag: '--timestamp-level <level>', description: 'Timestamp granularity: sentence, word (verbose_json / srt / vtt only)' },
-    { flag: '--stream',                  description: 'Stream incremental text to stdout (json only)' },
+    { flag: '--stream',                  description: 'Stream incremental text (json only; pair with --output text when piping)' },
     { flag: '--out <path>',              description: 'Write the result to a file instead of stdout' },
   ],
   examples: [
@@ -129,6 +128,7 @@ export default defineCommand({
 
       let text = '';
       let duration: number | undefined;
+      let finished = false;
       const toStdout = format !== 'json';
       for await (const event of parseSSE(res)) {
         if (event.data === '[DONE]') break;
@@ -144,19 +144,27 @@ export default defineCommand({
           text += chunk.delta;
           if (toStdout) process.stdout.write(chunk.delta);
         }
-        if (chunk.finish) duration = chunk.duration;
+        if (chunk.finish) {
+          duration = chunk.duration;
+          finished = true;
+          break;
+        }
       }
 
-      // Only the final event carries the audio duration, so it is reported once
-      // the stream is drained.
-      if (!config.quiet && duration !== undefined) {
-        process.stderr.write(`[Duration: ${duration}s]\n`);
+      if (!finished) {
+        process.stderr.write('[warning] Stream ended before the final event; the transcript may be incomplete.\n');
       }
 
       if (toStdout) {
         process.stdout.write('\n');
       } else {
         process.stdout.write(withTrailingNewline(formatOutput({ text, duration }, format)));
+      }
+
+      // Only the final event carries the audio duration, so it is reported once
+      // the stream is drained — after stdout is closed out.
+      if (!config.quiet && duration !== undefined) {
+        process.stderr.write(`[Duration: ${duration}s]\n`);
       }
       return;
     }
@@ -179,7 +187,18 @@ export default defineCommand({
     }
 
     if (outPath) {
-      writeFileSync(outPath, withTrailingNewline(payload), 'utf-8');
+      try {
+        writeFileSync(outPath, withTrailingNewline(payload), 'utf-8');
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'ENOSPC') {
+          throw new CLIError(
+            'Disk full — cannot write transcript file.',
+            ExitCode.GENERAL,
+            'Free up disk space and try again.',
+          );
+        }
+        throw err;
+      }
       if (config.quiet) {
         console.log(outPath);
       } else {

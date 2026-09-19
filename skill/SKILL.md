@@ -250,6 +250,10 @@ Notes:
   `mmx speech transcribe --file long.mp3 --stream --output text > transcript.txt`.
 - `srt` / `vtt` results are subtitle documents and are printed or saved verbatim.
 - Without `--out`, `--output json` prints the full API response for `json` / `verbose_json`.
+  Plain-text output prints the transcript only, so add `--output json` to read `n_speakers`
+  and `segments`.
+- A stream that ends without the API's final event raises a warning on stderr, since the
+  transcript may be truncated.
 - Input validation (missing file, unsupported format, over 50 MB, `--stream` with a non-json
   format) fails before anything is uploaded; the API stays the authority for the 500 s duration
   limit and codec support.

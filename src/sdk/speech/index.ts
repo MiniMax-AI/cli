@@ -20,6 +20,7 @@ import {
   isSubtitleFormat,
   sttFormFields,
   validateSttFileSize,
+  validateSttResponseFormat,
   validateSttStreaming,
 } from "../../utils/stt";
 export type TranscribeParams = ModelPartial<SpeechToTextRequest> & {
@@ -147,8 +148,7 @@ export class SpeechSDK extends Client {
       throw new SDKError('file is required', ExitCode.USAGE);
     }
 
-    const responseFormat = response_format ?? 'json';
-    validateSttStreaming(responseFormat, stream === true);
+    const responseFormat = this.validateTranscribeFormat(response_format, stream === true);
 
     const { blob, filename } = prepareAudioUpload(file);
 
@@ -227,5 +227,16 @@ export class SpeechSDK extends Client {
       },
       output_format: 'hex',
     }, params) as SpeechRequest;
+  }
+
+  /** Resolve the transcription response format, rejecting unusable values. */
+  private validateTranscribeFormat(
+    responseFormat: SpeechToTextFormat | undefined,
+    stream: boolean,
+  ): SpeechToTextFormat {
+    const resolved = responseFormat ?? 'json';
+    validateSttResponseFormat(resolved);
+    validateSttStreaming(resolved, stream);
+    return resolved;
   }
 }

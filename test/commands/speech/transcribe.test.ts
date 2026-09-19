@@ -412,6 +412,36 @@ describe('speech transcribe command', () => {
     }
   });
 
+  it('warns on stderr when the stream ends without the final event', async () => {
+    const { dir, filePath } = makeTempAudio();
+    const response = sseResponse([
+      { data: '{"index":0,"delta":"truncated","finish":false}' },
+    ]);
+
+    try {
+      await withStubbedFetch(
+        () => response,
+        async () => {
+          let captured = '';
+          const stderr = await captureStderr(async () => {
+            captured = await captureStdout(async () => {
+              await transcribeCommand.execute(baseConfig, {
+                ...baseFlags,
+                file: filePath,
+                stream: true,
+              });
+            });
+          });
+
+          expect(captured).toBe('truncated\n');
+          expect(stderr).toContain('Stream ended before the final event');
+        },
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('accumulates streamed text into a single json result under --output json', async () => {
     const { dir, filePath } = makeTempAudio();
     const response = sseResponse([

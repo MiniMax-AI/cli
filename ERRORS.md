@@ -129,6 +129,8 @@ This document lists all error scenarios and the messages users will see.
 | Audio file above 50 MB | `Audio file is ${size} MB; speech-to-text allows at most 50 MB: ${fullPath}` |
 | `--stream` with a response format other than `json` | `response_format "${fmt}" cannot be combined with stream=true; streaming returns incremental json only.` |
 | `--stream` together with `--out` | `--stream and --out cannot be combined.` |
+| `--out` unwritable (permissions, missing directory) | `File system error: ${message}` |
+| Disk full | `Disk full — cannot write transcript file.` |
 
 Audio longer than 500 seconds and unsupported/corrupt audio are rejected by the API; the
 server message is surfaced verbatim (e.g. `API error: invalid params, ... (HTTP 400)`).

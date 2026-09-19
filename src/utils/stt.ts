@@ -1,6 +1,5 @@
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
-import { formatList } from './audio-formats';
 import type { SpeechToTextFormat, SpeechToTextTimestampLevel } from '../types/api';
 
 /** The only model `POST /v1/speech_to_text` exposes today. */
@@ -62,7 +61,7 @@ export function sttFormFields({
 export function validateSttResponseFormat(format: string): void {
   if (!(STT_RESPONSE_FORMATS as readonly string[]).includes(format)) {
     throw new CLIError(
-      `Invalid response format "${format}". Supported: ${formatList(STT_RESPONSE_FORMATS)}`,
+      `Invalid response format "${format}". Supported: ${STT_RESPONSE_FORMATS.join(', ')}`,
       ExitCode.USAGE,
     );
   }
@@ -81,10 +80,11 @@ export function validateSttStreaming(responseFormat: string, stream: boolean): v
   }
 }
 
-export function validateSttFileSize(filePath: string, sizeBytes: number): void {
+/** `source` is what the caller calls the audio: a path, or a Blob's filename. */
+export function validateSttFileSize(source: string, sizeBytes: number): void {
   if (sizeBytes > STT_MAX_FILE_BYTES) {
     throw new CLIError(
-      `Audio file is ${(sizeBytes / 1024 / 1024).toFixed(1)} MB; speech-to-text allows at most ${STT_MAX_FILE_BYTES / 1024 / 1024} MB: ${filePath}`,
+      `Audio file is ${(sizeBytes / 1024 / 1024).toFixed(1)} MB; speech-to-text allows at most ${STT_MAX_FILE_BYTES / 1024 / 1024} MB: ${source}`,
       ExitCode.USAGE,
       'Re-encode to compressed mono audio (e.g. mp3 / aac) or split it into smaller files.',
     );

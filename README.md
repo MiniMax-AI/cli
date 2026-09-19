@@ -127,12 +127,14 @@ mmx speech transcribe --file long.mp3 --stream
 ```
 
 `mmx speech transcribe` accepts wav, aiff, flac, m4a, mp3, aac, opus, and ogg files up to
-50 MB and 500 seconds; larger files are rejected locally before upload. Omitting
-`--language` enables mixed-language recognition. `--response-format json` (default) prints the
-transcript, `verbose_json` adds speakers and per-segment timestamps, and `srt` / `vtt` return
-subtitle documents. `--stream` prints incremental text and requires `json`; when stdout is not
-a terminal it accumulates into a single JSON result unless `--output text` is passed.
-`mmx speech recognize` is an alias for `mmx speech transcribe`.
+50 MB and 500 seconds. Audio above 50 MB is rejected locally before upload; the 500 second
+limit is enforced by the API. Omitting `--language` enables mixed-language recognition.
+`--response-format json` (default) prints the transcript, `verbose_json` adds speakers and
+per-segment timestamps, and `srt` / `vtt` return subtitle documents. `n_speakers` and
+`segments` are part of the response, so pass `--output json` to see them. `--stream` prints
+incremental text and requires `json`; when stdout is not a terminal it accumulates into a single
+JSON result unless `--output text` is passed. `mmx speech recognize` is an alias for
+`mmx speech transcribe`.
 
 ### `mmx vision`
 

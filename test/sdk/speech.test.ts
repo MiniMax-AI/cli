@@ -5,7 +5,7 @@ import { SpeechSDK } from '../../src/sdk/speech';
 import { existsSync, mkdtempSync, rmSync, truncateSync, unlinkSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { SpeechResponse, SpeechToTextStreamEvent } from '../../src/types/api';
+import type { SpeechResponse, SpeechToTextFormat, SpeechToTextStreamEvent } from '../../src/types/api';
 import { STT_MAX_FILE_BYTES } from '../../src/utils/stt';
 
 function makeSpeechResponse(hexAudio?: string): SpeechResponse {
@@ -266,6 +266,19 @@ describe('SpeechSDK.transcribe', () => {
       await expect(
         sdk.transcribe({ file: filePath, stream: true, response_format: 'srt' }),
       ).rejects.toThrow(/cannot be combined with stream=true/);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('rejects an unknown response format before uploading', async () => {
+    const { filePath, cleanup } = withTempAudio('audio');
+    const unknown = 'txt' as unknown as SpeechToTextFormat;
+
+    try {
+      await expect(
+        sdk.transcribe({ file: filePath, response_format: unknown }),
+      ).rejects.toThrow(/Invalid response format "txt"/);
     } finally {
       cleanup();
     }
