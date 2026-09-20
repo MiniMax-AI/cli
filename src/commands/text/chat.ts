@@ -271,12 +271,19 @@ export default defineCommand({
 
       const think = new ThinkingIndicator(statusOut, config.noColor);
 
+      // The stream is only complete once the server sends a terminator
+      // (`message_stop` or `[DONE]`). A connection that closes before that
+      // leaves `textContent` silently truncated, so track it explicitly.
+      let streamCompleted = false;
+
       for await (const event of parseSSE(res)) {
-        if (event.data === '[DONE]') break;
+        if (event.data === '[DONE]') { streamCompleted = true; break; }
         try {
           const parsed = JSON.parse(event.data) as StreamEvent;
 
-          if (parsed.type === 'content_block_start') {
+          if (parsed.type === 'message_stop') {
+            streamCompleted = true;
+          } else if (parsed.type === 'content_block_start') {
             if (parsed.content_block.type === 'thinking') {
               inThinking = true;
               think.start();
@@ -299,6 +306,14 @@ export default defineCommand({
         }
       }
       if (inThinking) think.stop();
+
+      if (!streamCompleted) {
+        if (!isJsonOutput) resultOut?.write('\n');
+        throw new CLIError(
+          'Stream disconnected before response completed.',
+          ExitCode.NETWORK,
+        );
+      }
 
       if (format === 'json') {
         console.log(formatOutput({ content: textContent }, format));

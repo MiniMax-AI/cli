@@ -302,4 +302,63 @@ describe('text chat command', () => {
       console.log = originalLog;
     }
   });
+
+  it('should fail when the SSE stream ends without a terminator instead of printing truncated output', async () => {
+    // Deltas only: no `message_stop` event and no `data: [DONE]` line, i.e. the
+    // connection dropped part-way through the response.
+    const truncatedBody =
+      `data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } })}\n\n` +
+      `data: ${JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: ' wor' } })}\n\n`;
+
+    server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': () => new Response(truncatedBody, {
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+      },
+    });
+
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: server.url,
+      output: 'json',
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: false,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += `${msg}\n`; };
+
+    try {
+      await expect(
+        chatCommand.execute(config, {
+          message: ['Hello'],
+          stream: true,
+          quiet: false,
+          verbose: false,
+          noColor: true,
+          yes: false,
+          dryRun: false,
+          help: false,
+          nonInteractive: true,
+          async: false,
+        }),
+      ).rejects.toThrow('Stream disconnected before response completed.');
+
+      // The truncated text must not be reported as a complete result.
+      expect(output).toBe('');
+    } finally {
+      console.log = originalLog;
+    }
+  });
 });
