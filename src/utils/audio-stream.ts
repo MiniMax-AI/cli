@@ -37,6 +37,13 @@ function missingAudioError(): CLIError {
   );
 }
 
+function truncatedStreamError(): CLIError {
+  return new CLIError(
+    'Stream disconnected before audio completed.',
+    ExitCode.NETWORK,
+  );
+}
+
 export async function* decodeAudioStream(
   response: Response,
 ): AsyncGenerator<Uint8Array<ArrayBuffer>> {
@@ -61,8 +68,13 @@ export async function* decodeAudioStream(
   }
 
   let receivedAudio = false;
+  let streamCompleted = false;
   for await (const event of parseSSE(response)) {
-    if (!event.data || event.data === '[DONE]') break;
+    if (!event.data) break;
+    if (event.data === '[DONE]') {
+      streamCompleted = true;
+      break;
+    }
 
     let parsed: AudioPayload;
     try {
@@ -82,10 +94,14 @@ export async function* decodeAudioStream(
       yield decodeHexAudio(hex);
     }
 
-    if (parsed.data?.status === 2) break;
+    if (parsed.data?.status === 2) {
+      streamCompleted = true;
+      break;
+    }
   }
 
   if (!receivedAudio) throw missingAudioError();
+  if (!streamCompleted) throw truncatedStreamError();
 }
 
 export async function pipeAudioStream(response: Response): Promise<void> {
