@@ -21,17 +21,21 @@ describe('loadConfig', () => {
   const testDir = join(tmpdir(), `mmx-config-test-${Date.now()}`);
   const originalHome = process.env.HOME;
   const originalRegion = process.env.MINIMAX_REGION;
+  const originalApiKey = process.env.MINIMAX_API_KEY;
 
   beforeEach(() => {
     mkdirSync(join(testDir, '.mmx'), { recursive: true });
     process.env.HOME = testDir;
     delete process.env.MINIMAX_REGION;
+    delete process.env.MINIMAX_API_KEY;
   });
 
   afterEach(() => {
     process.env.HOME = originalHome;
     if (originalRegion === undefined) delete process.env.MINIMAX_REGION;
     else process.env.MINIMAX_REGION = originalRegion;
+    if (originalApiKey === undefined) delete process.env.MINIMAX_API_KEY;
+    else process.env.MINIMAX_API_KEY = originalApiKey;
     rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -55,6 +59,25 @@ describe('loadConfig', () => {
 
     expect(config.region).toBe('cn');
     expect(config.baseUrl).toBe('https://api.minimaxi.com');
+  });
+
+  it('loads MINIMAX_API_KEY as an environment credential', () => {
+    process.env.MINIMAX_API_KEY = 'sk-from-env';
+
+    const config = loadConfig(baseFlags);
+
+    expect(config.apiKey).toBe('sk-from-env');
+    expect(config.apiKeySource).toBe('env');
+    expect(config.needsRegionDetection).toBe(true);
+  });
+
+  it('prefers --api-key over MINIMAX_API_KEY', () => {
+    process.env.MINIMAX_API_KEY = 'sk-from-env';
+
+    const config = loadConfig({ ...baseFlags, apiKey: 'sk-from-flag' });
+
+    expect(config.apiKey).toBe('sk-from-flag');
+    expect(config.apiKeySource).toBe('flag');
   });
 });
 

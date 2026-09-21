@@ -53,6 +53,17 @@ describe('resolveCredential', () => {
     expect(cred.method).toBe('api-key');
   });
 
+  it('preserves the environment credential source', async () => {
+    const config = makeConfig({
+      apiKey: 'sk-from-env',
+      apiKeySource: 'env',
+    });
+    const cred = await resolveCredential(config);
+    expect(cred.token).toBe('sk-from-env');
+    expect(cred.method).toBe('api-key');
+    expect(cred.source).toBe('env');
+  });
+
   it('resolves from config file api key', async () => {
     const config = makeConfig({ fileApiKey: 'sk-from-file' });
     const cred = await resolveCredential(config);
