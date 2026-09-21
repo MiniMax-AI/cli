@@ -31,6 +31,8 @@ const VIDEO_V2_IMAGE_ROLES = new Set<VideoV2ImageRole>([
   'reference_image',
 ]);
 
+const VIDEO_V2_MAX_REFERENCE_INPUTS = 12;
+
 export class VideoV2InputError extends Error {
   constructor(message: string) {
     super(message);
@@ -186,6 +188,11 @@ export function validateVideoV2Request(request: VideoV2Request): void {
   }
   if (referenceImages.length > 9 || videos.length > 3 || audios.length > 3) {
     throw new VideoV2InputError('MiniMax-H3 accepts up to 9 reference images, 3 reference videos, and 3 reference audios.');
+  }
+  if (referenceImages.length + videos.length + audios.length > VIDEO_V2_MAX_REFERENCE_INPUTS) {
+    throw new VideoV2InputError(
+      `MiniMax-H3 accepts up to ${VIDEO_V2_MAX_REFERENCE_INPUTS} reference images, videos, and audios in total.`,
+    );
   }
   if (hasFrameInput && hasReferenceInput) {
     throw new VideoV2InputError('MiniMax-H3 frame inputs and reference inputs cannot be used together.');

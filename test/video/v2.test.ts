@@ -152,6 +152,21 @@ describe('Video Generation V2 request builder', () => {
     })).toThrow('3 reference audios');
   });
 
+  it('enforces the combined reference input limit', () => {
+    expect(() => buildVideoV2Request({
+      prompt,
+      images: referenceImages(9),
+      referenceVideos: referenceMedia(3, 'mp4'),
+    })).not.toThrow();
+
+    expect(() => buildVideoV2Request({
+      prompt,
+      images: referenceImages(9),
+      referenceVideos: referenceMedia(3, 'mp4'),
+      referenceAudios: referenceMedia(1, 'mp3'),
+    })).toThrow('up to 12 reference images, videos, and audios in total');
+  });
+
   it('rejects oversized Base64 image, video, and audio inputs', () => {
     expect(() => buildVideoV2Request({
       prompt,
