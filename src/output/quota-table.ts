@@ -47,9 +47,14 @@ function displayModelName(name: string, region: string): string {
   return MODEL_NAME_CN[name] ?? name;
 }
 
-function formatDuration(ms: number, nowLabel: string): string {
+function formatDuration(ms: number, nowLabel: string, showDays = false): string {
   if (ms <= 0) return nowLabel;
   if (ms < 60000) return `${Math.max(1, Math.floor(ms / 1000))}s`;
+  if (showDays && ms >= 24 * 3600000) {
+    const days = Math.floor(ms / (24 * 3600000));
+    const hours = Math.floor((ms % (24 * 3600000)) / 3600000);
+    return `${days}d ${hours}h`;
+  }
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
@@ -242,14 +247,29 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
     return { displayName, current, weekly, reset };
   });
 
+  const weeklyModel = models[0];
+  const weeklyWindowTag = weeklyModel
+    ? formatWindow(weeklyModel.weekly_end_time - weeklyModel.weekly_start_time)
+    : '';
+  const weeklyResetText = weeklyModel && !isUnavailablePlan(weeklyModel) && weeklyWindowTag
+    ? `${weeklyWindowTag} ${L.resetsIn} ${formatDuration(weeklyModel.weekly_remains_time, L.now, true)}`
+    : '';
+
+  const weekRange = models.length > 0
+    ? `${formatDate(models[0]!.weekly_start_time)} — ${formatDate(models[0]!.weekly_end_time)}`
+    : '';
+  const titlePlain = `MINIMAX  ${L.dashboard}`;
+  const weekPlain = `${L.week}: ${weekRange}`;
   const nameWidth = Math.max(6, ...rows.map(r => displayWidth(r.displayName)));
   const currentWidth = Math.max(...rows.map(r => displayWidth(r.current)), 18);
   const weeklyWidth = Math.max(...rows.map(r => displayWidth(r.weekly)), 18);
-  const resetWidth = Math.max(...rows.map(r => displayWidth(r.reset)), 10);
+  const resetWidth = Math.max(...rows.map(r => displayWidth(r.reset)), displayWidth(weeklyResetText), 10);
   // Left section holds name + current + weekly; the reset column sits to the
   // right of the divider. Keep the historical 72-cell minimum by widening the
   // left section when the natural width falls short.
   let leftWidth = nameWidth + 2 + currentWidth + 2 + weeklyWidth;
+  const minimumHeaderLeftWidth = displayWidth(titlePlain) + 2 + displayWidth(weekPlain);
+  leftWidth = Math.max(leftWidth, minimumHeaderLeftWidth);
   let W = leftWidth + 3 + resetWidth + 2;
   if (W < 72) {
     leftWidth += 72 - W;
@@ -257,21 +277,20 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
   }
   const divOffset = leftWidth + 3;
 
-  const weekRange = models.length > 0
-    ? `${formatDate(models[0]!.weekly_start_time)} — ${formatDate(models[0]!.weekly_end_time)}`
-    : '';
-
-  const titlePlain = `MINIMAX  ${L.dashboard}`;
-  const weekPlain = `${L.week}: ${weekRange}`;
-  const headerGap = Math.max(2, W - 2 - displayWidth(titlePlain) - displayWidth(weekPlain));
-  const headerContent = useColor
+  const headerGap = leftWidth - displayWidth(titlePlain) - displayWidth(weekPlain);
+  const headerLeftPlain = `${titlePlain}${' '.repeat(headerGap)}${weekPlain}`;
+  const headerLeft = useColor
     ? `${B}${MM_BLUE}MINIMAX${R}  ${D}${L.dashboard}${R}${' '.repeat(headerGap)}${D}${L.week}:${R} ${MM_CYAN}${weekRange}${R}`
-    : `${titlePlain}${' '.repeat(headerGap)}${weekPlain}`;
-  const headerVisLen = displayWidth(titlePlain) + headerGap + displayWidth(weekPlain);
+    : headerLeftPlain;
+  const headerReset = useColor ? `${D}${weeklyResetText}${R}` : weeklyResetText;
+  const headerDivider = useColor ? `${D}│${R}` : '|';
+  const headerContent = weeklyResetText
+    ? `${headerLeft} ${headerDivider} ${headerReset}${' '.repeat(resetWidth - displayWidth(weeklyResetText))}`
+    : `${headerLeft}${' '.repeat(Math.max(0, W - 2 - displayWidth(headerLeftPlain)))}`;
 
   console.log('');
-  console.log(boxLine(W, '╭', '─', '╮', useColor));
-  console.log(boxRow(headerContent, W, headerVisLen, useColor));
+  console.log(boxLine(W, '╭', '─', '╮', useColor, weeklyResetText ? divOffset : undefined, weeklyResetText ? '┬' : undefined));
+  console.log(boxRow(headerContent, W, displayWidth(headerContent), useColor));
 
   if (models.length === 0) {
     console.log(boxLine(W, '╰', '─', '╯', useColor));
