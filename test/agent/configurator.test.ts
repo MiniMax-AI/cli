@@ -21,6 +21,7 @@ import { parse as parseYaml } from 'yaml';
 
 import {
   applyAgentConfigurations,
+  configurationTargetIdentity,
   prepareAgentConfigurations,
 } from '../../src/agent/configurator';
 import { AGENT_IDS, type AgentId, type AgentSetupOptions } from '../../src/agent/types';
@@ -460,6 +461,26 @@ describe('agent configurator', () => {
       { env: { CLAUDE_CONFIG_DIR: shared, PI_CODING_AGENT_DIR: shared } },
     ))).toThrow('Multiple agent configuration paths');
     expect(existsSync(shared)).toBe(false);
+  });
+
+  it('compares configuration target paths case-insensitively on Windows', () => {
+    expect(configurationTargetIdentity('C:\\Users\\Alice\\settings.json', 'win32'))
+      .toBe('c:\\users\\alice\\settings.json');
+    expect(configurationTargetIdentity('/Users/Alice/settings.json', 'linux'))
+      .toBe('/Users/Alice/settings.json');
+  });
+
+  it('rejects duplicate targets that differ only by case on Windows', () => {
+    if (process.platform !== 'win32') return;
+
+    const shared = join(home, 'shared-agent-config');
+    mkdirSync(shared, { recursive: true });
+    const differentlyCased = shared.replace('shared-agent-config', 'SHARED-AGENT-CONFIG');
+
+    expect(() => prepareAgentConfigurations(setupOptions(
+      ['claude-code', 'pi'],
+      { env: { CLAUDE_CONFIG_DIR: shared, PI_CODING_AGENT_DIR: differentlyCased } },
+    ))).toThrow('Multiple agent configuration paths');
   });
 
   it('removes the setup lock when installation receives an exit signal', async () => {

@@ -990,6 +990,13 @@ function writeTarget(path: string): string {
   }
 }
 
+export function configurationTargetIdentity(
+  targetPath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  return platform === 'win32' ? targetPath.toLowerCase() : targetPath;
+}
+
 function hasWeakPermissions(mode: number): boolean {
   return process.platform !== 'win32' && (mode & 0o077) !== 0;
 }
@@ -997,14 +1004,15 @@ function hasWeakPermissions(mode: number): boolean {
 function assertDistinctConfigurationTargets(prepared: PreparedAgentFile[]): void {
   const targets = new Set<string>();
   for (const file of prepared) {
-    if (targets.has(file.targetPath)) {
+    const identity = configurationTargetIdentity(file.targetPath);
+    if (targets.has(identity)) {
       throw new CLIError(
         `Multiple agent configuration paths resolve to ${file.targetPath}.`,
         ExitCode.GENERAL,
         'No files were changed. Use distinct configuration paths and retry.',
       );
     }
-    targets.add(file.targetPath);
+    targets.add(identity);
   }
 }
 
