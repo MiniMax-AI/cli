@@ -32,6 +32,7 @@ const NO_AUTH_SETUP = [
   ['config', 'show'],
   ['config', 'set'],
   ['config', 'export-schema'],
+  ['help'],
   ['update'],
 ];
 
