@@ -31,16 +31,21 @@ export function maybeShowStatusBar(config: Config, token: string, model?: string
   const filePath   = config.configPath ? tildePath(config.configPath) : '~/.mmx/config.json';
   const baseUrlStr = stripScheme(config.baseUrl);
   const keySrc     = config.apiKey ? '(flag)' : '(file)';
-  const maskedKey  = maskToken(token);
-  const modelStr   = model ? ` ${dim}|${reset} ${dim}Model:${reset} ${mmPurple}${model}${reset}` : '';
+  const maskedKey = maskToken(token);
+  const paint = (code: string, value: string): string =>
+    config.noColor ? value : `${code}${value}${reset}`;
+  const separator = paint(dim, '|');
+  const modelStr = model
+    ? ` ${separator} ${paint(dim, 'Model:')} ${paint(mmPurple, model)}`
+    : '';
 
   process.stderr.write(
-    `${bold}${mmBlue}MINIMAX${reset} ` +
-    `${dim}${filePath}${reset} ` +
-    `${dim}|${reset} ` +
-    `${dim}URL:${reset} ${mmCyan}${baseUrlStr}${reset} ` +
-    `${dim}|${reset} ` +
-    `${dim}Key:${reset} ${mmPink}${maskedKey}${reset} ${dim}${keySrc}${reset}` +
+    `${paint(`${bold}${mmBlue}`, 'MINIMAX')} ` +
+    `${paint(dim, filePath)} ` +
+    `${separator} ` +
+    `${paint(dim, 'URL:')} ${paint(mmCyan, baseUrlStr)} ` +
+    `${separator} ` +
+    `${paint(dim, 'Key:')} ${paint(mmPink, maskedKey)} ${paint(dim, keySrc)}` +
     `${modelStr}\n`,
   );
 }
