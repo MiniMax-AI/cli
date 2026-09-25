@@ -224,6 +224,56 @@ describe('renderQuotaTable', () => {
     }
   });
 
+  it('uses the first model with a weekly quota for the header countdown', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      const [general, video] = createCodingPlanModels();
+      renderQuotaTable(
+        [
+          {
+            ...video,
+            current_interval_status: 3,
+            current_weekly_status: 3,
+            current_interval_total_count: 0,
+            current_weekly_total_count: 0,
+          },
+          general,
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(lines.find(line => line.includes('Week:'))).toContain('1w Reset 6d 0h');
+  });
+
+  it('uses compact hours for weekly countdowns shorter than one day', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [{ ...createModel(), weekly_remains_time: 23 * 60 * 60 * 1000 }],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const header = lines.find(line => line.includes('Week:')) ?? '';
+    expect(header).toContain('1w Reset 23h');
+    expect(header).not.toContain('23h 0m');
+  });
+
   it('renders seconds only for positive durations below one minute', () => {
     const lines: string[] = [];
     const originalLog = console.log;

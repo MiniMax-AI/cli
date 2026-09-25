@@ -50,10 +50,15 @@ function displayModelName(name: string, region: string): string {
 function formatDuration(ms: number, nowLabel: string, showDays = false): string {
   if (ms <= 0) return nowLabel;
   if (ms < 60000) return `${Math.max(1, Math.floor(ms / 1000))}s`;
-  if (showDays && ms >= 24 * 3600000) {
-    const days = Math.floor(ms / (24 * 3600000));
-    const hours = Math.floor((ms % (24 * 3600000)) / 3600000);
-    return `${days}d ${hours}h`;
+  if (showDays) {
+    const DAY = 24 * 3600000;
+    if (ms >= DAY) {
+      const days = Math.floor(ms / DAY);
+      const hours = Math.floor((ms % DAY) / 3600000);
+      return `${days}d ${hours}h`;
+    }
+    const hours = Math.floor(ms / 3600000);
+    if (hours > 0) return `${hours}h`;
   }
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);
@@ -247,7 +252,7 @@ export function renderQuotaTable(models: QuotaModelRemain[], config: Config): vo
     return { displayName, current, weekly, reset };
   });
 
-  const weeklyModel = models[0];
+  const weeklyModel = models.find(model => !isUnavailablePlan(model));
   const weeklyWindowTag = weeklyModel
     ? formatWindow(weeklyModel.weekly_end_time - weeklyModel.weekly_start_time)
     : '';
