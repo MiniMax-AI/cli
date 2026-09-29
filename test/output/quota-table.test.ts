@@ -122,12 +122,44 @@ describe('renderQuotaTable', () => {
     const output = lines.join('\n');
 
     expect(output).toContain('通用');
-    expect(output).toContain('剩余 [█████████.]  94%');
-    expect(output).toContain('周剩余 [██████████]  98%');
+    expect(output).toContain('剩余 [█████████.] 94.00%');
+    expect(output).toContain('周剩余 [██████████] 98.00%');
     expect(output).toContain('视频');
     expect(output).toContain('3 / 3');
     expect(output).toContain('21 / 21');
     expect(output).not.toContain('0 / 3');
+  });
+
+  it('preserves fractional remaining percentages in compact bars', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [
+          {
+            ...createModel(),
+            current_interval_total_count: 0,
+            current_interval_usage_count: 0,
+            current_interval_remaining_percent: 85.58,
+            current_weekly_total_count: 0,
+            current_weekly_usage_count: 0,
+            current_weekly_remaining_percent: 97.01,
+          },
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const output = lines.join('\n');
+    expect(output).toContain('Left [█████████.] 85.58%');
+    expect(output).toContain('Wk left [██████████] 97.01%');
   });
 
   it('uses remaining percent to disambiguate newer used-count responses', () => {
@@ -190,7 +222,7 @@ describe('renderQuotaTable', () => {
     }
 
     const output = lines.join('\n');
-    expect(output).toContain('Left [████......]  40%');
+    expect(output).toContain('Left [████......] 40.00%');
     expect(output).not.toContain('7 / 10');
     expect(output).not.toContain('3 / 10');
   });
@@ -281,7 +313,7 @@ describe('renderQuotaTable', () => {
     }
 
     const output = lines.join('\n');
-    expect(output).toContain('Wk left [██████████] 150%');
+    expect(output).toContain('Wk left [██████████] 150.00%');
   });
 
   it('clamps boosted weekly percent at MAX_DISPLAY_PCT (200)', () => {
@@ -310,7 +342,7 @@ describe('renderQuotaTable', () => {
     }
 
     const output = lines.join('\n');
-    expect(output).toContain('200%');
+    expect(output).toContain('200.00%');
     expect(output).not.toContain('300%');
   });
 
