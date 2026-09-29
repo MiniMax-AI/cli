@@ -4,7 +4,13 @@ export type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'thinking'; thinking: string }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
-  | { type: 'tool_result'; tool_use_id: string; content: string };
+  | { type: 'tool_result'; tool_use_id: string; content: string }
+  | { type: 'image'; source: ImageSource };
+
+/** Image source shapes accepted by the Messages API. `--image` always emits base64. */
+export type ImageSource =
+  | { type: 'base64'; media_type: string; data: string }
+  | { type: 'url'; url: string };
 
 export interface ChatMessage {
   role: 'user' | 'assistant';

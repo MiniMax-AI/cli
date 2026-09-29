@@ -54,9 +54,10 @@ mmx text chat --message <text> [flags]
 
 | Flag | Type | Description |
 |---|---|---|
-| `--message <text>` | string, **required**, repeatable | Message text. Prefix with `role:` to set role (e.g. `"system:You are helpful"`, `"user:Hello"`) |
+| `--message <text>` | string, repeatable (required unless `--image` or `--messages-file` is given) | Message text. Prefix with `role:` to set role (e.g. `"system:You are helpful"`, `"user:Hello"`) |
 | `--messages-file <path>` | string | JSON file with messages array. Use `-` for stdin |
 | `--system <text>` | string | System prompt |
+| `--image <path-or-url>` | string, repeatable | Image to send with the message (auto base64-encoded). Forces `MiniMax-M3` unless `--model` is set |
 | `--model <model>` | string | Model ID (default: `MiniMax-M3`) |
 | `--max-tokens <n>` | number | Max tokens (default: 4096) |
 | `--temperature <n>` | number | Sampling temperature (0.0, 1.0] |
@@ -76,7 +77,17 @@ mmx text chat \
 
 # From file
 cat conversation.json | mmx text chat --messages-file - --output json
+
+# With images (M3 is multimodal; --image is repeatable)
+mmx text chat --image photo.jpg --message "What breed is this dog?" --quiet
+mmx text chat --image before.png --image after.png \
+  --message "List every visual difference between these two." --quiet
 ```
+
+`text chat` posts to the Anthropic-compatible `/messages` endpoint, so hand-written
+`--messages-file` image blocks must use `{"type":"image","source":{"type":"base64",...}}`.
+The OpenAI `image_url` shape is rejected. `--image` emits the base64 shape for you; a hand-written
+`--messages-file` may also use `{"type":"image","source":{"type":"url","url":"https://..."}}`.
 
 **stdout**: response text (text mode) or full response object (json mode).
 
