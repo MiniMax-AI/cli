@@ -57,4 +57,42 @@ describe('text repl command', () => {
 
     await expect(cmd.execute(config, flags)).rejects.toThrow('interactive');
   });
+
+  it('help text documents the M3-default max_tokens', async () => {
+    const mod = await import('../../../src/commands/text/repl');
+    const cmd = mod.default;
+    const options = cmd.options!;
+    const maxTokensOpt = options.find(o => o.flag.includes('max-tokens'));
+    expect(maxTokensOpt).toBeDefined();
+    expect(maxTokensOpt!.description).toContain('131072');
+  });
+
+  it('help text documents temperature [0, 2] range', async () => {
+    const mod = await import('../../../src/commands/text/repl');
+    const cmd = mod.default;
+    const options = cmd.options!;
+    const tempOpt = options.find(o => o.flag.includes('temperature'));
+    expect(tempOpt).toBeDefined();
+    expect(tempOpt!.description).toContain('[0, 2]');
+  });
+
+  it('help text documents top_p 0.95 default', async () => {
+    const mod = await import('../../../src/commands/text/repl');
+    const cmd = mod.default;
+    const options = cmd.options!;
+    const topPOpt = options.find(o => o.flag.includes('top-p'));
+    expect(topPOpt).toBeDefined();
+    expect(topPOpt!.description).toContain('0.95');
+  });
+
+  it('help text describes --thinking flag with all three modes', async () => {
+    const mod = await import('../../../src/commands/text/repl');
+    const cmd = mod.default;
+    const options = cmd.options!;
+    const thinkingOpt = options.find(o => o.flag.includes('thinking'));
+    expect(thinkingOpt).toBeDefined();
+    expect(thinkingOpt!.description).toContain('enabled');
+    expect(thinkingOpt!.description).toContain('disabled');
+    expect(thinkingOpt!.description).toContain('adaptive');
+  });
 });
