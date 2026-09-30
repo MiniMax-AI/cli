@@ -118,6 +118,7 @@ This document lists all error scenarios and the messages users will see.
 | `--text-file` unreadable | `Cannot read file: ${e.message}` |
 | `--out` path no write permission | `Permission denied: cannot write to "${outPath}".` |
 | Disk full | `Disk full — cannot write audio file.` |
+| `--stream` connection drops before the final audio chunk | `Stream disconnected before audio completed.` |
 
 ### `mmx speech transcribe`
 
