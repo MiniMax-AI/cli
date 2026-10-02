@@ -3,6 +3,7 @@ import type { WriteStream } from 'fs';
 import { createProgressBar } from '../output/progress';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { validateSafeUrl } from '../utils/network';
 
 const DEFAULT_OVERALL_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_IDLE_TIMEOUT_MS = 60 * 1000;
@@ -17,6 +18,7 @@ export interface DownloadOpts {
   idleTimeoutMs?: number;
   maxBytes?: number;
   signal?: AbortSignal;
+  allowPrivate?: boolean;
 }
 
 class RetryableDownloadError extends CLIError {
@@ -296,7 +298,7 @@ async function attemptDownload(
       ? undefined
       : declaredLength;
     tmpPath = `${destPath}.tmp-${process.pid}-${Date.now()}-${attempt}-${Math.random().toString(36).slice(2)}`;
-    writer = createWriteStream(tmpPath);
+    writer = createWriteStream(tmpPath, { flags: 'wx', mode: 0o600 });
     progress = expectedLength && !opts.quiet
       ? createProgressBar(expectedLength, 'Downloading')
       : null;
@@ -394,6 +396,7 @@ export async function downloadFile(
 ): Promise<{ size: number }> {
   // Alibaba Cloud OSS US East blocks HTTP from certain regions.
   const downloadUrl = url.startsWith('http://') ? url.replace('http://', 'https://') : url;
+  await validateSafeUrl(downloadUrl, { allowPrivate: opts?.allowPrivate });
   const maxRetries = nonNegativeInteger(opts?.retries ?? 3, 'retries');
   const baseDelay = nonNegativeNumber(opts?.retryDelayMs ?? 1000, 'retryDelayMs');
   const overallTimeoutMs = positiveNumber(

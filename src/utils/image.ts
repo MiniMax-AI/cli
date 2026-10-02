@@ -2,6 +2,7 @@ import { readFileSync, existsSync, statSync } from 'fs';
 import { extname } from 'path';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
+import { validateSafeUrl } from './network';
 
 export const IMAGE_MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -41,18 +42,46 @@ export async function toDataUri(image: string): Promise<string> {
   if (image.startsWith('data:')) return image;
 
   if (image.startsWith('http://') || image.startsWith('https://')) {
+    await validateSafeUrl(image);
     const res = await fetch(image);
     if (!res.ok) throw new CLIError(`Failed to download image: HTTP ${res.status}`, ExitCode.GENERAL);
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const mime = contentType.split(';')[0]!.trim();
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > MAX_IMAGE_SIZE_BYTES) {
+
+    const declaredLength = res.headers.get('content-length');
+    if (declaredLength && Number(declaredLength) > MAX_IMAGE_SIZE_BYTES) {
       throw new CLIError(
-        `Image too large (${(buf.byteLength / 1024 / 1024).toFixed(1)} MB). Maximum is 50 MB.`,
+        `Image too large (${(Number(declaredLength) / 1024 / 1024).toFixed(1)} MB). Maximum is 50 MB.`,
         ExitCode.USAGE,
       );
     }
-    return `data:${mime};base64,${Buffer.from(buf).toString('base64')}`;
+
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const mime = contentType.split(';')[0]!.trim();
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new CLIError('Failed to read image response body.', ExitCode.GENERAL);
+
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_IMAGE_SIZE_BYTES) {
+          await reader.cancel();
+          throw new CLIError(
+            `Image too large (${(totalBytes / 1024 / 1024).toFixed(1)} MB). Maximum is 50 MB.`,
+            ExitCode.USAGE,
+          );
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const buf = Buffer.concat(chunks);
+    return `data:${mime};base64,${buf.toString('base64')}`;
   }
 
   if (!existsSync(image)) throw new CLIError(`File not found: ${image}`, ExitCode.USAGE);
