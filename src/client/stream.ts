@@ -10,11 +10,10 @@ export async function* parseSSE(response: Response): AsyncGenerator<ServerSentEv
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let skipLeadingLF = false;
   let event: Partial<ServerSentEvent> = {};
 
-  const processLine = (rawLine: string): ServerSentEvent | undefined => {
-    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
-
+  const processLine = (line: string): ServerSentEvent | undefined => {
     if (line === '') {
       const completed = event.data !== undefined
         ? { data: event.data, event: event.event, id: event.id }
@@ -51,9 +50,18 @@ export async function* parseSSE(response: Response): AsyncGenerator<ServerSentEv
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      let chunk = decoder.decode(value, { stream: true });
+      if (chunk.length === 0) continue;
 
-      const lines = buffer.split('\n');
+      // A CR completes its line immediately; swallow a paired LF in the next chunk.
+      if (skipLeadingLF) {
+        if (chunk.startsWith('\n')) chunk = chunk.slice(1);
+        skipLeadingLF = false;
+      }
+      buffer += chunk;
+      skipLeadingLF = buffer.endsWith('\r');
+
+      const lines = buffer.split(/\r\n|\r|\n/);
       buffer = lines.pop() || '';
 
       for (const line of lines) {
