@@ -35,17 +35,22 @@ export class Client {
   }
 
   protected async *streamSSE<T>(res: Response): AsyncGenerator<T> {
-    for await (const event of parseSSE(res)) {
-      if (event.data === '[DONE]') break;
-      if (!event.data) continue;
-      try {
-        yield JSON.parse(event.data) as T;
-      } catch (err) {
-        throw new SDKError(
-          `Failed to parse stream chunk: ${err instanceof Error ? err.message : String(err)}`,
-          ExitCode.GENERAL,
-        );
+    try {
+      for await (const event of parseSSE(res)) {
+        if (event.data === '[DONE]') break;
+        if (!event.data) continue;
+        try {
+          yield JSON.parse(event.data) as T;
+        } catch (err) {
+          throw new SDKError(
+            `Failed to parse stream chunk: ${err instanceof Error ? err.message : String(err)}`,
+            ExitCode.GENERAL,
+          );
+        }
       }
+    } finally {
+      // parseSSE releases its reader; the SDK also owns the response body.
+      await res.body?.cancel().catch(() => undefined);
     }
   }
 }
