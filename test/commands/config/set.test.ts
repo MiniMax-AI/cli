@@ -298,4 +298,44 @@ describe('config set command', () => {
     expect(readConfigFile).not.toHaveBeenCalled();
     expect(writeConfigFile).not.toHaveBeenCalled();
   });
+
+  it('rejects non-finite timeout values without changing the config file', async () => {
+    const readConfigFile = spyOn(configLoader, 'readConfigFile');
+    const writeConfigFile = spyOn(configLoader, 'writeConfigFile').mockResolvedValue();
+
+    try {
+      for (const value of ['Infinity', '1e309']) {
+        await expect(setCommand.execute({
+          region: 'global',
+          baseUrl: 'https://api.mmx.io',
+          output: 'json',
+          timeout: 10,
+          verbose: false,
+          quiet: false,
+          noColor: true,
+          yes: false,
+          dryRun: false,
+          nonInteractive: true,
+          async: false,
+        }, {
+          key: 'timeout',
+          value,
+          quiet: false,
+          verbose: false,
+          noColor: true,
+          yes: false,
+          dryRun: false,
+          help: false,
+          nonInteractive: true,
+          async: false,
+        })).rejects.toThrow('Invalid timeout');
+      }
+    } finally {
+      readConfigFile.mockRestore();
+      writeConfigFile.mockRestore();
+    }
+
+    expect(readConfigFile).not.toHaveBeenCalled();
+    expect(writeConfigFile).not.toHaveBeenCalled();
+  });
 });
