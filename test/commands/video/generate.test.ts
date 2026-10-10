@@ -581,4 +581,41 @@ describe('video generate command', () => {
       }),
     ).rejects.toThrow('MiniMax-Hailuo-2.3-Fast only supports I2V');
   });
+
+  it('rejects malicious or spoofed task ID with path traversal characters', async () => {
+    const server = createMockServer({
+      routes: {
+        '/v2/video_generation': () => new Response(JSON.stringify({ task_id: '../../evil' }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+        '/v2/query/video_generation': () => new Response(JSON.stringify({
+          task: {
+            id: '../../evil',
+            model: 'MiniMax-H3',
+            status: 'succeeded',
+            content: { url: 'https://example.com/video.mp4' },
+          },
+        }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      },
+    });
+
+    try {
+      await expect(
+        generateCommand.execute({
+          ...h3DryRunConfig,
+          baseUrl: server.url,
+          quiet: true,
+          dryRun: false,
+        }, {
+          ...baseFlags,
+          prompt: 'A malicious task',
+          model: 'MiniMax-H3',
+        }),
+      ).rejects.toThrow(/Unsafe or invalid task ID/);
+    } finally {
+      server.close();
+    }
+  });
 });

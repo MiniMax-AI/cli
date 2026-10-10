@@ -5,6 +5,7 @@ import {
   isPrivateOrLoopbackIpv6,
   isDisallowedHostname,
   validateSafeUrl,
+  safeFetch,
 } from '../../src/utils/network';
 import { CLIError } from '../../src/errors/base';
 
@@ -125,5 +126,54 @@ describe('validateSafeUrl', () => {
   it('allows private URLs when allowPrivate option is enabled', async () => {
     const parsed = await validateSafeUrl('http://127.0.0.1:8080/mock', { allowPrivate: true });
     expect(parsed.hostname).toBe('127.0.0.1');
+  });
+
+  it('rejects when DNS resolution fails (does not soft-fail)', async () => {
+    const { promises: dnsPromises } = await import('dns');
+    const originalLookup = dnsPromises.lookup;
+    try {
+      dnsPromises.lookup = (async () => {
+        throw new Error('getaddrinfo ENOTFOUND test.unresolved');
+      }) as any;
+
+      await expect(validateSafeUrl('https://test.unresolved/test'))
+        .rejects.toThrow(/Failed to resolve host/);
+    } finally {
+      dnsPromises.lookup = originalLookup;
+    }
+  });
+});
+
+describe('safeFetch', () => {
+  it('rejects redirects outright to prevent SSRF redirect bypasses', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = (async () => {
+        throw new TypeError('fetch failed: redirect not allowed');
+      }) as unknown as typeof fetch;
+
+      await expect(safeFetch('https://api.minimax.io/redirect-test', {}, { timeoutMs: 5000 }))
+        .rejects.toThrow(/Redirects are disallowed/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('enforces overall timeout on slow requests', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = (async (_url: any, init?: any) => {
+        return new Promise((_resolve, reject) => {
+          if (init?.signal) {
+            init.signal.addEventListener('abort', () => reject(init.signal.reason));
+          }
+        });
+      }) as unknown as typeof fetch;
+
+      await expect(safeFetch('https://api.minimax.io/hang', {}, { timeoutMs: 50 }))
+        .rejects.toThrow(/timed out/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

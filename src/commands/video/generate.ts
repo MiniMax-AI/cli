@@ -298,10 +298,15 @@ export default defineCommand({
       );
     }
 
+    const isLocal = Boolean(config.baseUrl && (config.baseUrl.includes('localhost') || config.baseUrl.includes('127.0.0.1')));
+
     // --download: save to file
     if (flags.download) {
       const destPath = flags.download as string;
-      const { size } = await downloadFile(downloadUrl, destPath, { quiet: config.quiet });
+      const { size } = await downloadFile(downloadUrl, destPath, {
+        quiet: config.quiet,
+        allowPrivate: isLocal,
+      });
 
       if (config.quiet) {
         console.log(destPath);
@@ -318,14 +323,26 @@ export default defineCommand({
     }
 
     // Default: auto-download to temp location and output local file path
+    // Guard against path traversal via malicious or spoofed taskId from API
+    if (!taskId || typeof taskId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(taskId)) {
+      throw new CLIError(`Unsafe or invalid task ID received from API: "${taskId}"`, ExitCode.GENERAL);
+    }
+
     const os = await import('os');
-    const { join } = await import('path');
-    const destDir = join(os.tmpdir(), 'mmx-video');
+    const { resolve } = await import('path');
+    const destDir = resolve(os.tmpdir(), 'mmx-video');
     const { existsSync, mkdirSync } = await import('fs');
     if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
-    const destPath = join(destDir, `${taskId}.mp4`);
+    const destPath = resolve(destDir, `${taskId}.mp4`);
 
-    await downloadFile(downloadUrl, destPath, { quiet: config.quiet });
+    if (!destPath.startsWith(destDir)) {
+      throw new CLIError(`Task ID "${taskId}" would escape destination directory.`, ExitCode.GENERAL);
+    }
+
+    await downloadFile(downloadUrl, destPath, {
+      quiet: config.quiet,
+      allowPrivate: isLocal,
+    });
 
     process.stdout.write(destPath);
     process.stdout.write('\n');

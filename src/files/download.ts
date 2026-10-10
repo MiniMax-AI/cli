@@ -3,7 +3,7 @@ import type { WriteStream } from 'fs';
 import { createProgressBar } from '../output/progress';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
-import { validateSafeUrl } from '../utils/network';
+import { validateSafeUrl, ssrfGuardedAgent } from '../utils/network';
 
 const DEFAULT_OVERALL_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_IDLE_TIMEOUT_MS = 60 * 1000;
@@ -246,7 +246,7 @@ async function attemptDownload(
   downloadUrl: string,
   destPath: string,
   attempt: number,
-  opts: Required<Pick<DownloadOpts, 'quiet' | 'idleTimeoutMs' | 'maxBytes'>>,
+  opts: Required<Pick<DownloadOpts, 'quiet' | 'idleTimeoutMs' | 'maxBytes'>> & { allowPrivate?: boolean },
   overallSignal: AbortSignal,
 ): Promise<{ size: number }> {
   const controller = new AbortController();
@@ -263,16 +263,33 @@ async function attemptDownload(
 
   try {
     try {
+      const fetchOpts: RequestInit & { dispatcher?: typeof ssrfGuardedAgent } = {
+        signal: controller.signal,
+        redirect: 'error',
+      };
+      if (!opts.allowPrivate && typeof process !== 'undefined') {
+        fetchOpts.dispatcher = ssrfGuardedAgent;
+      }
       response = await withIdleTimeout(
-        fetch(downloadUrl, { signal: controller.signal }),
+        fetch(downloadUrl, fetchOpts as RequestInit),
         controller,
         opts.idleTimeoutMs,
         'waiting for response headers',
       );
     } catch (error) {
       if (error instanceof CLIError) throw error;
+      const msg = error instanceof Error ? error.message : String(error);
+      if (
+        msg.toLowerCase().includes('redirect') ||
+        msg.toLowerCase().includes('uri requested responds with a redirect')
+      ) {
+        throw new CLIError(
+          `Redirects are disallowed for download URL "${downloadUrl}" (SSRF protection).`,
+          ExitCode.USAGE,
+        );
+      }
       throw new RetryableDownloadError(
-        `Download request failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Download request failed: ${msg}`,
       );
     }
 
@@ -443,7 +460,7 @@ export async function downloadFile(
           downloadUrl,
           destPath,
           attempt,
-          { quiet, idleTimeoutMs, maxBytes },
+          { quiet, idleTimeoutMs, maxBytes, allowPrivate: opts?.allowPrivate },
           overallController.signal,
         );
       } catch (error) {

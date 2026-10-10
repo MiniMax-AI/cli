@@ -9,7 +9,7 @@ import { writeFileSync } from 'fs';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import { T2A_FORMATS, formatList, validateAudioFormat, validateT2AStreaming, t2aDefaultSampleRate } from '../../utils/audio-formats';
 import { pipeAudioStream } from '../../utils/audio-stream';
-import { validateSafeUrl } from '../../utils/network';
+import { safeFetch } from '../../utils/network';
 import type { Config } from '../../config/schema';
 import type { GlobalFlags } from '../../types/flags';
 import type { SpeechRequest, SpeechResponse } from '../../types/api';
@@ -127,9 +127,7 @@ export default defineCommand({
     // Download and save subtitle file when --subtitles is requested
     if (flags.subtitles && response.data.subtitle_file) {
       try {
-        await validateSafeUrl(response.data.subtitle_file);
-        // Download the subtitle JSON file from the URL
-        const subtitleRes = await fetch(response.data.subtitle_file);
+        const subtitleRes = await safeFetch(response.data.subtitle_file, {}, { timeoutMs: 30000 });
         if (!subtitleRes.ok) {
           throw new CLIError(`Failed to download subtitle file: ${subtitleRes.status}`, ExitCode.GENERAL);
         }

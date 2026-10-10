@@ -2,7 +2,7 @@ import { readFileSync, existsSync, statSync } from 'fs';
 import { extname } from 'path';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
-import { validateSafeUrl } from './network';
+import { safeFetch } from './network';
 
 export const IMAGE_MIME_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -42,8 +42,7 @@ export async function toDataUri(image: string): Promise<string> {
   if (image.startsWith('data:')) return image;
 
   if (image.startsWith('http://') || image.startsWith('https://')) {
-    await validateSafeUrl(image);
-    const res = await fetch(image);
+    const res = await safeFetch(image, {}, { timeoutMs: 30000 });
     if (!res.ok) throw new CLIError(`Failed to download image: HTTP ${res.status}`, ExitCode.GENERAL);
 
     const declaredLength = res.headers.get('content-length');

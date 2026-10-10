@@ -184,19 +184,129 @@ export async function validateSafeUrl(
 
   // If it's a domain name, attempt asynchronous DNS resolution to guard against DNS rebinding
   try {
-    const lookupResult = await dns.lookup(rawHost);
-    if (lookupResult && isPrivateOrLoopbackIp(lookupResult.address)) {
-      throw new CLIError(
-        `Host "${rawHost}" resolved to private/loopback IP address "${lookupResult.address}", which is disallowed (SSRF protection).`,
-        ExitCode.USAGE,
-      );
+    const lookupResults = await dns.lookup(rawHost, { all: true });
+    if (Array.isArray(lookupResults) && lookupResults.length > 0) {
+      for (const entry of lookupResults) {
+        if (isPrivateOrLoopbackIp(entry.address)) {
+          throw new CLIError(
+            `Host "${rawHost}" resolved to private/loopback IP address "${entry.address}", which is disallowed (SSRF protection).`,
+            ExitCode.USAGE,
+          );
+        }
+      }
     }
   } catch (err) {
-    // If the error was our CLIError rejection, rethrow it
     if (err instanceof CLIError) throw err;
-    // Otherwise, DNS resolution may fail in offline or mocked testing environments.
-    // In that case, we let fetch proceed and handle connection/mock behavior naturally.
+    if (options?.allowPrivate) {
+      return parsed;
+    }
+    throw new CLIError(
+      `Failed to resolve host "${rawHost}" for security verification: ${err instanceof Error ? err.message : String(err)}`,
+      ExitCode.USAGE,
+    );
   }
 
   return parsed;
+}
+
+import { Agent } from 'undici';
+import dnsCallback from 'dns';
+
+/**
+ * Undici agent that validates resolved IPs at socket connection time,
+ * eliminating DNS rebinding TOCTOU gaps.
+ */
+export const ssrfGuardedAgent = new Agent({
+  connect: {
+    lookup: (hostname, options, callback) => {
+      dnsCallback.lookup(hostname, options, (err, address, family) => {
+        if (err) return callback(err, address, family);
+        const addresses = Array.isArray(address) ? address : [{ address, family }];
+        for (const entry of addresses) {
+          const ip = typeof entry === 'string' ? entry : entry.address;
+          if (isPrivateOrLoopbackIp(ip)) {
+            const err = new Error(`Host "${hostname}" resolved to private/loopback IP "${ip}" (SSRF protection)`);
+            return callback(err, '' as unknown as dnsCallback.LookupAddress[], 4);
+          }
+        }
+        callback(null, address, family);
+      });
+    },
+  },
+});
+
+export interface SafeFetchOptions extends ValidateUrlOptions {
+  timeoutMs?: number;
+}
+
+/**
+ * Performs a hardened fetch that:
+ * 1. Validates the URL before connecting (protocol, host, private IP).
+ * 2. Rejects HTTP 3xx redirects to prevent redirection to private/cloud-metadata targets.
+ * 3. Enforces an overall timeout to prevent slowloris resource exhaustion.
+ * 4. Connects via an SSRF-guarded dispatcher to guard against DNS rebinding.
+ */
+export async function safeFetch(
+  input: string | URL,
+  init?: RequestInit,
+  options?: SafeFetchOptions,
+): Promise<Response> {
+  const urlStr = typeof input === 'string' ? input : input.href;
+  await validateSafeUrl(urlStr, options);
+
+  const timeoutMs = options?.timeoutMs ?? 30000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new CLIError(`Request to "${urlStr}" timed out after ${timeoutMs}ms.`, ExitCode.TIMEOUT));
+  }, timeoutMs);
+
+  const externalSignal = init?.signal;
+  const abortHandler = () => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted) {
+    controller.abort(externalSignal.reason);
+  } else if (externalSignal) {
+    externalSignal.addEventListener('abort', abortHandler, { once: true });
+  }
+
+  try {
+    const fetchInit: RequestInit & { dispatcher?: Agent } = {
+      ...init,
+      signal: controller.signal,
+      redirect: 'error',
+    };
+
+    if (!options?.allowPrivate && typeof process !== 'undefined') {
+      fetchInit.dispatcher = ssrfGuardedAgent;
+    }
+
+    try {
+      return await fetch(input, fetchInit as RequestInit);
+    } catch (fetchErr: unknown) {
+      if (fetchErr instanceof CLIError) throw fetchErr;
+
+      // Check if aborted by our timeout controller
+      if (controller.signal.aborted && controller.signal.reason instanceof CLIError) {
+        throw controller.signal.reason;
+      }
+
+      // Detect redirect rejection
+      const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+      if (
+        msg.toLowerCase().includes('redirect') ||
+        msg.toLowerCase().includes('uri requested responds with a redirect')
+      ) {
+        throw new CLIError(
+          `Redirects are disallowed for destination "${urlStr}" (SSRF protection).`,
+          ExitCode.USAGE,
+        );
+      }
+
+      throw fetchErr;
+    }
+  } finally {
+    clearTimeout(timer);
+    if (externalSignal) {
+      externalSignal.removeEventListener('abort', abortHandler);
+    }
+  }
 }
