@@ -27,15 +27,15 @@ export function videoGenerateV2Endpoint(baseUrl: string): string {
 }
 
 export function videoTaskEndpoint(baseUrl: string, taskId: string): string {
-  return `${baseUrl}/v1/query/video_generation?task_id=${taskId}`;
+  return `${baseUrl}/v1/query/video_generation?task_id=${encodeURIComponent(taskId)}`;
 }
 
 export function videoTaskV2Endpoint(baseUrl: string, taskId: string): string {
-  return `${baseUrl}/v2/query/video_generation/${taskId}`;
+  return `${baseUrl}/v2/query/video_generation/${encodeURIComponent(taskId)}`;
 }
 
 export function fileRetrieveEndpoint(baseUrl: string, fileId: string): string {
-  return `${baseUrl}/v1/files/retrieve?file_id=${fileId}`;
+  return `${baseUrl}/v1/files/retrieve?file_id=${encodeURIComponent(fileId)}`;
 }
 
 export function searchEndpoint(baseUrl: string): string {
