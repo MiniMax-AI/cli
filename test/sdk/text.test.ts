@@ -10,18 +10,22 @@ describe('MiniMaxSDK.text', () => {
     server?.close();
   });
 
-  it('should chat successfully', async () => {
+  it('sends the default model and max_tokens when omitted', async () => {
+    let requestBody: unknown;
     server = createMockServer({
       routes: {
-        '/anthropic/v1/messages': () => jsonResponse({
-          id: 'msg-123',
-          type: 'message',
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Hello!' }],
-          model: 'MiniMax-M3',
-          stop_reason: 'end_turn',
-          usage: { input_tokens: 10, output_tokens: 5 },
-        }),
+        '/anthropic/v1/messages': async (req) => {
+          requestBody = await req.json();
+          return jsonResponse({
+            id: 'msg-123',
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Hello!' }],
+            model: 'MiniMax-M3.1-Flash-Preview',
+            stop_reason: 'end_turn',
+            usage: { input_tokens: 10, output_tokens: 5 },
+          });
+        },
       },
     });
 
@@ -35,9 +39,14 @@ describe('MiniMaxSDK.text', () => {
     });
 
     expect(result.id).toBe('msg-123');
+    expect(requestBody).toMatchObject({
+      model: 'MiniMax-M3.1-Flash-Preview',
+      max_tokens: 4096,
+    });
   });
 
   it('streaming skips empty SSE data events', async () => {
+    let requestBody: unknown;
     const chunk = JSON.stringify({
       type: 'content_block_delta',
       index: 0,
@@ -46,11 +55,14 @@ describe('MiniMaxSDK.text', () => {
 
     server = createMockServer({
       routes: {
-        '/anthropic/v1/messages': () => sseResponse([
-          { data: chunk },
-          { data: '' },
-          { data: chunk },
-        ]),
+        '/anthropic/v1/messages': async (req) => {
+          requestBody = await req.json();
+          return sseResponse([
+            { data: chunk },
+            { data: '' },
+            { data: chunk },
+          ]);
+        },
       },
     });
 
@@ -60,6 +72,7 @@ describe('MiniMaxSDK.text', () => {
     });
 
     const stream = await sdk.text.chat({
+      model: 'MiniMax-M3',
       messages: [{ role: 'user', content: 'Hi' }],
       stream: true,
     });
@@ -72,6 +85,7 @@ describe('MiniMaxSDK.text', () => {
     expect(events.length).toBe(2);
     expect(events[0].type).toBe('content_block_delta');
     expect(events[1].type).toBe('content_block_delta');
+    expect(requestBody).toMatchObject({ model: 'MiniMax-M3', stream: true });
   });
 });
 
@@ -80,11 +94,5 @@ describe('TextSDK.validateParams', () => {
 
   it('throws when messages array is empty', async () => {
     await expect(sdk.chat({ messages: [] })).rejects.toThrow('At least one message is required');
-  });
-
-  it('applies defaults for model and max_tokens', async () => {
-    await expect(
-      sdk.chat({ messages: [{ role: 'user', content: 'Hi' }] }),
-    ).rejects.not.toThrow('At least one message');
   });
 });

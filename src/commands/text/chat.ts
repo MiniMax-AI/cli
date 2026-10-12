@@ -6,6 +6,7 @@ import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { CLIError } from '../../errors/base';
 import { ExitCode } from '../../errors/codes';
 import type { Config } from '../../config/schema';
+import { DEFAULT_TEXT_MODEL } from '../../config/models';
 import type { GlobalFlags } from '../../types/flags';
 import type {
   ChatMessage,
@@ -158,7 +159,7 @@ export default defineCommand({
   apiDocs: '/docs/api-reference/text-post',
   usage: 'mmx text chat --message <text> [flags]',
   options: [
-    { flag: '--model <model>', description: 'Model ID (default: MiniMax-M3)' },
+    { flag: '--model <model>', description: `Model ID (default: ${DEFAULT_TEXT_MODEL})` },
     { flag: '--message <text>',        description: 'Message text (repeatable, prefix role: to set role)', required: true, type: 'array' },
     { flag: '--messages-file <path>',  description: 'JSON file with messages array (use - for stdin)' },
     { flag: '--system <text>',         description: 'System prompt' },
@@ -170,7 +171,7 @@ export default defineCommand({
   ],
   examples: [
     'mmx text chat --message "What is MiniMax?"',
-    'mmx text chat --model MiniMax-M3 --system "You are a coding assistant." --message "Write fizzbuzz in Python"',
+    `mmx text chat --model ${DEFAULT_TEXT_MODEL} --system "You are a coding assistant." --message "Write fizzbuzz in Python"`,
     'mmx text chat --message "Hello" --message "assistant:Hi!" --message "How are you?"',
     'cat conversation.json | mmx text chat --messages-file - --stream',
     'mmx text chat --message "Hello" --output json',
@@ -196,7 +197,7 @@ export default defineCommand({
 
     const model = (flags.model as string)
       || config.defaultTextModel
-      || 'MiniMax-M3';
+      || DEFAULT_TEXT_MODEL;
     const format = detectOutputFormat(config.output);
     const shouldStream = flags.stream === true || (
       flags.stream === undefined

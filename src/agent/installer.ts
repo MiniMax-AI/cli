@@ -23,12 +23,14 @@ const INSTALLER_URLS: Record<ScriptAgentId, string> = {
   'claude-code': 'https://claude.ai/install.sh',
   grok: 'https://x.ai/cli/install.sh',
   hermes: 'https://hermes-agent.nousresearch.com/install.sh',
+  'oh-my-pi': 'https://omp.sh/install',
 };
 
 const WINDOWS_INSTALLER_URLS: Record<ScriptAgentId, string> = {
   'claude-code': 'https://claude.ai/install.ps1',
   grok: 'https://x.ai/cli/install.ps1',
   hermes: 'https://hermes-agent.nousresearch.com/install.ps1',
+  'oh-my-pi': 'https://omp.sh/install.ps1',
 };
 
 // These mirror the official manifest's non-interactive stages. Setup, gateway,
@@ -136,7 +138,7 @@ export function getAgentInstallIssue(
       return `Pi requires Node.js 22.19 or newer (current: ${nodeVersion}).`;
     }
   }
-  const requirements = agent === 'claude-code' || agent === 'grok'
+  const requirements = agent === 'claude-code' || agent === 'grok' || agent === 'oh-my-pi'
     ? platform === 'win32' ? ['powershell.exe'] : ['bash', 'curl']
     : agent === 'hermes'
       ? platform === 'win32' ? ['powershell.exe'] : ['bash', 'curl', 'git']
@@ -153,13 +155,16 @@ function getScriptInstallCommand(
   if (platform === 'win32') {
     const url = WINDOWS_INSTALLER_URLS[agent];
     if (agent !== 'hermes') {
+      const binaryFlag = agent === 'oh-my-pi' ? ' -Binary' : '';
       const script = POWERSHELL_PROXY_SETUP
         + `$installer = Invoke-RestMethod '${url}'; `
-        + '& ([scriptblock]::Create($installer))';
+        + `& ([scriptblock]::Create($installer))${binaryFlag}`;
       return {
         executable: 'powershell.exe',
         args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script],
-        display: `irm ${url} | iex`,
+        display: agent === 'oh-my-pi'
+          ? `& ([scriptblock]::Create((irm ${url}))) -Binary`
+          : `irm ${url} | iex`,
       };
     }
     const stages = HERMES_WINDOWS_STAGES.map(stage => `'${stage}'`).join(', ');
@@ -204,7 +209,7 @@ function getScriptInstallCommand(
     };
   }
 
-  const display = `curl -fsSL ${url} | bash`;
+  const display = `curl -fsSL ${url} | bash${agent === 'oh-my-pi' ? ' -s -- --binary' : ''}`;
   return {
     executable: 'bash',
     args: ['-c', `set -o pipefail; ${display}`],
@@ -216,7 +221,7 @@ export function getAgentInstallCommand(
   agent: AgentId,
   platform: NodeJS.Platform = process.platform,
 ): AgentInstallCommand {
-  if (agent === 'claude-code' || agent === 'grok' || agent === 'hermes') {
+  if (agent === 'claude-code' || agent === 'grok' || agent === 'hermes' || agent === 'oh-my-pi') {
     return getScriptInstallCommand(agent, platform);
   }
 
@@ -241,6 +246,24 @@ export function getAgentVerificationCommand(
   agent: AgentId,
   platform: NodeJS.Platform = process.platform,
 ): AgentInstallCommand {
+  if (agent === 'oh-my-pi') {
+    const display = 'omp --version';
+    if (platform === 'win32') {
+      return {
+        executable: 'powershell.exe',
+        args: ['-NoProfile', '-Command',
+          "$bin = if ($env:PI_INSTALL_DIR) { $env:PI_INSTALL_DIR } "
+          + "else { Join-Path $env:LOCALAPPDATA 'omp' }; "
+          + "& (Join-Path $bin 'omp.exe') --version"],
+        display,
+      };
+    }
+    return {
+      executable: 'bash',
+      args: ['-c', 'exec "${PI_INSTALL_DIR:-$HOME/.local/bin}/omp" --version'],
+      display,
+    };
+  }
   if (agent === 'claude-code' || agent === 'grok' || agent === 'hermes') {
     const executable = agent === 'claude-code' ? 'claude' : agent;
     const display = `${executable} --version`;
@@ -391,7 +414,7 @@ export async function installAgent(
   const command = getAgentInstallCommand(agent, options.platform);
   const verificationCommand = getAgentVerificationCommand(agent, options.platform);
   const networkHint = 'Check internet access, DNS, firewall, and proxy settings, then retry.';
-  const manualHint = agent === 'claude-code' || agent === 'grok' || agent === 'hermes'
+  const manualHint = agent === 'claude-code' || agent === 'grok' || agent === 'hermes' || agent === 'oh-my-pi'
     ? `Run the official installer manually:\n${command.display}`
     : `Run the installer manually:\n${command.display}\nFor npm permission errors, see: `
       + 'https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally';

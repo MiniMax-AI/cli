@@ -65,9 +65,11 @@ mmx quota
 
 ### `mmx text`
 
+`text chat` 和 `text repl` 默认使用 `MiniMax-M3.1-Flash-Preview`；显式指定的 `--model` 或已保存的 `default-text-model` 优先。该预览模型目前仅通过 M Plan 和 MiniMax Code 提供；使用按量付费 Key 时，请显式选择 `MiniMax-M3`。详见[模型调用文档](https://platform.minimax.cn/docs/guides/text-generation#agent)。
+
 ```bash
 mmx text chat --message "写一首诗"
-mmx text chat --model MiniMax-M3 --message "你好" --stream
+mmx text chat --model MiniMax-M3.1-Flash-Preview --message "你好" --stream
 mmx text chat --system "你是编程助手" --message "用 Go 写 Fizzbuzz"
 mmx text chat --message "user:你好" --message "assistant:嗨！" --message "你叫什么名字？"
 cat messages.json | mmx text chat --messages-file - --output json
@@ -170,21 +172,27 @@ Global 与中国两个 region，选用能通过的那个。
 mmx quota
 mmx config show
 mmx config set --key region --value cn
-mmx config set --key default-text-model --value MiniMax-M3
+mmx config set --key default-text-model --value MiniMax-M3.1-Flash-Preview
 mmx config export-schema | jq .
 ```
 
 ### `mmx agent setup`
 
-一键为 Claude Code、Codex、Grok Build、OpenCode、Hermes 或 Pi 配置 MiniMax，并保留配置文件中的其他设置。不带选项时进入交互式向导；带选项时自动使用非交互模式，便于脚本调用。
+一键为 Claude Code、Codex、Grok Build、OpenCode、Hermes、Pi 或 [Oh my Pi](https://github.com/can1357/oh-my-pi) 配置 MiniMax，并保留配置文件中的其他设置。不带选项时进入交互式向导；带选项时自动使用非交互模式，便于脚本调用。
 
 ```bash
 mmx agent setup
 mmx agent setup --agent codex --agent claude-code --api-key "$MINIMAX_API_KEY" --region global
 mmx agent setup --all --api-key "$MINIMAX_API_KEY" --region cn --output json
+mmx agent setup --agent oh-my-pi --api-key "$MINIMAX_API_KEY" --region cn
+# --agent omp 是 --agent oh-my-pi 的别名
 ```
 
+`agent setup` 对订阅 Key 默认使用 `MiniMax-M3.1-Flash-Preview`，对按量付费 Key（`sk-api-...`）默认使用 `MiniMax-M3`。非交互模式下可用 `--model` 覆盖该选择。
+
 写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览且不会发起联网请求。在交互式向导中，兼容且未在 `PATH` 中检测到的 Agent 会出现在第二个安装多选列表，并通过官方软件包或安装脚本安装。Hermes 仅执行官方核心 CLI 安装阶段，跳过可选系统软件包、Node 工作区、浏览器、计算机控制、初始化和网关阶段。安装完成后，mmx 会保留安装器生成的其他设置并写入 MiniMax 配置。平台或依赖检查不通过的 Agent 会说明原因并保持仅配置。非交互调用仍只写配置，且该命令不会启动 Agent。
+
+Oh my Pi 使用原生 `~/.omp/agent/models.yml` 和 `config.yml`（已有 `.yaml` 文件会原地更新），遵循 `OMP_PROFILE` / `PI_PROFILE`、`PI_CONFIG_DIR` 和默认 profile 的 `PI_CODING_AGENT_DIR` 配置。仅有旧版 JSON 配置时，请先运行一次 `omp` 完成迁移。交互式安装使用官方预编译二进制安装器，无需 Bun 或 npm。
 
 ### `mmx update`
 
