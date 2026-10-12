@@ -1,4 +1,5 @@
 import { copyFileSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
+import { randomBytes } from 'crypto';
 import { parseConfigFile, REGIONS, type Config, type ConfigFile, type Region } from './schema';
 import { ensureConfigDir, getConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
@@ -56,9 +57,15 @@ export async function writeConfigFile(
 ): Promise<void> {
   await ensureConfigDir();
   const path = getConfigPath();
-  const tmp = path + '.tmp';
-  writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
-  renameWithCrossDeviceFallback(tmp, path, renameOps);
+  const uniqueSuffix = randomBytes(8).toString('hex');
+  const tmp = `${path}.${process.pid}.${Date.now()}.${uniqueSuffix}.tmp`;
+  writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+  try {
+    renameWithCrossDeviceFallback(tmp, path, renameOps);
+  } catch (err) {
+    try { unlinkSync(tmp); } catch { /* best effort */ }
+    throw err;
+  }
 }
 
 export function loadConfig(flags: GlobalFlags): Config {

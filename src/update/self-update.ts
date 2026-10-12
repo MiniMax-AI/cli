@@ -1,4 +1,4 @@
-import { createWriteStream, renameSync, chmodSync, existsSync } from 'fs';
+import { createWriteStream, renameSync, chmodSync, existsSync, mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { CLIError } from '../errors/base';
@@ -110,7 +110,7 @@ export async function downloadFile(url: string, dest: string, onProgress?: (pct:
   const total = Number(res.headers.get('content-length') ?? 0);
   let received = 0;
 
-  const writer = createWriteStream(dest);
+  const writer = createWriteStream(dest, { flags: 'wx', mode: 0o700 });
   const reader = res.body!.getReader();
 
   try {
@@ -150,7 +150,10 @@ export async function downloadFile(url: string, dest: string, onProgress?: (pct:
       });
     }
     // Don't leave a half-downloaded binary in /tmp on failure.
-    try { (await import('fs')).unlinkSync(dest); } catch { /* best-effort — race with concurrent cleanup is fine */ }
+    // If the error was EEXIST, dest already existed and was not created by this download.
+    if ((err as { code?: string })?.code !== 'EEXIST') {
+      try { (await import('fs')).unlinkSync(dest); } catch { /* best-effort — race with concurrent cleanup is fine */ }
+    }
     throw err;
   } finally {
     // Always release the Web Streams reader lock — the API contract requires
@@ -177,40 +180,45 @@ export async function resolveUpdateTarget(channel: Channel): Promise<UpdateTarge
 }
 
 export async function applySelfUpdate(target: UpdateTarget, currentBin: string): Promise<void> {
-  const tmp = join(tmpdir(), `mmx-update-${Date.now()}`);
+  const tempDir = mkdtempSync(join(tmpdir(), 'mmx-update-'));
+  const tmp = join(tempDir, 'mmx-bin');
 
-  process.stderr.write(`Downloading ${target.version}...\n`);
-  let lastPct = -1;
-  await downloadFile(target.downloadUrl, tmp, (pct) => {
-    if (pct !== lastPct && pct % 10 === 0) {
-      process.stderr.write(`  ${pct}%\r`);
-      lastPct = pct;
-    }
-  });
-  process.stderr.write('  \r');
-
-  process.stderr.write('Verifying checksum...\n');
-  await verifySha256(tmp, target.checksum);
-
-  chmodSync(tmp, 0o755);
-
-  // Atomic replace: rename works on same filesystem
-  // If cross-device, fall back to copy+rename
   try {
-    renameSync(tmp, currentBin);
-  } catch {
-    const { copyFileSync, unlinkSync } = await import('fs');
-    const backup = `${currentBin}.bak`;
-    copyFileSync(currentBin, backup);
+    process.stderr.write(`Downloading ${target.version}...\n`);
+    let lastPct = -1;
+    await downloadFile(target.downloadUrl, tmp, (pct) => {
+      if (pct !== lastPct && pct % 10 === 0) {
+        process.stderr.write(`  ${pct}%\r`);
+        lastPct = pct;
+      }
+    });
+    process.stderr.write('  \r');
+
+    process.stderr.write('Verifying checksum...\n');
+    await verifySha256(tmp, target.checksum);
+
+    chmodSync(tmp, 0o755);
+
+    // Atomic replace: rename works on same filesystem
+    // If cross-device, fall back to copy+rename
     try {
-      copyFileSync(tmp, currentBin);
-      chmodSync(currentBin, 0o755);
-      unlinkSync(tmp);
-      if (existsSync(backup)) unlinkSync(backup);
-    } catch (e) {
-      // Restore backup
-      if (existsSync(backup)) renameSync(backup, currentBin);
-      throw e;
+      renameSync(tmp, currentBin);
+    } catch {
+      const { copyFileSync, unlinkSync } = await import('fs');
+      const backup = `${currentBin}.bak`;
+      copyFileSync(currentBin, backup);
+      try {
+        copyFileSync(tmp, currentBin);
+        chmodSync(currentBin, 0o755);
+        unlinkSync(tmp);
+        if (existsSync(backup)) unlinkSync(backup);
+      } catch (e) {
+        // Restore backup
+        if (existsSync(backup)) renameSync(backup, currentBin);
+        throw e;
+      }
     }
+  } finally {
+    try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* best-effort cleanup */ }
   }
 }
