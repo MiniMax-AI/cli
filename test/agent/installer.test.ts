@@ -89,6 +89,34 @@ describe('agent installer', () => {
     expect(getAgentVerificationCommand('hermes', 'win32').display).toBe('hermes --version');
   });
 
+  it('installs and verifies Oh my Pi with official binaries without requiring Bun or npm', async () => {
+    for (const platform of ['darwin', 'linux', 'win32'] as const) {
+      expect(getAgentInstallIssue('oh-my-pi', {
+        platform, arch: 'arm64', commandExists: command => !['npm', 'bun', 'sh'].includes(command),
+      })).toBeUndefined();
+      const received: AgentInstallCommand[] = [];
+      await installAgent('oh-my-pi', {
+        platform, commandExists: () => true,
+        runner: async command => { received.push(command); return 0; },
+      });
+      expect(received).toEqual([
+        getAgentInstallCommand('oh-my-pi', platform),
+        getAgentVerificationCommand('oh-my-pi', platform),
+      ]);
+      expect(received[0]?.args.join(' ')).toContain('https://omp.sh/install');
+      expect(received[0]?.args.join(' ')).toContain(platform === 'win32' ? '-Binary' : '--binary');
+      if (platform !== 'win32') expect(received[0]?.args.join(' ')).toContain('| bash -s -- --binary');
+      expect(received[1]?.args.join(' ')).toContain('PI_INSTALL_DIR');
+      expect(received[1]?.display).toBe('omp --version');
+    }
+    expect(getAgentInstallIssue('oh-my-pi', {
+      platform: 'linux', commandExists: command => command !== 'curl',
+    })).toContain('curl');
+    expect(getAgentInstallIssue('oh-my-pi', {
+      platform: 'win32', commandExists: () => false,
+    })).toContain('powershell.exe');
+  });
+
   it('preflights platform, architecture, commands, and Node requirements', () => {
     const commandsExist = { commandExists: () => true };
     expect(getAgentInstallIssue('pi', {
@@ -325,12 +353,13 @@ describe('agent installer', () => {
       );
       chmodSync(npm, 0o755);
       const moduleUrl = pathToFileURL(join(import.meta.dir, '../../src/agent/installer.ts')).href;
+      // Allow a cold shell startup before timing out so the descendant exists to verify cleanup.
       const child = Bun.spawn({
         cmd: [
           process.execPath,
           '-e',
           `import { installAgent } from ${JSON.stringify(moduleUrl)}; `
-            + "try { await installAgent('codex', { commandExists: () => true, installTimeoutMs: 200 }); process.exit(2); } "
+            + "try { await installAgent('codex', { commandExists: () => true, installTimeoutMs: 2000 }); process.exit(2); } "
             + 'catch (error) { if (error?.exitCode !== 5 || !error?.hint?.includes('
             + "'installer was stopped')) process.exit(3); }",
         ],

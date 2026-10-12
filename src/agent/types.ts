@@ -1,4 +1,5 @@
 import type { Region } from '../config/schema';
+import { DEFAULT_TEXT_MODEL } from '../config/models';
 
 export const AGENT_IDS = [
   'claude-code',
@@ -7,13 +8,14 @@ export const AGENT_IDS = [
   'opencode',
   'hermes',
   'pi',
+  'oh-my-pi',
 ] as const;
 
 export type AgentId = typeof AGENT_IDS[number];
 
 export const MINIMAX_MODELS = [
   {
-    id: 'MiniMax-M3.1-Flash-Preview',
+    id: DEFAULT_TEXT_MODEL,
     contextWindow: 524288,
     maxTokens: 128000,
     input: ['text', 'image'],

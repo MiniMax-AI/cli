@@ -72,6 +72,45 @@ function pathFromOverride(value: string | undefined, fallback: string, home: str
   return isAbsolute(value) ? value : resolve(home, value);
 }
 
+function ohMyPiConfigPaths(home: string, env: NodeJS.ProcessEnv): string[] {
+  // Match OMP's profile/env precedence, including an explicitly empty OMP_PROFILE.
+  const profile = (env.OMP_PROFILE ?? env.PI_PROFILE)?.trim();
+  const root = join(home, env.PI_CONFIG_DIR || '.omp');
+  const validProfile = (name: string) => /^[a-z0-9][a-z0-9._-]{0,63}$/.test(name)
+    && !name.endsWith('.')
+    && !/^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\..*)?$/i.test(name);
+  let dir: string;
+  if (profile && profile !== 'default') {
+    if (!validProfile(profile)) {
+      throw new CLIError('Invalid Oh my Pi profile name.', ExitCode.USAGE);
+    }
+    dir = join(root, 'profiles', profile, 'agent');
+  } else {
+    // A parent OMP process propagates its named profile's directory. Selecting
+    // the default profile must discard that inherited value, as OMP itself does.
+    const inheritedProfile = env.PI_PROFILE?.trim();
+    const inheritedDir = inheritedProfile && inheritedProfile !== 'default' && validProfile(inheritedProfile)
+      ? join(root, 'profiles', inheritedProfile, 'agent') : undefined;
+    const override = env.PI_CODING_AGENT_DIR === inheritedDir ? undefined : env.PI_CODING_AGENT_DIR;
+    dir = override ? resolve(override) : join(root, 'agent');
+  }
+  return ['models', 'config'].map(name => {
+    const yml = join(dir, `${name}.yml`);
+    const yaml = join(dir, `${name}.yaml`);
+    if (existsSync(yml)) return yml;
+    if (existsSync(yaml)) return yaml;
+    const legacy = join(dir, name === 'models' ? 'models.json' : 'settings.json');
+    if (existsSync(legacy)) {
+      throw new CLIError(
+        'Oh my Pi has legacy JSON configuration that needs migration.',
+        ExitCode.GENERAL,
+        'Run omp once with the same profile/environment to migrate it to YAML, then retry. No files were changed.',
+      );
+    }
+    return yml;
+  });
+}
+
 function configPathsForAgent(
   agent: AgentId,
   options: AgentSetupOptions,
@@ -115,6 +154,8 @@ function configPathsForAgent(
       );
       return [join(dir, 'models.json'), join(dir, 'settings.json')];
     }
+    case 'oh-my-pi':
+      return ohMyPiConfigPaths(home, env);
   }
 }
 
@@ -938,6 +979,73 @@ function preparePi(options: AgentSetupOptions, paths: string[]): PreparedAgentFi
   ];
 }
 
+function prepareOhMyPi(options: AgentSetupOptions, paths: string[]): PreparedAgentFile[] {
+  const providerId = options.region === 'cn' ? 'minimax-cn' : 'minimax';
+  const baseUrl = endpointsForRegion(options.region).anthropic;
+  return paths.map((path, index) => {
+    const existing = readPrepared(path);
+    const label = `Oh my Pi ${basename(path)}`;
+    const document = parseDocument(existing.before ?? '{}\n');
+    if (document.errors.length > 0) {
+      throw new CLIError(`${label} is not valid YAML.`, ExitCode.GENERAL, INVALID_CONFIG_HINT);
+    }
+    if (document.contents === null) document.set(index === 0 ? 'providers' : 'modelRoles', document.createNode({}));
+    const root = document.toJS() as unknown;
+    assertObject(root, `${label} must contain an object at its root.`);
+    if (index === 0) {
+      if (root.providers !== undefined) assertObject(root.providers, `${label} providers must be an object.`);
+      const provider = root.providers?.[providerId];
+      if (provider !== undefined) assertObject(provider, `${label} provider must be an object.`);
+      const models = provider?.models;
+      if (models !== undefined && !Array.isArray(models)) {
+        throw new CLIError(`${label} models must be an array.`, ExitCode.GENERAL, INVALID_CONFIG_HINT);
+      }
+      const entries = (models ?? []) as unknown[];
+      for (const entry of entries) assertObject(entry, `${label} model entries must be objects.`);
+      const prefix = ['providers', providerId];
+      for (const [key, value] of Object.entries({ baseUrl, apiKey: options.apiKey, api: 'anthropic-messages', auth: 'apiKey' })) {
+        document.setIn([...prefix, key], value);
+      }
+      if (models === undefined) document.setIn([...prefix, 'models'], document.createNode([]));
+      let appendIndex = entries.length;
+      for (const model of MINIMAX_MODELS) {
+        const found = entries.findIndex(entry => (entry as Record<string, unknown>).id === model.id);
+        const modelPath = [...prefix, 'models', found >= 0 ? found : appendIndex++];
+        const definition = {
+          id: model.id,
+          name: model.id,
+          api: 'anthropic-messages',
+          baseUrl,
+          reasoning: true,
+          input: [...model.input],
+          contextWindow: model.contextWindow,
+          maxTokens: model.maxTokens,
+          ...(model.id === 'MiniMax-M3.1-Flash-Preview' ? {
+            thinking: {
+              mode: 'anthropic-adaptive',
+              efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+              defaultLevel: 'max',
+              requiresEffort: true,
+            },
+          } : {}),
+        };
+        if (found < 0) {
+          document.setIn(modelPath, document.createNode(definition));
+        } else {
+          for (const [key, value] of Object.entries(definition)) {
+            document.setIn([...modelPath, key], document.createNode(value));
+          }
+        }
+      }
+    } else {
+      if (root.modelRoles !== undefined) assertObject(root.modelRoles, `${label} modelRoles must be an object.`);
+      const effort = options.model === 'MiniMax-M3.1-Flash-Preview' ? ':max' : '';
+      document.setIn(['modelRoles', 'default'], `${providerId}/${options.model}${effort}`);
+    }
+    return { agent: 'oh-my-pi', path, ...existing, after: document.toString() };
+  });
+}
+
 export function prepareAgentConfigurations(options: AgentSetupOptions): PreparedAgentFile[] {
   const prepared: PreparedAgentFile[] = [];
   for (const agent of options.agents) {
@@ -960,6 +1068,9 @@ export function prepareAgentConfigurations(options: AgentSetupOptions): Prepared
         break;
       case 'pi':
         prepared.push(...preparePi(options, paths));
+        break;
+      case 'oh-my-pi':
+        prepared.push(...prepareOhMyPi(options, paths));
         break;
     }
   }

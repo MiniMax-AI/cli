@@ -413,6 +413,20 @@ describe('agent setup command', () => {
     expect(JSON.parse(output).agents).toEqual(['grok']);
   });
 
+  it('accepts both Oh my Pi names and includes it in --all', async () => {
+    for (const selection of [{ agent: ['omp', 'oh-my-pi'] }, { all: true }]) {
+      const output = await captureConsoleLog(() => setupCommand.execute(
+        testConfig(),
+        testFlags({ ...selection, apiKey: 'sk-cp-test-secret', region: 'global' }),
+      ));
+      const result = JSON.parse(output);
+      expect(result.agents.filter((agent: string) => agent === 'oh-my-pi')).toHaveLength(1);
+      expect(result.files.filter((file: { agent: string }) => file.agent === 'oh-my-pi')).toHaveLength(2);
+      expect(result.verification.model).toBe('MiniMax-M3.1-Flash-Preview');
+      expect(output).not.toContain('sk-cp-test-secret');
+    }
+  });
+
   it('validates --agent values even when --all is present', async () => {
     await expect(setupCommand.execute(
       testConfig(),

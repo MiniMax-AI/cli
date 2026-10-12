@@ -53,6 +53,8 @@ const AGENT_ALIASES: Record<string, AgentId> = {
   opencode: 'opencode',
   hermes: 'hermes',
   pi: 'pi',
+  'oh-my-pi': 'oh-my-pi',
+  omp: 'oh-my-pi',
 };
 
 const AGENT_LABELS: Record<AgentId, string> = {
@@ -62,6 +64,7 @@ const AGENT_LABELS: Record<AgentId, string> = {
   opencode: 'OpenCode',
   hermes: 'Hermes Agent',
   pi: 'Pi',
+  'oh-my-pi': 'Oh my Pi (omp)',
 };
 const DEFAULT_INTERACTIVE_AGENTS: AgentId[] = ['claude-code', 'codex'];
 
@@ -488,7 +491,7 @@ export default defineCommand({
   options: [
     {
       flag: '--agent <name>',
-      description: 'Agent: claude-code, codex, grok/grok-build, opencode, hermes, pi (repeatable)',
+      description: 'Agent: claude-code, codex, grok/grok-build, opencode, hermes, pi, oh-my-pi/omp (repeatable)',
       type: 'array',
     },
     {

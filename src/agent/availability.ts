@@ -10,6 +10,7 @@ const AGENT_EXECUTABLES: Record<AgentId, readonly string[]> = {
   opencode: ['opencode'],
   hermes: ['hermes'],
   pi: ['pi'],
+  'oh-my-pi': ['omp'],
 };
 
 const AGENT_RUNTIME_MARKERS: Partial<Record<AgentId, readonly [string, string]>> = {

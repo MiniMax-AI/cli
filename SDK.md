@@ -25,16 +25,18 @@ You can also omit `apiKey` if it's already configured via `mmx config set api-ke
 
 ### Text
 
+When `model` is omitted, the SDK uses `MiniMax-M3.1-Flash-Preview`. This preview currently requires M Plan or MiniMax Code; with a pay-as-you-go key, pass `model: 'MiniMax-M3'` explicitly. Thinking is enabled by default with `max` effort; no extra request fields are required. See the [model guide](https://platform.minimax.io/docs/guides/text-generation#agent).
+
 ```typescript
 const response = await sdk.text.chat({
-  model: 'MiniMax-M3',
+  model: 'MiniMax-M3.1-Flash-Preview',
   messages: [{ role: 'user', content: 'Hello!' }],
   max_tokens: 4096,
 });
 
 // Streaming
 const stream = await sdk.text.chat({
-  model: 'MiniMax-M3',
+  model: 'MiniMax-M3.1-Flash-Preview',
   messages: [{ role: 'user', content: 'Write a poem' }],
   stream: true,
 });

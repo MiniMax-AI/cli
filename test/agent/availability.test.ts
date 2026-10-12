@@ -43,6 +43,12 @@ describe('agent availability', () => {
     }
   });
 
+  it('detects Oh my Pi separately from Pi', () => {
+    const root = executableDirectory('omp');
+    expect(detectAgentsOnPath({ PATH: root, PATHEXT: '.COM;.EXE;.BAT;.CMD' }))
+      .toEqual(new Set(['oh-my-pi']));
+  });
+
   it('does not scan the working directory when PATH is missing', () => {
     const root = executableDirectory('codex');
     const originalCwd = process.cwd();
