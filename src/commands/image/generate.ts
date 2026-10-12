@@ -142,6 +142,16 @@ export default defineCommand({
       process.stderr.write('[Model: image-01]\n');
     }
 
+    // The API answers 200 with an empty image list when every image is rejected.
+    // Without this check the command reports the --out path as saved and exits 0
+    // even though nothing was written (see ERRORS.md, `mmx image generate`).
+    if (response.data.success_count === 0) {
+      throw new CLIError(
+        'Image generation failed: all images were rejected (content policy or model error).',
+        ExitCode.GENERAL,
+      );
+    }
+
     const saved: string[] = [];
 
     if (outPath) {
