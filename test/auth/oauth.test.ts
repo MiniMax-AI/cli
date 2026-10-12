@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, afterAll, mock, spyOn } from 'bun:test';
+import childProcess from 'child_process';
 
-// Prevent openBrowser from actually opening a browser during tests
-mock.module('child_process', () => ({
-  execFile: () => {},
-  spawn: () => {},
-}));
+// Prevent openBrowser from actually opening a browser during tests. It
+// require()s child_process at call time, which mock.module doesn't intercept.
+const spawnSpy = spyOn(childProcess, 'spawn').mockImplementation(
+  (() => ({})) as unknown as typeof childProcess.spawn,
+);
+const execFileSpy = spyOn(childProcess, 'execFile').mockImplementation(
+  (() => ({})) as unknown as typeof childProcess.execFile,
+);
+
+afterAll(() => {
+  spawnSpy.mockRestore();
+  execFileSpy.mockRestore();
+});
 
 // Dynamic import to avoid module-level side effects
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
