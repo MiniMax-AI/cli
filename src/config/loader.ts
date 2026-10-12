@@ -64,7 +64,10 @@ export async function writeConfigFile(
 export function loadConfig(flags: GlobalFlags): Config {
   const file = readConfigFile();
 
-  const apiKey = flags.apiKey || undefined;
+  const flagApiKey = flags.apiKey || undefined;
+  const envApiKey = process.env.MINIMAX_API_KEY || undefined;
+  const apiKey = flagApiKey || envApiKey;
+  const apiKeySource = flagApiKey ? 'flag' : envApiKey ? 'env' : undefined;
   const fileApiKey = file.api_key;
 
   const explicitRegion = (flags.region as string) || process.env.MINIMAX_REGION || undefined;
@@ -100,6 +103,7 @@ export function loadConfig(flags: GlobalFlags): Config {
 
   return {
     apiKey,
+    apiKeySource,
     fileApiKey,
     fileRegion: file.region,
     configPath: getConfigPath(),

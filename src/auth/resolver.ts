@@ -7,9 +7,13 @@ import { ExitCode } from '../errors/codes';
 import { buildNoCredentialsHint } from './hints';
 
 export async function resolveCredential(config: Config): Promise<ResolvedCredential> {
-  // 1. --api-key flag
+  // 1. Explicit API key (--api-key takes precedence over MINIMAX_API_KEY)
   if (config.apiKey) {
-    return { token: config.apiKey, method: 'api-key', source: 'flag' };
+    return {
+      token: config.apiKey,
+      method: 'api-key',
+      source: config.apiKeySource ?? 'flag',
+    };
   }
 
   // 2. OAuth credentials in config file
