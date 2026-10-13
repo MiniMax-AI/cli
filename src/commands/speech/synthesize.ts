@@ -6,6 +6,7 @@ import { speechEndpoint } from '../../client/endpoints';
 import { detectOutputFormat, formatOutput, dryRun } from '../../output/formatter';
 import { saveAudioOutput } from '../../output/audio';
 import { writeFileSync } from 'fs';
+import { extname } from 'path';
 import { readTextFromPathOrStdin } from '../../utils/fs';
 import { T2A_FORMATS, formatList, validateAudioFormat, validateT2AStreaming, t2aDefaultSampleRate } from '../../utils/audio-formats';
 import { pipeAudioStream } from '../../utils/audio-stream';
@@ -136,7 +137,7 @@ export default defineCommand({
         
         if (subtitleArray?.length) {
           // Convert to SRT format (API returns time in milliseconds)
-          const subtitlePath = outPath.replace(/\.[^.]+$/, '') + '.srt';
+          const subtitlePath = outPath.slice(0, outPath.length - extname(outPath).length) + '.srt';
           const srtContent = subtitleArray
             .map((s, i) => {
               // API already returns milliseconds, use directly

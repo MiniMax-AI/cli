@@ -1,4 +1,8 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, spyOn } from 'bun:test';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createMockServer, jsonResponse } from '../../helpers/mock-server';
 import { default as synthesizeCommand } from '../../../src/commands/speech/synthesize';
 
 describe('speech synthesize command', () => {
@@ -395,6 +399,47 @@ describe('speech synthesize format validation', () => {
       expect(parsed.request.audio_setting.sample_rate).toBe(16000);
     } finally {
       console.log = originalLog;
+    }
+  });
+});
+
+describe('speech synthesize subtitle paths', () => {
+  it.each([
+    ['clip.mp3', 'clip.srt'],
+    ['clip.part.mp3', 'clip.part.srt'],
+    ['clip', 'clip.srt'],
+    ['.clip', '.clip.srt'],
+  ])('saves subtitles beside %s in a dotted directory', async (filename, subtitleName) => {
+    const directory = mkdtempSync(join(tmpdir(), 'mmx-subtitles-'));
+    const outputDirectory = join(directory, 'session.v1');
+    mkdirSync(outputDirectory);
+    const out = join(outputDirectory, filename);
+    const server = createMockServer({ routes: {
+      '/v1/t2a_v2': () => jsonResponse({
+        base_resp: { status_code: 0, status_msg: 'ok' },
+        data: { audio: '48656c6c6f', subtitle_file: `${server.url}/subtitles` },
+      }),
+      '/subtitles': () => jsonResponse([{ text: 'Hello', time_begin: 0, time_end: 1500 }]),
+    } });
+    const output = spyOn(console, 'log').mockImplementation(() => {});
+    const flags = {
+      text: 'Hello', subtitles: true, out, quiet: true, verbose: false,
+      noColor: true, yes: false, dryRun: false, help: false, nonInteractive: true, async: false,
+    };
+    try {
+      await synthesizeCommand.execute({
+        ...flags, apiKey: 'test-key', region: 'global', baseUrl: server.url, output: 'text', timeout: 10,
+      }, flags);
+      expect(readFileSync(out, 'utf8')).toBe('Hello');
+      expect(readFileSync(join(outputDirectory, subtitleName), 'utf8')).toBe(
+        '1\n00:00:00,000 --> 00:00:01,500\nHello',
+      );
+      expect(output).toHaveBeenCalledWith(join(outputDirectory, subtitleName));
+      expect(readdirSync(directory)).toEqual(['session.v1']);
+    } finally {
+      output.mockRestore();
+      server.close();
+      rmSync(directory, { recursive: true, force: true });
     }
   });
 });
