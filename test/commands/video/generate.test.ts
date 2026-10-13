@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, spyOn } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { default as generateCommand } from '../../../src/commands/video/generate';
 import type { Config } from '../../../src/config/schema';
 import type { GlobalFlags } from '../../../src/types/flags';
-import { createMockServer } from '../../helpers/mock-server';
+import { createMockServer, jsonResponse } from '../../helpers/mock-server';
 
 const h3DryRunConfig: Config = {
   apiKey: 'test-key',
@@ -580,5 +580,56 @@ describe('video generate command', () => {
         async: false,
       }),
     ).rejects.toThrow('MiniMax-Hailuo-2.3-Fast only supports I2V');
+  });
+
+  it('rejects a configured Fast model without an image before submitting a task', async () => {
+    let submissions = 0;
+    const server = createMockServer({
+      routes: {
+        'POST /v1/video_generation': () => {
+          submissions++;
+          return jsonResponse({ task_id: 'unexpected-task', base_resp: { status_code: 0 } });
+        },
+      },
+    });
+    try {
+      await expect(generateCommand.execute({
+        ...h3DryRunConfig,
+        baseUrl: server.url,
+        defaultVideoModel: 'MiniMax-Hailuo-2.3-Fast',
+        dryRun: false,
+        async: true,
+        quiet: true,
+      }, { ...baseFlags, dryRun: false, prompt: 'A cat' })).rejects.toMatchObject({
+        message: expect.stringContaining('MiniMax-Hailuo-2.3-Fast only supports I2V'),
+        exitCode: 2,
+      });
+      expect(submissions).toBe(0);
+    } finally {
+      server.close();
+    }
+  });
+
+  it.each([
+    [{ image: 'https://example.com/first.png' }, 'MiniMax-Hailuo-2.3-Fast'],
+    [{ firstFrame: 'https://example.com/first.png' }, 'MiniMax-Hailuo-2.3-Fast'],
+    [{ model: 'MiniMax-Hailuo-2.3' }, 'MiniMax-Hailuo-2.3'],
+    [{ subjectImage: 'https://example.com/subject.png' }, 'S2V-01'],
+    [{ image: 'https://example.com/first.png', lastFrame: 'https://example.com/last.png' }, 'MiniMax-Hailuo-02'],
+  ])('preserves model resolution with a Fast default and %j', async (flags, model) => {
+    const log = spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await generateCommand.execute({
+        ...h3DryRunConfig,
+        defaultVideoModel: 'MiniMax-Hailuo-2.3-Fast',
+      }, { ...baseFlags, prompt: 'A cat', ...flags });
+      const output = JSON.parse(log.mock.calls[0]![0]) as { request: { model: string; first_frame_image?: string } };
+      expect(output.request.model).toBe(model);
+      if ('image' in flags || 'firstFrame' in flags) {
+        expect(output.request.first_frame_image).toBe('https://example.com/first.png');
+      }
+    } finally {
+      log.mockRestore();
+    }
   });
 });
