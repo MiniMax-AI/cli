@@ -174,7 +174,11 @@ export default defineCommand({
       }
 
       if (!finished) {
-        process.stderr.write('[warning] Stream ended before the final event; the transcript may be incomplete.\n');
+        if (toStdout) process.stdout.write('\n');
+        throw new CLIError(
+          'Stream ended before the final event; the transcript may be incomplete.',
+          ExitCode.GENERAL,
+        );
       }
 
       // Assembled by index, per the API's contract — arrival order only shows

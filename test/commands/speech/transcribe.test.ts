@@ -420,11 +420,18 @@ describe('speech transcribe command', () => {
     }
   });
 
-  it('warns on stderr when the stream ends without the final event', async () => {
+  it.each([
+    { format: 'text' as const, ending: 'eof' },
+    { format: 'text' as const, ending: 'done' },
+    { format: 'json' as const, ending: 'eof' },
+    { format: 'json' as const, ending: 'done' },
+  ])('rejects incomplete $format transcription at $ending', async ({ format, ending }) => {
     const { dir, filePath } = makeTempAudio();
-    const response = sseResponse([
-      { data: '{"index":0,"delta":"truncated","finish":false}' },
-    ]);
+    const response = new Response(
+      'data: {"index":0,"delta":"truncated","finish":false}\n\n'
+        + (ending === 'done' ? 'data: [DONE]\n\n' : ''),
+      { headers: { 'Content-Type': 'text/event-stream' } },
+    );
 
     try {
       await withStubbedFetch(
@@ -433,16 +440,18 @@ describe('speech transcribe command', () => {
           let captured = '';
           const stderr = await captureStderr(async () => {
             captured = await captureStdout(async () => {
-              await transcribeCommand.execute(baseConfig, {
-                ...baseFlags,
-                file: filePath,
-                stream: true,
+              await expect(transcribeCommand.execute({ ...baseConfig, output: format }, {
+                ...baseFlags, file: filePath, stream: true,
+              })).rejects.toMatchObject({
+                name: 'CLIError',
+                exitCode: 1,
+                message: 'Stream ended before the final event; the transcript may be incomplete.',
               });
             });
           });
 
-          expect(captured).toBe('truncated\n');
-          expect(stderr).toContain('Stream ended before the final event');
+          expect(captured).toBe(format === 'text' ? 'truncated\n' : '');
+          expect(stderr).not.toContain('[Duration:');
         },
       );
     } finally {
