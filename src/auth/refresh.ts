@@ -1,6 +1,8 @@
+import { resolve } from 'path';
 import type { CredentialFile } from './types';
 import type { Region } from '../config/schema';
 import { OAUTH_HOSTS } from '../config/schema';
+import { getConfigPath } from '../config/paths';
 import { saveCredentials } from './credentials';
 import { CLIError } from '../errors/base';
 import { ExitCode } from '../errors/codes';
@@ -10,6 +12,7 @@ const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 500;
 const REQUEST_TIMEOUT_MS = 10_000;
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+const pendingRefreshes = new Map<string, Promise<string>>();
 
 interface RefreshResponse {
   base_resp?: { status_code: number; status_msg?: string };
@@ -100,15 +103,29 @@ export async function ensureFreshToken(creds: CredentialFile): Promise<string> {
   const expiresAt = new Date(creds.expires_at).getTime();
   if (Date.now() < expiresAt - REFRESH_BUFFER_MS) return creds.access_token;
 
-  const fresh = await refreshAccessToken(creds.refresh_token, creds.region ?? 'global');
-  const updated: CredentialFile = {
-    access_token: fresh.access_token,
-    refresh_token: fresh.refresh_token,
-    expires_at: fresh.expires_at,
-    region: creds.region,
-    resource_url: fresh.resource_url ?? creds.resource_url,
-    account: creds.account,
-  };
-  await saveCredentials(updated);
-  return updated.access_token;
+  const path = resolve(getConfigPath());
+  const key = JSON.stringify([path, creds.region ?? 'global', creds.refresh_token]);
+  const existing = pendingRefreshes.get(key);
+  if (existing) return existing;
+
+  // Share persistence as well as the request: waiters need the rotated token on disk.
+  const pending = (async () => {
+    const fresh = await refreshAccessToken(creds.refresh_token, creds.region ?? 'global');
+    const updated: CredentialFile = {
+      access_token: fresh.access_token,
+      refresh_token: fresh.refresh_token,
+      expires_at: fresh.expires_at,
+      region: creds.region,
+      resource_url: fresh.resource_url ?? creds.resource_url,
+      account: creds.account,
+    };
+    await saveCredentials(updated, path);
+    return updated.access_token;
+  })();
+  pendingRefreshes.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    pendingRefreshes.delete(key);
+  }
 }
