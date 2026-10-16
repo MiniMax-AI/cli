@@ -85,7 +85,7 @@ export function loadConfig(flags: GlobalFlags): Config {
   const baseUrl = flags.baseUrl
     || process.env.MINIMAX_BASE_URL
     || file.base_url
-    || file.oauth?.resource_url
+    || (!apiKey ? file.oauth?.resource_url : undefined)
     || REGIONS[region]
     || REGIONS.global;
 
