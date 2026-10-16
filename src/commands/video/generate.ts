@@ -128,7 +128,7 @@ export default defineCommand({
     }
 
     // MiniMax-Hailuo-2.3-Fast only supports I2V, not T2V
-    if (explicitModel === 'MiniMax-Hailuo-2.3-Fast' && !inputImage) {
+    if (model === 'MiniMax-Hailuo-2.3-Fast' && !inputImage) {
       throw new CLIError(
         'MiniMax-Hailuo-2.3-Fast only supports I2V (image-to-video). Use --image to provide an input image.',
         ExitCode.USAGE,
