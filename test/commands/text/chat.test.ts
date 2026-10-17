@@ -10,7 +10,7 @@ describe('text chat command', () => {
     server?.close();
   });
 
-  it('sends chat request and gets response', async () => {
+  it('preserves the full JSON response in quiet mode', async () => {
     server = createMockServer({
       routes: {
         '/anthropic/v1/messages': () => jsonResponse(textChatResponse),
@@ -54,7 +54,52 @@ describe('text chat command', () => {
         async: false,
       });
 
-      expect(output).toContain('Hello! How can I help you today?');
+      expect(JSON.parse(output)).toEqual(textChatResponse);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it.each([false, true])('keeps text output with quiet=%s', async (quiet) => {
+    server = createMockServer({
+      routes: {
+        '/anthropic/v1/messages': () => jsonResponse(textChatResponse),
+      },
+    });
+
+    const { default: chatCommand } = await import('../../../src/commands/text/chat');
+    const config: Config = {
+      apiKey: 'test-key',
+      region: 'global',
+      baseUrl: server.url,
+      output: 'text',
+      timeout: 10,
+      verbose: false,
+      quiet,
+      noColor: true,
+      yes: false,
+      dryRun: false,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+    try {
+      await chatCommand.execute(config, {
+        message: ['Hello'],
+        stream: false,
+        quiet,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: false,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+      expect(output).toBe('Hello! How can I help you today?');
     } finally {
       console.log = originalLog;
     }
