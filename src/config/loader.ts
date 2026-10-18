@@ -1,4 +1,5 @@
 import { copyFileSync, existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'fs';
+import { dirname } from 'path';
 import { parseConfigFile, REGIONS, type Config, type ConfigFile, type Region } from './schema';
 import { ensureConfigDir, getConfigPath } from './paths';
 import { detectOutputFormat, type OutputFormat } from '../output/formatter';
@@ -36,8 +37,7 @@ export function renameWithCrossDeviceFallback(
   }
 }
 
-export function readConfigFile(): ConfigFile {
-  const path = getConfigPath();
+export function readConfigFile(path = getConfigPath()): ConfigFile {
   if (!existsSync(path)) return {};
   try {
     return parseConfigFile(JSON.parse(readFileSync(path, 'utf-8')));
@@ -53,9 +53,9 @@ export function readConfigFile(): ConfigFile {
 export async function writeConfigFile(
   data: Record<string, unknown>,
   renameOps?: RenameWithFallbackOps,
+  path = getConfigPath(),
 ): Promise<void> {
-  await ensureConfigDir();
-  const path = getConfigPath();
+  await ensureConfigDir(dirname(path));
   const tmp = path + '.tmp';
   writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
   renameWithCrossDeviceFallback(tmp, path, renameOps);
@@ -85,7 +85,7 @@ export function loadConfig(flags: GlobalFlags): Config {
   const baseUrl = flags.baseUrl
     || process.env.MINIMAX_BASE_URL
     || file.base_url
-    || file.oauth?.resource_url
+    || (!apiKey ? file.oauth?.resource_url : undefined)
     || REGIONS[region]
     || REGIONS.global;
 

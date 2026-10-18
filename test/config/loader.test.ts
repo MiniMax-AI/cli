@@ -4,6 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { loadConfig, renameWithCrossDeviceFallback, writeConfigFile } from '../../src/config/loader';
 import { CLIError } from '../../src/errors/base';
+import { resolveCredential } from '../../src/auth/resolver';
 import type { GlobalFlags } from '../../src/types/flags';
 
 const baseFlags: GlobalFlags = {
@@ -55,6 +56,54 @@ describe('loadConfig', () => {
 
     expect(config.region).toBe('cn');
     expect(config.baseUrl).toBe('https://api.minimax.cn');
+  });
+});
+
+describe('OAuth resource URL credential scope', () => {
+  const testDir = join(tmpdir(), `mmx-oauth-host-test-${Date.now()}`);
+  const envKeys = ['MMX_CONFIG_DIR', 'MINIMAX_REGION', 'MINIMAX_BASE_URL'] as const;
+  let savedEnv: Array<string | undefined>;
+
+  beforeEach(async () => {
+    savedEnv = envKeys.map(key => process.env[key]);
+    for (const key of envKeys) delete process.env[key];
+    process.env.MMX_CONFIG_DIR = testDir;
+    await writeConfigFile({
+      region: 'cn',
+      api_key: 'file-key',
+      oauth: {
+        access_token: 'oauth-token',
+        refresh_token: 'refresh-token',
+        expires_at: '2099-01-01T00:00:00Z',
+        region: 'cn',
+        resource_url: 'https://oauth-resource.example',
+      },
+    });
+  });
+
+  afterEach(() => {
+    envKeys.forEach((key, index) => {
+      if (savedEnv[index] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[index];
+    });
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it.each(['global', 'cn'])('uses the %s API host when an explicit key overrides OAuth', async region => {
+    const config = loadConfig({ ...baseFlags, apiKey: 'flag-key', region });
+    expect(await resolveCredential(config)).toMatchObject({ token: 'flag-key', method: 'api-key' });
+    expect(config.baseUrl).toBe(region === 'cn' ? 'https://api.minimax.cn' : 'https://api.minimax.io');
+  });
+
+  it('keeps the resource URL when OAuth wins over a stored API key', async () => {
+    const config = loadConfig(baseFlags);
+    expect(await resolveCredential(config)).toMatchObject({ token: 'oauth-token', method: 'oauth' });
+    expect(config.baseUrl).toBe('https://oauth-resource.example');
+  });
+
+  it('preserves an explicit base URL with an explicit key', () => {
+    const config = loadConfig({ ...baseFlags, apiKey: 'flag-key', baseUrl: 'https://custom.example' });
+    expect(config.baseUrl).toBe('https://custom.example');
   });
 });
 

@@ -49,7 +49,7 @@ export async function poll<T>(config: Config, opts: PollOptions): Promise<T> {
         );
       }
 
-      await new Promise(r => setTimeout(r, opts.intervalSec * 1000));
+      await new Promise(r => setTimeout(r, Math.min(opts.intervalSec * 1000, Math.max(0, deadline - Date.now()))));
     }
   } finally {
     spinner.stop();
