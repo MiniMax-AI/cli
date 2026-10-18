@@ -1,4 +1,5 @@
 import { readConfigFile, writeConfigFile } from '../config/loader';
+import { getConfigPath } from '../config/paths';
 import type { CredentialFile } from './types';
 
 /**
@@ -12,10 +13,10 @@ export async function loadCredentials(): Promise<CredentialFile | null> {
   return cfg.oauth ?? null;
 }
 
-export async function saveCredentials(creds: CredentialFile): Promise<void> {
-  const existing = readConfigFile() as Record<string, unknown>;
+export async function saveCredentials(creds: CredentialFile, path = getConfigPath()): Promise<void> {
+  const existing = readConfigFile(path) as Record<string, unknown>;
   existing.oauth = creds;
-  await writeConfigFile(existing);
+  await writeConfigFile(existing, undefined, path);
 }
 
 export async function clearCredentials(): Promise<void> {

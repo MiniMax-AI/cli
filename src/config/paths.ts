@@ -12,8 +12,7 @@ export function getConfigPath(): string {
   return join(getConfigDir(), 'config.json');
 }
 
-export async function ensureConfigDir(): Promise<void> {
-  const dir = getConfigDir();
+export async function ensureConfigDir(dir = getConfigDir()): Promise<void> {
   const fs = await import('fs/promises');
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
 }

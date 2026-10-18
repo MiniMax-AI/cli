@@ -147,4 +147,20 @@ describe('poll', () => {
     expect(callCount).toBe(1);
     expect(result).toBeDefined();
   });
+
+  it('does not sleep for the full polling interval when the timeout is shorter', async () => {
+    setFetch(mock(() => Promise.resolve(jsonRes({ status: 'Processing' }))));
+    const { poll } = await import('../../src/polling/poll');
+    const started = performance.now();
+
+    await expect(poll(baseConfig, {
+      url: 'https://api.mmx.io/poll',
+      intervalSec: 1.5,
+      timeoutSec: 0.05,
+      isComplete: () => false,
+      isFailed: () => false,
+    })).rejects.toThrow('Polling timed out');
+
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
 });
