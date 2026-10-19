@@ -364,7 +364,7 @@ describe('agent setup command', () => {
     expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash');
   });
 
-  it('uses MiniMax-M3 by default for pay-as-you-go keys', async () => {
+  it('uses MiniMax-M3.1-Flash by default for pay-as-you-go keys', async () => {
     const output = await captureConsoleLog(() => setupCommand.execute(
       testConfig(),
       testFlags({
@@ -373,7 +373,7 @@ describe('agent setup command', () => {
         region: 'cn',
       }),
     ));
-    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3');
+    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash');
   });
 
   it('keeps an explicit model choice for pay-as-you-go keys', async () => {
@@ -383,10 +383,10 @@ describe('agent setup command', () => {
         agent: ['codex'],
         apiKey: 'sk-api-test-secret',
         region: 'cn',
-        model: 'MiniMax-M3.1-Flash',
+        model: 'MiniMax-M3',
       }),
     ));
-    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash');
+    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3');
   });
 
   it('rejects a legacy model outside this setup contract', async () => {
