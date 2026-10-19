@@ -198,7 +198,7 @@ describe('agent setup command', () => {
       testFlags({ agent: ['codex'], region: 'cn', output: 'json' }),
     ));
 
-    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash-Preview');
+    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash');
     expect(output).not.toContain('sk-cp-existing-key');
   });
 
@@ -352,7 +352,7 @@ describe('agent setup command', () => {
     expect(JSON.parse(output).verification.model).toBe('MiniMax-M3');
   });
 
-  it('uses MiniMax-M3.1-Flash-Preview when no model is specified', async () => {
+  it('uses MiniMax-M3.1-Flash when no model is specified', async () => {
     const output = await captureConsoleLog(() => setupCommand.execute(
       testConfig(),
       testFlags({
@@ -361,7 +361,7 @@ describe('agent setup command', () => {
         region: 'cn',
       }),
     ));
-    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash-Preview');
+    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash');
   });
 
   it('uses MiniMax-M3 by default for pay-as-you-go keys', async () => {
@@ -383,10 +383,10 @@ describe('agent setup command', () => {
         agent: ['codex'],
         apiKey: 'sk-api-test-secret',
         region: 'cn',
-        model: 'MiniMax-M3.1-Flash-Preview',
+        model: 'MiniMax-M3.1-Flash',
       }),
     ));
-    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash-Preview');
+    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3.1-Flash');
   });
 
   it('rejects a legacy model outside this setup contract', async () => {
@@ -422,7 +422,7 @@ describe('agent setup command', () => {
       const result = JSON.parse(output);
       expect(result.agents.filter((agent: string) => agent === 'oh-my-pi')).toHaveLength(1);
       expect(result.files.filter((file: { agent: string }) => file.agent === 'oh-my-pi')).toHaveLength(2);
-      expect(result.verification.model).toBe('MiniMax-M3.1-Flash-Preview');
+      expect(result.verification.model).toBe('MiniMax-M3.1-Flash');
       expect(output).not.toContain('sk-cp-test-secret');
     }
   });
