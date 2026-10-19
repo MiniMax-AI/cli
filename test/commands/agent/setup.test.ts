@@ -346,10 +346,10 @@ describe('agent setup command', () => {
         agent: ['codex'],
         apiKey: 'sk-test-secret',
         region: 'cn',
-        model: 'MiniMax-M2.7',
+        model: 'MiniMax-M3',
       }),
     ));
-    expect(JSON.parse(output).verification.model).toBe('MiniMax-M2.7');
+    expect(JSON.parse(output).verification.model).toBe('MiniMax-M3');
   });
 
   it('uses MiniMax-M3.1-Flash-Preview when no model is specified', async () => {
@@ -396,9 +396,9 @@ describe('agent setup command', () => {
         agent: ['codex'],
         apiKey: 'sk-test-secret',
         region: 'cn',
-        model: 'MiniMax-M2.5',
+        model: 'MiniMax-M2.7',
       }),
-    )).rejects.toThrow('Unsupported MiniMax model "MiniMax-M2.5"');
+    )).rejects.toThrow('Unsupported MiniMax model "MiniMax-M2.7"');
   });
 
   it('accepts grok-build as an alias', async () => {

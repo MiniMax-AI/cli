@@ -43,26 +43,6 @@ export const MINIMAX_MODELS = [
       ],
     },
   },
-  {
-    id: 'MiniMax-M2.7',
-    contextWindow: 204800,
-    maxTokens: 131072,
-    input: ['text'],
-    codex: {
-      defaultReasoningLevel: 'high',
-      supportedReasoningLevels: [{ effort: 'high', description: 'Always on' }],
-    },
-  },
-  {
-    id: 'MiniMax-M2.7-highspeed',
-    contextWindow: 204800,
-    maxTokens: 131072,
-    input: ['text'],
-    codex: {
-      defaultReasoningLevel: 'high',
-      supportedReasoningLevels: [{ effort: 'high', description: 'Always on' }],
-    },
-  },
 ] as const;
 
 export const DEFAULT_MINIMAX_MODEL = MINIMAX_MODELS[0].id;

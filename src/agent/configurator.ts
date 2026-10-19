@@ -449,10 +449,7 @@ function updateHermesYaml(
         `Hermes model override for ${candidate.id} must be an object.`,
       );
     }
-    const hermesContextWindow = candidate.id === 'MiniMax-M3.1-Flash-Preview'
-      || candidate.id === 'MiniMax-M3'
-      ? 1_000_000
-      : candidate.contextWindow;
+    const hermesContextWindow = 1_000_000;
     document.setIn(
       ['model_overrides', provider, candidate.id, 'context_window'],
       hermesContextWindow,
@@ -534,14 +531,10 @@ function prepareClaude(options: AgentSetupOptions, path: string): PreparedAgentF
   const pickerOptions = MINIMAX_MODELS.map(candidate => ({
     model: claudeModelId(candidate.id),
     label: candidate.id,
-    description: candidate.id.endsWith('-highspeed')
-      ? '204.8K context · faster inference'
-      : candidate.id === 'MiniMax-M3.1-Flash-Preview' || candidate.id === 'MiniMax-M3'
-        ? candidate.id === options.model
-          ? `1M supported · ${candidate.id === 'MiniMax-M3.1-Flash-Preview'
-            && (options.m31ContextWindow ?? 524288) !== 1_000_000 ? '512K' : '1M'} compact`
-          : '1M supported'
-        : '204.8K context',
+    description: candidate.id === options.model
+      ? `1M supported · ${candidate.id === 'MiniMax-M3.1-Flash-Preview'
+        && (options.m31ContextWindow ?? 524288) !== 1_000_000 ? '512K' : '1M'} compact`
+      : '1M supported',
   }));
   const managedPickerModels = new Set(MINIMAX_MODELS.flatMap(candidate => [
     candidate.id,
