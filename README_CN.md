@@ -65,11 +65,11 @@ mmx quota
 
 ### `mmx text`
 
-`text chat` 和 `text repl` 默认使用 `MiniMax-M3.1-Flash-Preview`；显式指定的 `--model` 或已保存的 `default-text-model` 优先。该预览模型目前仅通过 M Plan 和 MiniMax Code 提供；使用按量付费 Key 时，请显式选择 `MiniMax-M3`。详见[模型调用文档](https://platform.minimax.cn/docs/guides/text-generation#agent)。
+`text chat` 和 `text repl` 默认使用 `MiniMax-M3.1-Flash`；显式指定的 `--model` 或已保存的 `default-text-model` 优先。该模型目前仅通过 M Plan 和 MiniMax Code 提供；使用按量付费 Key 时，请显式选择 `MiniMax-M3`。详见[模型调用文档](https://platform.minimax.cn/docs/guides/text-generation#agent)。
 
 ```bash
 mmx text chat --message "写一首诗"
-mmx text chat --model MiniMax-M3.1-Flash-Preview --message "你好" --stream
+mmx text chat --model MiniMax-M3.1-Flash --message "你好" --stream
 mmx text chat --system "你是编程助手" --message "用 Go 写 Fizzbuzz"
 mmx text chat --message "user:你好" --message "assistant:嗨！" --message "你叫什么名字？"
 cat messages.json | mmx text chat --messages-file - --output json
@@ -172,7 +172,7 @@ Global 与中国两个 region，选用能通过的那个。
 mmx quota
 mmx config show
 mmx config set --key region --value cn
-mmx config set --key default-text-model --value MiniMax-M3.1-Flash-Preview
+mmx config set --key default-text-model --value MiniMax-M3.1-Flash
 mmx config export-schema | jq .
 ```
 
@@ -188,7 +188,7 @@ mmx agent setup --agent oh-my-pi --api-key "$MINIMAX_API_KEY" --region cn
 # --agent omp 是 --agent oh-my-pi 的别名
 ```
 
-`agent setup` 对订阅 Key 默认使用 `MiniMax-M3.1-Flash-Preview`，对按量付费 Key（`sk-api-...`）默认使用 `MiniMax-M3`。非交互模式下可用 `--model` 覆盖该选择。
+`agent setup` 对订阅 Key 默认使用 `MiniMax-M3.1-Flash`，对按量付费 Key（`sk-api-...`）默认使用 `MiniMax-M3`。非交互模式下可用 `--model` 覆盖该选择。
 
 写入前会验证 Key 和所选区域；修改已有文件时会创建备份。可用 `--dry-run` 预览且不会发起联网请求。在交互式向导中，兼容且未在 `PATH` 中检测到的 Agent 会出现在第二个安装多选列表，并通过官方软件包或安装脚本安装。Hermes 仅执行官方核心 CLI 安装阶段，跳过可选系统软件包、Node 工作区、浏览器、计算机控制、初始化和网关阶段。安装完成后，mmx 会保留安装器生成的其他设置并写入 MiniMax 配置。平台或依赖检查不通过的 Agent 会说明原因并保持仅配置。非交互调用仍只写配置，且该命令不会启动 Agent。
 

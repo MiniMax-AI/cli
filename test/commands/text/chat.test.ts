@@ -96,7 +96,7 @@ describe('text chat command', () => {
       });
 
       const parsed = JSON.parse(output);
-      expect(parsed.request.model).toBe('MiniMax-M3.1-Flash-Preview');
+      expect(parsed.request.model).toBe('MiniMax-M3.1-Flash');
       expect(parsed.request.messages).toHaveLength(1);
     } finally {
       console.log = originalLog;

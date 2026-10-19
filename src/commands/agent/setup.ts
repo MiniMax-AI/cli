@@ -321,7 +321,7 @@ async function interactiveOptions(
   let m31ContextWindow: 524288 | 1_000_000 = 524288;
   if (agents.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode')) {
     const selectedWindow = await promptSelect({
-      message: 'Choose the MiniMax-M3.1-Flash-Preview context window',
+      message: 'Choose the MiniMax-M3.1-Flash context window',
       choices: [
         { value: '512k', label: '512K (Recommended)' },
         { value: '1m', label: '1M' },
@@ -378,7 +378,7 @@ async function interactiveOptions(
   if (model === 'MiniMax-M3') {
     await promptNote({
       title: 'Model for pay-as-you-go key',
-      message: 'MiniMax-M3.1-Flash-Preview currently requires Token Plan or MiniMax Code. '
+      message: 'MiniMax-M3.1-Flash currently requires Token Plan or MiniMax Code. '
         + 'This setup will use MiniMax-M3.'
         + (agents.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode')
           ? ' The earlier window choice applies to the M3.1 model entry, not the active M3 model.'
@@ -506,7 +506,7 @@ export default defineCommand({
     },
     {
       flag: '--m31-context-window <size>',
-      description: 'MiniMax-M3.1-Flash-Preview window for Claude Code, Codex, and OpenCode: 512k (recommended) or 1m',
+      description: 'MiniMax-M3.1-Flash window for Claude Code, Codex, and OpenCode: 512k (recommended) or 1m',
     },
   ],
   examples: [

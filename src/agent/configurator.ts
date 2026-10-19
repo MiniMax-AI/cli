@@ -48,7 +48,7 @@ function minimaxModel(modelId: MiniMaxModelId) {
 }
 
 function claudeModelId(modelId: MiniMaxModelId): string {
-  return modelId === 'MiniMax-M3.1-Flash-Preview' || modelId === 'MiniMax-M3'
+  return modelId === 'MiniMax-M3.1-Flash' || modelId === 'MiniMax-M3'
     ? `${modelId}[1m]`
     : modelId;
 }
@@ -465,7 +465,7 @@ function updateHermesYaml(
   document.setIn(['model', 'base_url'], baseUrl);
   document.setIn(
     ['model', 'context_length'],
-    model === 'MiniMax-M3.1-Flash-Preview' || model === 'MiniMax-M3'
+    model === 'MiniMax-M3.1-Flash' || model === 'MiniMax-M3'
       ? 1_000_000
       : selectedModel.contextWindow,
   );
@@ -532,7 +532,7 @@ function prepareClaude(options: AgentSetupOptions, path: string): PreparedAgentF
     model: claudeModelId(candidate.id),
     label: candidate.id,
     description: candidate.id === options.model
-      ? `1M supported · ${candidate.id === 'MiniMax-M3.1-Flash-Preview'
+      ? `1M supported · ${candidate.id === 'MiniMax-M3.1-Flash'
         && (options.m31ContextWindow ?? 524288) !== 1_000_000 ? '512K' : '1M'} compact`
       : '1M supported',
   }));
@@ -563,7 +563,7 @@ function prepareClaude(options: AgentSetupOptions, path: string): PreparedAgentF
     API_TIMEOUT_MS: '3000000',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
     CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(
-      options.model === 'MiniMax-M3.1-Flash-Preview'
+      options.model === 'MiniMax-M3.1-Flash'
         ? options.m31ContextWindow ?? 524288
         : minimaxModel(options.model).contextWindow,
     ),
@@ -591,13 +591,13 @@ function codexModelCatalog(options: AgentSetupOptions): string {
   return `${JSON.stringify({
     _managed_by: CODEX_MODEL_CATALOG_OWNER,
     models: MINIMAX_MODELS.map((model, priority) => {
-      const contextWindow = model.id === 'MiniMax-M3.1-Flash-Preview'
+      const contextWindow = model.id === 'MiniMax-M3.1-Flash'
         ? options.m31ContextWindow ?? 524288 : model.contextWindow;
       return {
         slug: model.id,
         display_name: model.id,
-        description: model.id === 'MiniMax-M3.1-Flash-Preview'
-          ? 'MiniMax M3.1 Flash Preview'
+        description: model.id === 'MiniMax-M3.1-Flash'
+          ? 'MiniMax M3.1 Flash'
           : 'MiniMax',
         default_reasoning_level: model.codex.defaultReasoningLevel,
         supported_reasoning_levels: model.codex.supportedReasoningLevels,
@@ -770,7 +770,7 @@ function prepareOpenCode(options: AgentSetupOptions, path: string): PreparedAgen
         `OpenCode model definition for ${model.id} modalities must be an object.`,
       );
     }
-    if (model.id === 'MiniMax-M3.1-Flash-Preview') {
+    if (model.id === 'MiniMax-M3.1-Flash') {
       const variants = (configuredModel as Record<string, unknown> | undefined)?.variants;
       if (variants !== undefined) {
         assertObject(variants, `OpenCode model definition for ${model.id} variants must be an object.`);
@@ -798,7 +798,7 @@ function prepareOpenCode(options: AgentSetupOptions, path: string): PreparedAgen
       },
       {
         path: ['provider', 'minimax', 'models', model.id, 'limit', 'context'],
-        value: model.id === 'MiniMax-M3.1-Flash-Preview'
+        value: model.id === 'MiniMax-M3.1-Flash'
           ? options.m31ContextWindow ?? 524288 : model.contextWindow,
       },
       {
@@ -807,7 +807,7 @@ function prepareOpenCode(options: AgentSetupOptions, path: string): PreparedAgen
       },
     ];
   });
-  const m31Path = ['provider', 'minimax', 'models', 'MiniMax-M3.1-Flash-Preview'];
+  const m31Path = ['provider', 'minimax', 'models', 'MiniMax-M3.1-Flash'];
   const m31Updates = [
     { path: [...m31Path, 'interleaved'], value: { field: 'reasoning_content' } },
     { path: [...m31Path, 'variants', 'none', 'disabled'], value: true },
@@ -1013,7 +1013,7 @@ function prepareOhMyPi(options: AgentSetupOptions, paths: string[]): PreparedAge
           input: [...model.input],
           contextWindow: model.contextWindow,
           maxTokens: model.maxTokens,
-          ...(model.id === 'MiniMax-M3.1-Flash-Preview' ? {
+          ...(model.id === 'MiniMax-M3.1-Flash' ? {
             thinking: {
               mode: 'anthropic-adaptive',
               efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
@@ -1032,7 +1032,7 @@ function prepareOhMyPi(options: AgentSetupOptions, paths: string[]): PreparedAge
       }
     } else {
       if (root.modelRoles !== undefined) assertObject(root.modelRoles, `${label} modelRoles must be an object.`);
-      const effort = options.model === 'MiniMax-M3.1-Flash-Preview' ? ':max' : '';
+      const effort = options.model === 'MiniMax-M3.1-Flash' ? ':max' : '';
       document.setIn(['modelRoles', 'default'], `${providerId}/${options.model}${effort}`);
     }
     return { agent: 'oh-my-pi', path, ...existing, after: document.toString() };

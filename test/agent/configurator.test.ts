@@ -78,26 +78,26 @@ describe('agent configurator', () => {
   it('keeps the 1M Claude selector with a 512K auto-compact window for M3.1', () => {
     applyAgentConfigurations(prepareAgentConfigurations(setupOptions(
       ['claude-code'],
-      { model: 'MiniMax-M3.1-Flash-Preview' },
+      { model: 'MiniMax-M3.1-Flash' },
     )));
 
     const claude = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8'));
     expect(claude.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('524288');
     expect(claude.modelPicker.options.find((item: { label: string }) =>
-      item.label === 'MiniMax-M3.1-Flash-Preview').description).toBe('1M supported · 512K compact');
+      item.label === 'MiniMax-M3.1-Flash').description).toBe('1M supported · 512K compact');
     for (const key of [
       'ANTHROPIC_MODEL',
       'ANTHROPIC_DEFAULT_SONNET_MODEL',
       'ANTHROPIC_DEFAULT_OPUS_MODEL',
       'ANTHROPIC_DEFAULT_HAIKU_MODEL',
     ]) {
-      expect(claude.env[key]).toBe('MiniMax-M3.1-Flash-Preview[1m]');
+      expect(claude.env[key]).toBe('MiniMax-M3.1-Flash[1m]');
     }
   });
 
   it('applies the M3.1 window choice to Claude Code, Codex, and OpenCode', () => {
     const options = setupOptions(['claude-code', 'codex', 'opencode'], {
-      model: 'MiniMax-M3.1-Flash-Preview',
+      model: 'MiniMax-M3.1-Flash',
       m31ContextWindow: 1_000_000,
     });
     applyAgentConfigurations(prepareAgentConfigurations(options));
@@ -108,7 +108,7 @@ describe('agent configurator', () => {
       .replace(/^\s*\/\/.*$/gm, ''));
     expect(claude.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('1000000');
     expect(claude.modelPicker.options.find((item: { label: string }) =>
-      item.label === 'MiniMax-M3.1-Flash-Preview').description).toBe('1M supported · 1M compact');
+      item.label === 'MiniMax-M3.1-Flash').description).toBe('1M supported · 1M compact');
     expect(catalog.models[0]).toMatchObject({
       context_window: 1_000_000,
       max_context_window: 1_000_000,
@@ -118,7 +118,7 @@ describe('agent configurator', () => {
       context_window: 1_000_000,
       effective_context_window_percent: 85,
     });
-    expect(openCode.provider.minimax.models['MiniMax-M3.1-Flash-Preview'].limit.context)
+    expect(openCode.provider.minimax.models['MiniMax-M3.1-Flash'].limit.context)
       .toBe(1_000_000);
 
     applyAgentConfigurations(prepareAgentConfigurations({ ...options, m31ContextWindow: 524288 }));
@@ -128,14 +128,14 @@ describe('agent configurator', () => {
       .replace(/^\s*\/\/.*$/gm, ''));
     expect(claude.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('524288');
     expect(claude.modelPicker.options.find((item: { label: string }) =>
-      item.label === 'MiniMax-M3.1-Flash-Preview').description).toBe('1M supported · 512K compact');
+      item.label === 'MiniMax-M3.1-Flash').description).toBe('1M supported · 512K compact');
     expect(catalog.models[0]).toMatchObject({
       context_window: 524288,
       max_context_window: 524288,
       effective_context_window_percent: 95,
     });
     expect(catalog.models[1].context_window).toBe(1_000_000);
-    expect(openCode.provider.minimax.models['MiniMax-M3.1-Flash-Preview'].limit.context)
+    expect(openCode.provider.minimax.models['MiniMax-M3.1-Flash'].limit.context)
       .toBe(524288);
   });
 
@@ -159,8 +159,8 @@ describe('agent configurator', () => {
       options: [
         { model: 'keep-model', label: 'Keep' },
         {
-          model: 'MiniMax-M3.1-Flash-Preview[1m]',
-          label: 'MiniMax-M3.1-Flash-Preview',
+          model: 'MiniMax-M3.1-Flash[1m]',
+          label: 'MiniMax-M3.1-Flash',
           description: '1M supported',
         },
         { model: 'MiniMax-M3[1m]', label: 'MiniMax-M3', description: '1M supported · 1M compact' },
@@ -184,8 +184,8 @@ describe('agent configurator', () => {
     expect(codexCatalog._managed_by).toBe('mmx agent setup');
     expect(codexCatalog.models).toHaveLength(2);
     expect(codexCatalog.models[0]).toMatchObject({
-      slug: 'MiniMax-M3.1-Flash-Preview',
-      description: 'MiniMax M3.1 Flash Preview',
+      slug: 'MiniMax-M3.1-Flash',
+      description: 'MiniMax M3.1 Flash',
       priority: 0,
       default_reasoning_level: 'max',
       supported_reasoning_levels: [
@@ -236,7 +236,7 @@ describe('agent configurator', () => {
     writeFileSync(join(m31Home, '.codex', 'config.toml'), 'model_reasoning_effort = "medium"\n');
     const m31Options = setupOptions(['codex'], {
       homeDir: m31Home,
-      model: 'MiniMax-M3.1-Flash-Preview',
+      model: 'MiniMax-M3.1-Flash',
     });
     applyAgentConfigurations(prepareAgentConfigurations(m31Options));
     const m31Config = parseToml(readFileSync(join(m31Home, '.codex', 'config.toml'), 'utf8'));
@@ -264,7 +264,7 @@ describe('agent configurator', () => {
       .toEqual({ input: ['text', 'image'], output: ['text'] });
     expect(openCode.provider.minimax.models['MiniMax-M3'].limit)
       .toEqual({ context: 1_000_000, output: 128000 });
-    const m31OpenCode = openCode.provider.minimax.models['MiniMax-M3.1-Flash-Preview'];
+    const m31OpenCode = openCode.provider.minimax.models['MiniMax-M3.1-Flash'];
     expect(m31OpenCode.reasoning).toBe(true);
     expect(m31OpenCode.temperature).toBe(true);
     expect(m31OpenCode.interleaved).toEqual({ field: 'reasoning_content' });
@@ -275,7 +275,7 @@ describe('agent configurator', () => {
       expect(m31OpenCode.variants[effort].reasoningEffort).toBe(effort);
     }
     expect(Object.keys(openCode.provider.minimax.models).sort())
-      .toEqual(['MiniMax-M3', 'MiniMax-M3.1-Flash-Preview', 'keep-model']);
+      .toEqual(['MiniMax-M3', 'MiniMax-M3.1-Flash', 'keep-model']);
 
     const hermes = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
     expect(hermes.model.provider).toBe('minimax-cn');
@@ -284,12 +284,12 @@ describe('agent configurator', () => {
     expect(hermes.agent.reasoning_overrides['MiniMax-M3']).toBe('none');
     expect(Object.keys(hermes.model_overrides['minimax-cn']))
       .toEqual([
-        'MiniMax-M3.1-Flash-Preview',
+        'MiniMax-M3.1-Flash',
         'MiniMax-M3',
       ]);
     expect(hermes.model_overrides['minimax-cn']['MiniMax-M3'].context_window)
       .toBe(1_000_000);
-    expect(hermes.model_overrides['minimax-cn']['MiniMax-M3.1-Flash-Preview'].context_window)
+    expect(hermes.model_overrides['minimax-cn']['MiniMax-M3.1-Flash'].context_window)
       .toBe(1_000_000);
     expect(hermes.model_overrides['minimax-cn']['MiniMax-M3'].supports_vision)
       .toBe(true);
@@ -318,7 +318,7 @@ describe('agent configurator', () => {
       .toEqual([
         'keep-model',
         'MiniMax-M3',
-        'MiniMax-M3.1-Flash-Preview',
+        'MiniMax-M3.1-Flash',
       ]);
     expect(piSettings).toMatchObject({ defaultProvider: 'minimax-cn', defaultModel: 'MiniMax-M3' });
 
@@ -344,7 +344,7 @@ describe('agent configurator', () => {
   it('uses 1M for Hermes M3.1 and M3', () => {
     applyAgentConfigurations(prepareAgentConfigurations(setupOptions(
       ['hermes'],
-      { model: 'MiniMax-M3.1-Flash-Preview' },
+      { model: 'MiniMax-M3.1-Flash' },
     )));
     let configured = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
     expect(configured.model.context_length).toBe(1_000_000);
@@ -404,7 +404,7 @@ describe('agent configurator', () => {
 
     applyAgentConfigurations(prepareAgentConfigurations(setupOptions(
       ['codex'],
-      { model: 'MiniMax-M3.1-Flash-Preview', m31ContextWindow: 524288 },
+      { model: 'MiniMax-M3.1-Flash', m31ContextWindow: 524288 },
     )));
 
     const configText = readFileSync(join(home, '.codex', 'config.toml'), 'utf8');
@@ -507,7 +507,7 @@ describe('agent configurator', () => {
     const configured = JSON.parse(readFileSync(modelsPath, 'utf8'));
     expect(configured.providers.minimax.models.map((model: { id: string }) => model.id))
       .toEqual([
-        'MiniMax-M3.1-Flash-Preview',
+        'MiniMax-M3.1-Flash',
         'MiniMax-M3',
       ]);
     expect(configured.providers.minimax.models[0]).toMatchObject({

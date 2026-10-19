@@ -21,7 +21,7 @@ describe('MiniMaxSDK.text', () => {
             type: 'message',
             role: 'assistant',
             content: [{ type: 'text', text: 'Hello!' }],
-            model: 'MiniMax-M3.1-Flash-Preview',
+            model: 'MiniMax-M3.1-Flash',
             stop_reason: 'end_turn',
             usage: { input_tokens: 10, output_tokens: 5 },
           });
@@ -40,7 +40,7 @@ describe('MiniMaxSDK.text', () => {
 
     expect(result.id).toBe('msg-123');
     expect(requestBody).toMatchObject({
-      model: 'MiniMax-M3.1-Flash-Preview',
+      model: 'MiniMax-M3.1-Flash',
       max_tokens: 4096,
     });
   });

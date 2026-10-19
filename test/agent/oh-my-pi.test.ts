@@ -15,7 +15,7 @@ describe('Oh my Pi configuration', () => {
     homeDir = mkdtempSync(join(tmpdir(), 'mmx-omp-'));
     options = {
       agents: ['oh-my-pi'], homeDir, env: {}, region: 'global',
-      apiKey: 'sk-cp-test-only', model: 'MiniMax-M3.1-Flash-Preview',
+      apiKey: 'sk-cp-test-only', model: 'MiniMax-M3.1-Flash',
     };
   });
 
@@ -27,7 +27,7 @@ describe('Oh my Pi configuration', () => {
     writeFileSync(join(dir, 'models.yaml'), '# keep models comment\nproviders:\n  custom:\n    apiKey: KEEP\n'
       + '  minimax:\n    headers: {x-keep: yes}\n    models:\n'
       + '      - id: keep-model\n        name: Keep\n'
-      + '      - id: MiniMax-M3.1-Flash-Preview\n        cost: {input: 1, output: 2, cacheRead: 0, cacheWrite: 0}\n');
+      + '      - id: MiniMax-M3.1-Flash\n        cost: {input: 1, output: 2, cacheRead: 0, cacheWrite: 0}\n');
     writeFileSync(join(dir, 'config.yaml'), '# keep config comment\ntheme: {dark: titanium}\n'
       + 'modelRoles:\n  smol: custom/keep-model\n  default: old/model\n');
     for (const region of ['global', 'cn'] as const) {

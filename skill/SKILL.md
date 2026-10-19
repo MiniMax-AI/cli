@@ -46,7 +46,7 @@ Always use these flags in non-interactive (agent/CI) contexts:
 
 ### text chat
 
-Chat completion. Default model: `MiniMax-M3.1-Flash-Preview`. An explicit `--model` or saved `default-text-model` takes precedence. This preview currently requires M Plan or MiniMax Code; with a pay-as-you-go key, use `--model MiniMax-M3`. Thinking is enabled by default with `max` effort. See the [model guide](https://platform.minimax.io/docs/guides/text-generation#agent).
+Chat completion. Default model: `MiniMax-M3.1-Flash`. An explicit `--model` or saved `default-text-model` takes precedence. This model currently requires M Plan or MiniMax Code; with a pay-as-you-go key, use `--model MiniMax-M3`. Thinking is enabled by default with `max` effort. See the [model guide](https://platform.minimax.io/docs/guides/text-generation#agent).
 
 ```bash
 mmx text chat --message <text> [flags]
@@ -57,7 +57,7 @@ mmx text chat --message <text> [flags]
 | `--message <text>` | string, **required**, repeatable | Message text. Prefix with `role:` to set role (e.g. `"system:You are helpful"`, `"user:Hello"`) |
 | `--messages-file <path>` | string | JSON file with messages array. Use `-` for stdin |
 | `--system <text>` | string | System prompt |
-| `--model <model>` | string | Model ID (default: `MiniMax-M3.1-Flash-Preview`) |
+| `--model <model>` | string | Model ID (default: `MiniMax-M3.1-Flash`) |
 | `--max-tokens <n>` | number | Max tokens (default: 4096) |
 | `--temperature <n>` | number | Sampling temperature (0.0, 1.0] |
 | `--top-p <n>` | number | Nucleus sampling threshold |
@@ -381,7 +381,7 @@ Set per-modality defaults so you don't need `--model` every time:
 
 ```bash
 # Set defaults
-mmx config set --key default-text-model --value MiniMax-M3.1-Flash-Preview
+mmx config set --key default-text-model --value MiniMax-M3.1-Flash
 mmx config set --key default-speech-model --value speech-2.8-hd
 mmx config set --key default-video-model --value MiniMax-Hailuo-2.3
 
@@ -391,7 +391,7 @@ mmx speech synthesize --text "Hello" --out hello.mp3
 mmx video generate --prompt "Ocean waves"
 
 # --model still overrides per-call
-mmx text chat --model MiniMax-M3.1-Flash-Preview --message "Hello"
+mmx text chat --model MiniMax-M3.1-Flash --message "Hello"
 ```
 
 **Resolution priority**: `--model` flag > config default > hardcoded fallback.
