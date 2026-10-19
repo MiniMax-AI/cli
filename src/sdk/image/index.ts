@@ -116,8 +116,10 @@ export class ImageSDK extends Client {
 
     return toMerged({
       model: "image-01",
-      aspect_ratio: (width !== undefined && height !== undefined) ? undefined : aspect_ratio,
       n: 1,
-    }, params) as ImageRequest;
+    }, {
+      ...params,
+      aspect_ratio: (width !== undefined && height !== undefined) ? undefined : aspect_ratio,
+    }) as ImageRequest;
   }
 }

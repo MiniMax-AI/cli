@@ -38,6 +38,32 @@ describe('MiniMaxSDK.image', () => {
     server?.close();
   });
 
+  it.each([
+    { width: 1920, height: 1080, aspect_ratio: '1:1' },
+    { width: 1024, height: 1024 },
+    { aspect_ratio: '16:9' },
+  ])('should preserve image sizing precedence for %j', async (sizing) => {
+    let body: Record<string, unknown> = {};
+    server = createMockServer({
+      routes: {
+        '/v1/image_generation': async (req) => {
+          body = await req.json() as Record<string, unknown>;
+          return jsonResponse(makeBase64Response(['aW1hZ2U=']));
+        },
+      },
+    });
+    const sdk = new MiniMaxSDK({ apiKey: 'test-key', region: 'global', baseUrl: server.url });
+    const request = { prompt: 'A landscape', seed: 42, n: 2, ...sizing };
+
+    await sdk.image.generate(request);
+
+    expect(body.width).toBe(sizing.width);
+    expect(body.height).toBe(sizing.height);
+    expect(body.aspect_ratio).toBe(sizing.width !== undefined ? undefined : sizing.aspect_ratio);
+    expect(body).toMatchObject({ model: 'image-01', prompt: 'A landscape', seed: 42, n: 2 });
+    expect(request).toEqual({ prompt: 'A landscape', seed: 42, n: 2, ...sizing });
+  });
+
   it('should generate image successfully', async () => {
     server = createMockServer({
       routes: {
