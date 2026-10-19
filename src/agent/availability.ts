@@ -11,6 +11,7 @@ const AGENT_EXECUTABLES: Record<AgentId, readonly string[]> = {
   hermes: ['hermes'],
   pi: ['pi'],
   'oh-my-pi': ['omp'],
+  zed: ['zed', 'zeditor'],
 };
 
 const AGENT_RUNTIME_MARKERS: Partial<Record<AgentId, readonly [string, string]>> = {

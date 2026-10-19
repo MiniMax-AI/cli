@@ -142,7 +142,7 @@ describe('agent setup command', () => {
     await expect(setupCommand.execute(
       testConfig(),
       testFlags({ agent: ['hermes'], apiKey: 'sk-test-secret', region: 'cn', m31ContextWindow: '1m' }),
-    )).rejects.toThrow('--m31-context-window requires Claude Code, Codex, or OpenCode');
+    )).rejects.toThrow('--m31-context-window requires Claude Code, Codex, OpenCode, or Zed');
   });
 
   it('requires an explicit region for scripts', async () => {

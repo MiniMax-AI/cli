@@ -9,6 +9,7 @@ export const AGENT_IDS = [
   'hermes',
   'pi',
   'oh-my-pi',
+  'zed',
 ] as const;
 
 export type AgentId = typeof AGENT_IDS[number];

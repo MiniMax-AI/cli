@@ -5,7 +5,7 @@ import { ExitCode } from '../errors/codes';
 import type { AgentId } from './types';
 
 type NpmAgentId = Extract<AgentId, 'codex' | 'opencode' | 'pi'>;
-type ScriptAgentId = Exclude<AgentId, NpmAgentId>;
+type ScriptAgentId = Exclude<AgentId, NpmAgentId | 'zed'>;
 
 const NPM_PACKAGES: Record<NpmAgentId, string> = {
   codex: '@openai/codex',
@@ -126,6 +126,7 @@ export function getAgentInstallIssue(
   const commandExists = environment.commandExists
     ?? ((executable: string) => defaultCommandExists(executable, platform));
 
+  if (agent === 'zed') return 'Install Zed from https://zed.dev/download.';
   if (!SUPPORTED_PLATFORMS.has(platform)) {
     return `Automated installation is not supported on ${platform}.`;
   }
@@ -224,6 +225,9 @@ export function getAgentInstallCommand(
   if (agent === 'claude-code' || agent === 'grok' || agent === 'hermes' || agent === 'oh-my-pi') {
     return getScriptInstallCommand(agent, platform);
   }
+  if (agent === 'zed') {
+    throw new CLIError('Install Zed from https://zed.dev/download.', ExitCode.USAGE);
+  }
 
   const args = [
     'install',
@@ -294,6 +298,9 @@ export function getAgentVerificationCommand(
     };
   }
 
+  if (agent === 'zed') {
+    return { executable: 'zed', args: ['--version'], display: 'zed --version' };
+  }
   const display = `${AGENT_EXECUTABLES[agent]} --version`;
   if (platform === 'win32') {
     return {

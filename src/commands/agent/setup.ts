@@ -55,6 +55,7 @@ const AGENT_ALIASES: Record<string, AgentId> = {
   pi: 'pi',
   'oh-my-pi': 'oh-my-pi',
   omp: 'oh-my-pi',
+  zed: 'zed',
 };
 
 const AGENT_LABELS: Record<AgentId, string> = {
@@ -65,7 +66,11 @@ const AGENT_LABELS: Record<AgentId, string> = {
   hermes: 'Hermes Agent',
   pi: 'Pi',
   'oh-my-pi': 'Oh my Pi (omp)',
+  zed: 'Zed',
 };
+// Zed keeps provider keys in the OS keychain or the MINIMAX_API_KEY environment variable.
+const ZED_API_KEY_HINT = 'Zed: paste your MiniMax API key in Agent Panel > Settings > minimax, '
+  + 'or start Zed with MINIMAX_API_KEY set.\n';
 const DEFAULT_INTERACTIVE_AGENTS: AgentId[] = ['claude-code', 'codex'];
 
 interface SelectedAgentSetup extends AgentSetupOptions {
@@ -319,7 +324,7 @@ async function interactiveOptions(
   }
 
   let m31ContextWindow: 524288 | 1_000_000 = 524288;
-  if (agents.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode')) {
+  if (agents.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode' || agent === 'zed')) {
     const selectedWindow = await promptSelect({
       message: 'Choose the MiniMax-M3.1-Flash context window',
       choices: [
@@ -380,7 +385,7 @@ async function interactiveOptions(
       title: 'Model for pay-as-you-go key',
       message: 'MiniMax-M3.1-Flash currently requires Token Plan or MiniMax Code. '
         + 'This setup will use MiniMax-M3.'
-        + (agents.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode')
+        + (agents.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode' || agent === 'zed')
           ? ' The earlier window choice applies to the M3.1 model entry, not the active M3 model.'
           : ''),
     });
@@ -439,9 +444,9 @@ function nonInteractiveOptions(flags: GlobalFlags): SelectedAgentSetup {
     );
   }
   if (requestedWindow !== undefined
-    && !selected.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode')) {
+    && !selected.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode' || agent === 'zed')) {
     throw new CLIError(
-      '--m31-context-window requires Claude Code, Codex, or OpenCode.',
+      '--m31-context-window requires Claude Code, Codex, OpenCode, or Zed.',
       ExitCode.USAGE,
     );
   }
@@ -491,7 +496,7 @@ export default defineCommand({
   options: [
     {
       flag: '--agent <name>',
-      description: 'Agent: claude-code, codex, grok/grok-build, opencode, hermes, pi, oh-my-pi/omp (repeatable)',
+      description: 'Agent: claude-code, codex, grok/grok-build, opencode, hermes, pi, oh-my-pi/omp, zed (repeatable)',
       type: 'array',
     },
     {
@@ -567,6 +572,9 @@ export default defineCommand({
       agents: options.agents,
       files,
     }, format, interactive && !config.noColor));
+    if (options.agents.includes('zed') && !config.quiet) {
+      process.stderr.write(ZED_API_KEY_HINT);
+    }
     const notDetected = options.agents.filter((agent) => !detectedAgents.has(agent));
     if (!interactive && notDetected.length > 0 && !config.quiet) {
       process.stderr.write(
