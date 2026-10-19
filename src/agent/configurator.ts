@@ -794,7 +794,7 @@ function prepareOpenCode(options: AgentSetupOptions, path: string): PreparedAgen
     return [
       { path: ['provider', 'minimax', 'models', model.id, 'name'], value: model.id },
       { path: ['provider', 'minimax', 'models', model.id, 'reasoning'], value: true },
-      { path: ['provider', 'minimax', 'models', model.id, 'temperature'], value: true },
+      { path: ['provider', 'minimax', 'models', model.id, 'temperature'], value: false },
       {
         path: ['provider', 'minimax', 'models', model.id, 'attachment'],
         value: input.includes('image'),
@@ -911,8 +911,12 @@ function preparePi(options: AgentSetupOptions, paths: string[]): PreparedAgentFi
     name: model.id,
     reasoning: true,
     ...(model.id === 'MiniMax-M3'
-      ? { compat: { forceAdaptiveThinking: true } }
-      : { thinkingLevelMap: { off: null } }),
+      ? { compat: { forceAdaptiveThinking: true, supportsTemperature: false } }
+      : {
+        // Always thinks (no off level); effort low..max via output_config.effort; no temperature.
+        compat: { forceAdaptiveThinking: true, supportsTemperature: false },
+        thinkingLevelMap: { off: null, minimal: null, xhigh: 'xhigh', max: 'max' },
+      }),
     input: [...model.input],
     contextWindow: model.contextWindow,
     maxTokens: model.maxTokens,

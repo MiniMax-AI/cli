@@ -260,13 +260,14 @@ describe('agent configurator', () => {
     expect(openCode.provider.minimax.models['keep-model']).toEqual({ name: 'Keep' });
     expect(openCode.provider.minimax.models['MiniMax-M3'].custom).toBe(true);
     expect(openCode.provider.minimax.models['MiniMax-M3'].attachment).toBe(true);
+    expect(openCode.provider.minimax.models['MiniMax-M3'].temperature).toBe(false);
     expect(openCode.provider.minimax.models['MiniMax-M3'].modalities)
       .toEqual({ input: ['text', 'image'], output: ['text'] });
     expect(openCode.provider.minimax.models['MiniMax-M3'].limit)
       .toEqual({ context: 1_000_000, output: 128000 });
     const m31OpenCode = openCode.provider.minimax.models['MiniMax-M3.1-Flash'];
     expect(m31OpenCode.reasoning).toBe(true);
-    expect(m31OpenCode.temperature).toBe(true);
+    expect(m31OpenCode.temperature).toBe(false);
     expect(m31OpenCode.interleaved).toEqual({ field: 'reasoning_content' });
     expect(m31OpenCode.variants.default.reasoningEffort).toBe('max');
     expect(m31OpenCode.variants.none.disabled).toBe(true);
@@ -310,8 +311,11 @@ describe('agent configurator', () => {
     });
     expect(piModels.providers['minimax-cn'].models[1].thinkingLevelMap).toBeUndefined();
     expect(piModels.providers['minimax-cn'].models[1].compat)
-      .toEqual({ supportsStrictTools: true, forceAdaptiveThinking: true });
-    expect(piModels.providers['minimax-cn'].models[2].thinkingLevelMap).toEqual({ off: null });
+      .toEqual({ supportsStrictTools: true, forceAdaptiveThinking: true, supportsTemperature: false });
+    expect(piModels.providers['minimax-cn'].models[2].thinkingLevelMap)
+      .toEqual({ off: null, minimal: null, xhigh: 'xhigh', max: 'max' });
+    expect(piModels.providers['minimax-cn'].models[2].compat)
+      .toEqual({ forceAdaptiveThinking: true, supportsTemperature: false });
     expect(piModels.providers['minimax-cn'].api).toBe('anthropic-messages');
     expect(piModels.providers['minimax-cn'].baseUrl).toBe('https://api.minimax.cn/anthropic');
     expect(piModels.providers['minimax-cn'].models.map((model: { id: string }) => model.id))
