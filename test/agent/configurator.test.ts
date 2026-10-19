@@ -53,7 +53,7 @@ describe('agent configurator', () => {
       '{\n  "theme": "dark",\n  "modelPicker": {\n'
         + '    "options": [\n'
         + '      { "model": "keep-model", "label": "Keep" },\n'
-        + '      { "model": "MiniMax-M2.7", "label": "Old MiniMax" }\n'
+        + '      { "model": "MiniMax-M3", "label": "Old MiniMax" }\n'
         + '    ],\n    "replaceBuiltInOptions": false\n  }\n}\n',
     );
     writeFileSync(join(home, '.codex', 'config.toml'), '[mcp_servers.keep]\ncommand = "keep"\n');
@@ -92,23 +92,6 @@ describe('agent configurator', () => {
       'ANTHROPIC_DEFAULT_HAIKU_MODEL',
     ]) {
       expect(claude.env[key]).toBe('MiniMax-M3.1-Flash-Preview[1m]');
-    }
-  });
-
-  it('does not add the 1M suffix when Claude Code uses M2.7', () => {
-    applyAgentConfigurations(prepareAgentConfigurations(setupOptions(
-      ['claude-code'],
-      { model: 'MiniMax-M2.7' },
-    )));
-
-    const claude = JSON.parse(readFileSync(join(home, '.claude', 'settings.json'), 'utf8'));
-    for (const key of [
-      'ANTHROPIC_MODEL',
-      'ANTHROPIC_DEFAULT_SONNET_MODEL',
-      'ANTHROPIC_DEFAULT_OPUS_MODEL',
-      'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-    ]) {
-      expect(claude.env[key]).toBe('MiniMax-M2.7');
     }
   });
 
@@ -181,12 +164,6 @@ describe('agent configurator', () => {
           description: '1M supported',
         },
         { model: 'MiniMax-M3[1m]', label: 'MiniMax-M3', description: '1M supported · 1M compact' },
-        { model: 'MiniMax-M2.7', label: 'MiniMax-M2.7', description: '204.8K context' },
-        {
-          model: 'MiniMax-M2.7-highspeed',
-          label: 'MiniMax-M2.7-highspeed',
-          description: '204.8K context · faster inference',
-        },
       ],
       replaceBuiltInOptions: false,
     });
@@ -205,7 +182,7 @@ describe('agent configurator', () => {
       readFileSync(join(home, '.codex', 'mmx-model-catalog.json'), 'utf8'),
     );
     expect(codexCatalog._managed_by).toBe('mmx agent setup');
-    expect(codexCatalog.models).toHaveLength(4);
+    expect(codexCatalog.models).toHaveLength(2);
     expect(codexCatalog.models[0]).toMatchObject({
       slug: 'MiniMax-M3.1-Flash-Preview',
       description: 'MiniMax M3.1 Flash Preview',
@@ -251,17 +228,7 @@ describe('agent configurator', () => {
         { effort: 'high', description: 'Deep' },
       ],
     });
-    expect(codexCatalog.models[2]).toMatchObject({
-      slug: 'MiniMax-M2.7',
-      priority: 2,
-      context_window: 204800,
-      max_context_window: 204800,
-      input_modalities: ['text'],
-      supported_reasoning_levels: [{ effort: 'high', description: 'Always on' }],
-    });
-    expect(codexCatalog.models[3].slug).toBe('MiniMax-M2.7-highspeed');
-    expect(codexCatalog.models[3].supported_reasoning_levels)
-      .toEqual([{ effort: 'high', description: 'Always on' }]);
+    expect(codexCatalog.models).toHaveLength(2);
     expect(codexCatalog.models[1].apply_patch_tool_type).toBe('freeform');
 
     const m31Home = join(tmpdir(), `mmx-agent-config-m31-${process.pid}-${Date.now()}`);
@@ -282,10 +249,6 @@ describe('agent configurator', () => {
       .toBe('chat_completions');
     expect((grok.model as Record<string, Record<string, unknown>>).minimax.max_completion_tokens)
       .toBe(128000);
-    expect((grok.model as Record<string, Record<string, unknown>>)['minimax-m2-7'].model)
-      .toBe('MiniMax-M2.7');
-    expect((grok.model as Record<string, Record<string, unknown>>)['minimax-m2-7-highspeed'].model)
-      .toBe('MiniMax-M2.7-highspeed');
 
     const openCodeText = readFileSync(join(home, '.config', 'opencode', 'opencode.json'), 'utf8');
     const openCode = JSON.parse(openCodeText.replace(/^\s*\/\/.*$/gm, ''));
@@ -311,13 +274,8 @@ describe('agent configurator', () => {
     for (const effort of ['low', 'medium', 'high', 'xhigh', 'max']) {
       expect(m31OpenCode.variants[effort].reasoningEffort).toBe(effort);
     }
-    expect(openCode.provider.minimax.models['MiniMax-M2.7'].attachment).toBe(false);
-    expect(openCode.provider.minimax.models['MiniMax-M2.7'].modalities)
-      .toEqual({ input: ['text'], output: ['text'] });
-    expect(openCode.provider.minimax.models['MiniMax-M2.7'].limit)
-      .toEqual({ context: 204800, output: 131072 });
-    expect(openCode.provider.minimax.models['MiniMax-M2.7-highspeed'].limit)
-      .toEqual({ context: 204800, output: 131072 });
+    expect(Object.keys(openCode.provider.minimax.models).sort())
+      .toEqual(['MiniMax-M3', 'MiniMax-M3.1-Flash-Preview', 'keep-model']);
 
     const hermes = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
     expect(hermes.model.provider).toBe('minimax-cn');
@@ -328,19 +286,13 @@ describe('agent configurator', () => {
       .toEqual([
         'MiniMax-M3.1-Flash-Preview',
         'MiniMax-M3',
-        'MiniMax-M2.7',
-        'MiniMax-M2.7-highspeed',
       ]);
     expect(hermes.model_overrides['minimax-cn']['MiniMax-M3'].context_window)
       .toBe(1_000_000);
     expect(hermes.model_overrides['minimax-cn']['MiniMax-M3.1-Flash-Preview'].context_window)
       .toBe(1_000_000);
-    expect(hermes.model_overrides['minimax-cn']['MiniMax-M2.7'].context_window)
-      .toBe(204800);
     expect(hermes.model_overrides['minimax-cn']['MiniMax-M3'].supports_vision)
       .toBe(true);
-    expect(hermes.model_overrides['minimax-cn']['MiniMax-M2.7'].supports_vision)
-      .toBe(false);
     expect(readFileSync(join(home, '.hermes', '.env'), 'utf8'))
       .toContain('MINIMAX_CN_API_KEY=sk-test-secret');
 
@@ -360,8 +312,6 @@ describe('agent configurator', () => {
     expect(piModels.providers['minimax-cn'].models[1].compat)
       .toEqual({ supportsStrictTools: true, forceAdaptiveThinking: true });
     expect(piModels.providers['minimax-cn'].models[2].thinkingLevelMap).toEqual({ off: null });
-    expect(piModels.providers['minimax-cn'].models[3].thinkingLevelMap).toEqual({ off: null });
-    expect(piModels.providers['minimax-cn'].models[4].thinkingLevelMap).toEqual({ off: null });
     expect(piModels.providers['minimax-cn'].api).toBe('anthropic-messages');
     expect(piModels.providers['minimax-cn'].baseUrl).toBe('https://api.minimax.cn/anthropic');
     expect(piModels.providers['minimax-cn'].models.map((model: { id: string }) => model.id))
@@ -369,8 +319,6 @@ describe('agent configurator', () => {
         'keep-model',
         'MiniMax-M3',
         'MiniMax-M3.1-Flash-Preview',
-        'MiniMax-M2.7',
-        'MiniMax-M2.7-highspeed',
       ]);
     expect(piSettings).toMatchObject({ defaultProvider: 'minimax-cn', defaultModel: 'MiniMax-M3' });
 
@@ -393,7 +341,7 @@ describe('agent configurator', () => {
     expect(configured.model).toMatchObject({ default: 'MiniMax-M3', provider: 'minimax' });
   });
 
-  it('uses 1M for Hermes M3.1 while keeping M2.7 at 204800', () => {
+  it('uses 1M for Hermes M3.1 and M3', () => {
     applyAgentConfigurations(prepareAgentConfigurations(setupOptions(
       ['hermes'],
       { model: 'MiniMax-M3.1-Flash-Preview' },
@@ -403,10 +351,10 @@ describe('agent configurator', () => {
 
     applyAgentConfigurations(prepareAgentConfigurations(setupOptions(
       ['hermes'],
-      { model: 'MiniMax-M2.7' },
+      { model: 'MiniMax-M3' },
     )));
     configured = parseYaml(readFileSync(join(home, '.hermes', 'config.yaml'), 'utf8'));
-    expect(configured.model.context_length).toBe(204800);
+    expect(configured.model.context_length).toBe(1_000_000);
   });
 
   it('preserves existing Hermes reasoning overrides', () => {
@@ -561,8 +509,6 @@ describe('agent configurator', () => {
       .toEqual([
         'MiniMax-M3.1-Flash-Preview',
         'MiniMax-M3',
-        'MiniMax-M2.7',
-        'MiniMax-M2.7-highspeed',
       ]);
     expect(configured.providers.minimax.models[0]).toMatchObject({
       input: ['text', 'image'],
@@ -808,7 +754,7 @@ describe('agent configurator', () => {
       '{\n  "modelPicker": {\n    "options": [\n'
         + '      // keep this custom model\n'
         + '      { "model": "keep-model", "label": "Keep" },\n'
-        + '      { "model": "MiniMax-M2.7", "label": "Replace" }\n'
+        + '      { "model": "MiniMax-M3", "label": "Replace" }\n'
         + '    ]\n  }\n}\n',
     );
 
