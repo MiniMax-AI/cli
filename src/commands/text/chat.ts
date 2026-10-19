@@ -316,7 +316,7 @@ export default defineCommand({
 
       const text = extractText(response.content);
 
-      if (config.quiet || format === 'text') {
+      if (format === 'text') {
         console.log(text);
       } else {
         console.log(formatOutput(response, format));
