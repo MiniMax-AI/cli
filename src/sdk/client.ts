@@ -2,6 +2,7 @@ import { loadConfig } from "../config/loader";
 import { Config } from "../config/schema";
 import { request as requestClient, requestJson as requestJsonClient, RequestOpts } from "../client/http";
 import { parseSSE } from "../client/stream";
+import { mapApiError, type ApiErrorBody } from "../errors/api";
 import { SDKError } from "../errors/base";
 import { ExitCode } from "../errors/codes";
 import { MiniMaxSDKOptions } from "./types";
@@ -38,14 +39,20 @@ export class Client {
     for await (const event of parseSSE(res)) {
       if (event.data === '[DONE]') break;
       if (!event.data) continue;
+      let chunk: T & ApiErrorBody;
       try {
-        yield JSON.parse(event.data) as T;
+        chunk = JSON.parse(event.data) as T & ApiErrorBody;
       } catch (err) {
         throw new SDKError(
           `Failed to parse stream chunk: ${err instanceof Error ? err.message : String(err)}`,
           ExitCode.GENERAL,
         );
       }
+      const statusCode = chunk?.base_resp?.status_code;
+      if ((statusCode !== undefined && statusCode !== 0) || chunk?.error) {
+        throw mapApiError(res.status, chunk, res.url || undefined);
+      }
+      yield chunk as T;
     }
   }
 }
