@@ -1019,6 +1019,7 @@ function prepareOhMyPi(options: AgentSetupOptions, paths: string[]): PreparedAge
               efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
               defaultLevel: 'max',
               requiresEffort: true,
+              effortMap: { low: 'low', medium: 'medium', high: 'high' },
             },
           } : {}),
         };

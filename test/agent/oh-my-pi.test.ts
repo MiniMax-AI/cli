@@ -50,6 +50,7 @@ describe('Oh my Pi configuration', () => {
         thinking: {
           mode: 'anthropic-adaptive', efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
           defaultLevel: 'max', requiresEffort: true,
+          effortMap: { low: 'low', medium: 'medium', high: 'high' },
         },
       });
       expect(modelsText).toContain('# keep models comment');
