@@ -70,7 +70,7 @@ derives the npm package version from that tag. See [the release guide](docs/rele
 
 ### `mmx text`
 
-`text chat` and `text repl` default to `MiniMax-M3.1-Flash`. An explicit `--model` or saved `default-text-model` takes precedence. This model currently requires M Plan or MiniMax Code; with a pay-as-you-go key, select `MiniMax-M3` explicitly. See the [model guide](https://platform.minimax.io/docs/guides/text-generation#agent).
+`text chat` and `text repl` default to `MiniMax-M3.1-Flash`. An explicit `--model` or saved `default-text-model` takes precedence. It is available with Token Plan, MiniMax Code, and pay-as-you-go keys. See the [model guide](https://platform.minimax.io/docs/guides/text-generation#agent).
 
 ```bash
 mmx text chat --message "Write a poem"
@@ -214,7 +214,7 @@ mmx agent setup --agent oh-my-pi --api-key "$MINIMAX_API_KEY" --region global
 # --agent omp is an alias for --agent oh-my-pi
 ```
 
-`agent setup` defaults to `MiniMax-M3.1-Flash` for subscription keys and to `MiniMax-M3` for pay-as-you-go keys (`sk-api-...`). In non-interactive mode, `--model` overrides this selection.
+`agent setup` defaults to `MiniMax-M3.1-Flash` for both Token Plan and pay-as-you-go keys (`sk-api-...`). In non-interactive mode, `--model` overrides this selection.
 
 The command verifies the key and selected region before writing. Existing files are backed up when changed; use `--dry-run` to preview without a live request. In the interactive wizard, compatible agents that are missing from `PATH` can be installed from a second multi-select list using their official packages or installer scripts. The Hermes install uses its official core CLI stages and skips optional system packages, Node workspace, browser, computer-use, setup, and gateway stages. After installation, mmx applies the MiniMax configuration while preserving installer settings. Agents that fail a platform or prerequisite check are explained and left configuration-only. Non-interactive invocations remain configuration-only, and the command never launches an agent.
 

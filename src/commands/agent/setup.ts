@@ -137,10 +137,6 @@ function detectApiKeyKind(apiKey: string): ApiKeyKind | undefined {
   return undefined;
 }
 
-function defaultModelForApiKey(apiKey: string): typeof DEFAULT_MINIMAX_MODEL | 'MiniMax-M3' {
-  return detectApiKeyKind(apiKey) === 'paygo' ? 'MiniMax-M3' : DEFAULT_MINIMAX_MODEL;
-}
-
 function readExistingCodexApiKey(agents: AgentId[]): string | undefined {
   if (!agents.includes('codex')) return undefined;
   const home = homedir();
@@ -379,17 +375,7 @@ async function interactiveOptions(
   if (!apiKey) {
     throw new CLIError('A MiniMax API key is required.', ExitCode.USAGE);
   }
-  const model = defaultModelForApiKey(apiKey);
-  if (model === 'MiniMax-M3') {
-    await promptNote({
-      title: 'Model for pay-as-you-go key',
-      message: 'MiniMax-M3.1-Flash currently requires Token Plan or MiniMax Code. '
-        + 'This setup will use MiniMax-M3.'
-        + (agents.some(agent => agent === 'claude-code' || agent === 'codex' || agent === 'opencode' || agent === 'zed')
-          ? ' The earlier window choice applies to the M3.1 model entry, not the active M3 model.'
-          : ''),
-    });
-  }
+  const model = DEFAULT_MINIMAX_MODEL;
 
   let message = `Configure ${agents.map((agent) => AGENT_LABELS[agent]).join(', ')}? `
     + 'mmx will write configuration files.';
@@ -469,7 +455,7 @@ function nonInteractiveOptions(flags: GlobalFlags): SelectedAgentSetup {
     );
   }
 
-  const model = ((flags.model as string | undefined) ?? defaultModelForApiKey(apiKey)).trim();
+  const model = ((flags.model as string | undefined) ?? DEFAULT_MINIMAX_MODEL).trim();
   if (!model) throw new CLIError('--model must not be empty.', ExitCode.USAGE);
   const supportedModel = MINIMAX_MODELS.find(candidate => candidate.id === model)?.id;
   if (!supportedModel) {
