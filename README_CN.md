@@ -178,7 +178,7 @@ mmx config export-schema | jq .
 
 ### `mmx agent setup`
 
-一键为 Claude Code、Codex、Grok Build、OpenCode、Hermes、Pi 或 [Oh my Pi](https://github.com/can1357/oh-my-pi) 配置 MiniMax，并保留配置文件中的其他设置。不带选项时进入交互式向导；带选项时自动使用非交互模式，便于脚本调用。
+一键为 Claude Code、Codex、Grok Build、OpenCode、Hermes、Pi、[Oh my Pi](https://github.com/can1357/oh-my-pi) 或 Zed 配置 MiniMax，并保留配置文件中的其他设置。不带选项时进入交互式向导；带选项时自动使用非交互模式，便于脚本调用。
 
 ```bash
 mmx agent setup

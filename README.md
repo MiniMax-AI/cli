@@ -204,7 +204,7 @@ mmx config export-schema | jq .
 
 ### `mmx agent setup`
 
-Configure MiniMax for Claude Code, Codex, Grok Build, OpenCode, Hermes, Pi, or [Oh my Pi](https://github.com/can1357/oh-my-pi) while preserving unrelated settings. Run without options for the interactive wizard; supplying options makes the command non-interactive and suitable for scripts.
+Configure MiniMax for Claude Code, Codex, Grok Build, OpenCode, Hermes, Pi, [Oh my Pi](https://github.com/can1357/oh-my-pi), or Zed while preserving unrelated settings. Run without options for the interactive wizard; supplying options makes the command non-interactive and suitable for scripts.
 
 ```bash
 mmx agent setup

@@ -156,6 +156,17 @@ function configPathsForAgent(
     }
     case 'oh-my-pi':
       return ohMyPiConfigPaths(home, env);
+    case 'zed': {
+      // Mirrors Zed's paths::config_dir().
+      if (process.platform === 'win32') {
+        return [join(env.APPDATA || join(home, 'AppData', 'Roaming'), 'Zed', 'settings.json')];
+      }
+      const xdgConfig = process.platform === 'darwin'
+        ? join(home, '.config')
+        : env.FLATPAK_XDG_CONFIG_HOME
+          || pathFromOverride(env.XDG_CONFIG_HOME, join(home, '.config'), home);
+      return [join(xdgConfig, 'zed', 'settings.json')];
+    }
   }
 }
 
@@ -1040,6 +1051,83 @@ function prepareOhMyPi(options: AgentSetupOptions, paths: string[]): PreparedAge
   });
 }
 
+function prepareZed(options: AgentSetupOptions, path: string): PreparedAgentFile[] {
+  const prepared = readPrepared(path);
+  const label = 'Zed settings.json';
+  const parsed = parseJsoncObject(prepared.before ?? '{}', label);
+  const languageModels = parsed.language_models;
+  if (languageModels !== undefined) {
+    assertObject(languageModels, `${label} language_models must be an object.`);
+  }
+  const compatible = languageModels?.openai_compatible;
+  if (compatible !== undefined) {
+    assertObject(compatible, `${label} language_models.openai_compatible must be an object.`);
+  }
+  const provider = compatible?.minimax;
+  if (provider !== undefined) {
+    assertObject(provider, `${label} language_models.openai_compatible.minimax must be an object.`);
+  }
+  const existingModels = provider?.available_models;
+  if (existingModels !== undefined && !Array.isArray(existingModels)) {
+    throw new CLIError(
+      `${label} minimax available_models must be an array.`,
+      ExitCode.GENERAL,
+      INVALID_CONFIG_HINT,
+    );
+  }
+  const agentSettings = parsed.agent;
+  if (agentSettings !== undefined) assertObject(agentSettings, `${label} agent must be an object.`);
+  const defaultModel = agentSettings?.default_model;
+  if (defaultModel !== undefined) {
+    assertObject(defaultModel, `${label} agent.default_model must be an object.`);
+  }
+
+  // Thinking is always on for MiniMax models; Zed treats "none" as thinking disabled.
+  const effortFor = (modelId: MiniMaxModelId) => modelId === 'MiniMax-M3.1-Flash' ? 'max' : 'high';
+  const prefix = ['language_models', 'openai_compatible', 'minimax'];
+  const definitions = MINIMAX_MODELS.map(model => ({
+    name: model.id,
+    display_name: model.id,
+    max_tokens: model.id === 'MiniMax-M3.1-Flash'
+      ? options.m31ContextWindow ?? 524288 : model.contextWindow,
+    max_output_tokens: model.maxTokens,
+    reasoning_effort: effortFor(model.id),
+    capabilities: {
+      tools: true,
+      images: model.input.some(input => input === 'image'),
+      parallel_tool_calls: true,
+      prompt_cache_key: false,
+      chat_completions: true,
+      interleaved_reasoning: true,
+      max_tokens_parameter: false,
+    },
+  }));
+  const updates: Array<{ path: Array<string | number>; value: unknown }> = [
+    { path: [...prefix, 'api_url'], value: endpointsForRegion(options.region).openai },
+  ];
+  if (existingModels === undefined) {
+    updates.push({ path: [...prefix, 'available_models'], value: definitions });
+  } else {
+    let appendIndex = existingModels.length;
+    for (const definition of definitions) {
+      const found = existingModels.findIndex(entry => typeof entry === 'object'
+        && entry !== null
+        && (entry as Record<string, unknown>).name === definition.name);
+      updates.push({
+        path: [...prefix, 'available_models', found >= 0 ? found : appendIndex++],
+        value: definition,
+      });
+    }
+  }
+  updates.push(
+    { path: ['agent', 'default_model', 'provider'], value: 'minimax' },
+    { path: ['agent', 'default_model', 'model'], value: options.model },
+    { path: ['agent', 'default_model', 'enable_thinking'], value: true },
+    { path: ['agent', 'default_model', 'effort'], value: effortFor(options.model) },
+  );
+  return [{ agent: 'zed', path, ...prepared, after: updateJsonc(prepared.before, label, updates) }];
+}
+
 export function prepareAgentConfigurations(options: AgentSetupOptions): PreparedAgentFile[] {
   const prepared: PreparedAgentFile[] = [];
   for (const agent of options.agents) {
@@ -1065,6 +1153,9 @@ export function prepareAgentConfigurations(options: AgentSetupOptions): Prepared
         break;
       case 'oh-my-pi':
         prepared.push(...prepareOhMyPi(options, paths));
+        break;
+      case 'zed':
+        prepared.push(...prepareZed(options, paths[0]!));
         break;
     }
   }
