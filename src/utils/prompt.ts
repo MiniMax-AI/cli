@@ -33,15 +33,30 @@ export async function promptText(options: {
   const { defaultValue, message } = options;
   const inquirer = await import('@clack/prompts');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const val = await (inquirer as any).text({
-    message,
-    default: defaultValue,
-    placeholder: defaultValue,
-  });
+  const val = await (inquirer as any).text(textPromptOptions(message, defaultValue));
 
   // @clack/prompts returns a Symbol.cancel when the user presses Ctrl+C
   if (typeof val === 'symbol') return undefined;
   return val as string;
+}
+
+/**
+ * Build the options for a text prompt.
+ *
+ * A default value is presented as a placeholder rather than as the prompt's
+ * actual value, so a hint can never be submitted as input text.
+ *
+ * @clack/prompts has no `default` option (its option is `defaultValue`), so
+ * passing one alongside `placeholder` never had any effect.
+ */
+export function textPromptOptions(message: string, defaultValue?: string): {
+  message: string;
+  placeholder?: string;
+} {
+  return {
+    message,
+    ...(defaultValue === undefined ? {} : { placeholder: defaultValue }),
+  };
 }
 
 const API_KEY_VISIBLE_LENGTH = 30;
