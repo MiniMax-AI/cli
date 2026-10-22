@@ -68,6 +68,102 @@ describe('HTTP client', () => {
     expect(result.echo).toEqual({ hello: 'world' });
   });
 
+  it.each([
+    [1.001, 1001],
+    [2.007, 2007],
+    [2.0075, 2007],
+    [0.0015, 1],
+    [0.0005, 0],
+    [0, 0],
+  ])('converts a %s second timeout to %s whole milliseconds', async (seconds, milliseconds) => {
+    const timeout = spyOn(AbortSignal, 'timeout');
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () =>
+      jsonResponse({ result: 'ok' })) as unknown as typeof fetch);
+
+    try {
+      await requestJson(makeConfig('https://example.com'), {
+        url: 'https://example.com/test',
+        timeout: seconds,
+        noAuth: true,
+      });
+
+      expect(timeout).toHaveBeenCalledWith(milliseconds);
+    } finally {
+      fetchSpy.mockRestore();
+      timeout.mockRestore();
+    }
+  });
+
+  it('keeps malformed JSON responses as general API errors', async () => {
+    server = createMockServer({
+      routes: { '/v1/test': () => new Response('not json') },
+    });
+
+    await expect(requestJson(makeConfig(server.url), {
+      url: `${server.url}/v1/test`,
+    })).rejects.toMatchObject({
+      exitCode: 1,
+      message: expect.stringContaining('API returned non-JSON response'),
+    });
+  });
+
+  it.each([-1, -0.0005])('leaves a negative %s second timeout to platform validation', async (seconds) => {
+    const timeout = spyOn(AbortSignal, 'timeout')
+      .mockImplementation(() => new AbortController().signal);
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () =>
+      jsonResponse({ result: 'ok' })) as unknown as typeof fetch);
+
+    try {
+      await requestJson(makeConfig('https://example.com'), {
+        url: 'https://example.com/test',
+        timeout: seconds,
+        noAuth: true,
+      });
+
+      expect(timeout).toHaveBeenCalledWith(seconds * 1000);
+    } finally {
+      fetchSpy.mockRestore();
+      timeout.mockRestore();
+    }
+  });
+
+  it('keeps non-JSON HTTP 500 responses as API errors', async () => {
+    server = createMockServer({
+      routes: { '/v1/test': () => new Response('upstream failure', { status: 500 }) },
+    });
+
+    await expect(requestJson(makeConfig(server.url), {
+      url: `${server.url}/v1/test`,
+    })).rejects.toMatchObject({
+      exitCode: 1,
+      message: expect.stringContaining('HTTP 500'),
+    });
+  });
+
+  it.each([
+    [200, 'AbortError'],
+    [200, 'TimeoutError'],
+    [500, 'AbortError'],
+    [500, 'TimeoutError'],
+  ])('preserves HTTP %s body %s', async (status, name) => {
+    const error = new DOMException('request stopped', name);
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation((async () => ({
+      ok: status === 200,
+      status,
+      headers: new Headers({ 'Content-Type': 'application/json' }),
+      json: async () => { throw error; },
+    })) as unknown as typeof fetch);
+
+    try {
+      await expect(requestJson(makeConfig('https://example.com'), {
+        url: 'https://example.com/test',
+        noAuth: true,
+      })).rejects.toBe(error);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('throws CLIError on 401', async () => {
     server = createMockServer({
       routes: {
