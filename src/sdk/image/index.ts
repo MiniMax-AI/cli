@@ -48,27 +48,28 @@ export class ImageSDK extends Client {
 
     if (options.out) {
       // Single-image, exact path
-      const count = (fmt === 'base64'
-        ? (response.data.image_base64 || []).length
-        : (response.data.image_urls || []).length);
+      const images = fmt === 'base64'
+        ? response.data.image_base64 || []
+        : response.data.image_urls || [];
 
-      if (count > 1) {
+      if (images.length > 1) {
         throw new SDKError(
           'Cannot use `out` with multiple images. Use `outDir` instead.',
           ExitCode.USAGE,
         );
       }
 
+      const image = images[0];
+      if (!image?.trim()) return saved;
+
       const destPath = resolve(options.out);
       const dir = dirname(destPath);
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
       if (fmt === 'base64') {
-        const image = (response.data.image_base64 || [])[0];
-        if (image) writeFileSync(destPath, image, 'base64');
+        writeFileSync(destPath, image, 'base64');
       } else {
-        const imageUrl = (response.data.image_urls || [])[0];
-        if (imageUrl) await downloadFile(imageUrl, destPath, { quiet });
+        await downloadFile(image, destPath, { quiet });
       }
       saved.push(destPath);
     } else {
