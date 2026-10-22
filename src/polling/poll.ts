@@ -21,8 +21,14 @@ export async function poll<T>(config: Config, opts: PollOptions): Promise<T> {
   if (!config.quiet) spinner.start();
 
   try {
-    while (Date.now() < deadline) {
-      const data = await requestJson<T>(config, { url: opts.url });
+    while (true) {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) break;
+
+      // Cap the HTTP wait by the polling budget remaining at this point,
+      // without increasing a shorter configured per-request timeout.
+      const timeout = Math.min(config.timeout, remainingMs / 1000);
+      const data = await requestJson<T>(config, { url: opts.url, timeout });
 
       if (opts.getStatus && !config.quiet) {
         spinner.update(`Status: ${opts.getStatus(data)}`);
