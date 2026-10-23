@@ -118,7 +118,7 @@ export default defineCommand({
       };
 
       if (params.image) {
-        if (params.image.startsWith('http')) {
+        if (params.image.startsWith('http://') || params.image.startsWith('https://')) {
           ref.image_url = params.image;
         } else {
           ref.image_file = localFileToDataUri(resolve(params.image));

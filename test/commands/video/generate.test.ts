@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { default as generateCommand } from '../../../src/commands/video/generate';
@@ -52,6 +52,23 @@ async function h3DryRun(flags: Partial<GlobalFlags>): Promise<Record<string, unk
 }
 
 describe('video generate command', () => {
+  it('encodes a local first frame whose relative path starts with http', async () => {
+    const dir = mkdtempSync('http-video-');
+    const file = join(dir, 'frame.png');
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0qQAAAAASUVORK5CYII=', 'base64');
+    try {
+      writeFileSync(file, png);
+      const body = await h3DryRun({ image: file });
+      expect(body.content).toContainEqual({
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${png.toString('base64')}` },
+        role: 'first_frame',
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('has correct name', () => {
     expect(generateCommand.name).toBe('video generate');
   });
