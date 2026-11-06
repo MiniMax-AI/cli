@@ -5,6 +5,7 @@ import type {
   VideoV2ImageRole,
   VideoV2Ratio,
   VideoV2Request,
+  VideoV2Resolution,
   VideoV2Task,
 } from '../types/api';
 import {
@@ -14,6 +15,8 @@ import {
 } from '../utils/media';
 
 export const VIDEO_V2_MODEL = 'MiniMax-H3' as const;
+
+const VIDEO_V2_RESOLUTIONS = new Set<VideoV2Resolution>(['768P', '2K']);
 
 const VIDEO_V2_RATIOS = new Set<VideoV2Ratio>([
   'adaptive',
@@ -105,7 +108,7 @@ export function buildVideoV2Request(options: BuildVideoV2RequestOptions): VideoV
   const request: VideoV2Request = {
     model: VIDEO_V2_MODEL,
     content,
-    resolution: (options.resolution ?? '2K') as '2K',
+    resolution: (options.resolution ?? '2K') as VideoV2Resolution,
     duration: (options.duration ?? 5) as VideoV2Duration,
     ratio: (hasFrameInput
       ? 'adaptive'
@@ -131,8 +134,8 @@ export function validateVideoV2Request(request: VideoV2Request): void {
     throw new VideoV2InputError('MiniMax-H3 text content must not exceed 7000 characters.');
   }
 
-  if (request.resolution !== '2K') {
-    throw new VideoV2InputError('MiniMax-H3 currently only supports 2K resolution.');
+  if (!VIDEO_V2_RESOLUTIONS.has(request.resolution)) {
+    throw new VideoV2InputError('MiniMax-H3 resolution must be one of: 768P, 2K.');
   }
   if (!Number.isInteger(request.duration) || request.duration < 4 || request.duration > 15) {
     throw new VideoV2InputError('MiniMax-H3 duration must be an integer from 4 to 15 seconds.');

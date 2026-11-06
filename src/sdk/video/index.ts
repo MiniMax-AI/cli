@@ -153,7 +153,7 @@ export class VideoSDK extends Client {
           const body = {
             ...params,
             model: VIDEO_V2_MODEL,
-            resolution: (params.resolution ?? '2K') as '2K',
+            resolution: (params.resolution ?? '2K') as VideoV2Request['resolution'],
             duration: (params.duration ?? 5) as VideoV2Request['duration'],
             ratio: params.ratio ?? (hasFrameInput || hasReferenceInput ? 'adaptive' : '16:9'),
           } as VideoV2Request;

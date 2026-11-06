@@ -100,6 +100,74 @@ describe('MiniMaxSDK.video', () => {
     });
   });
 
+  it('should pass 768P resolution through both H3 request forms', async () => {
+    const requestBodies: Array<{ resolution?: string }> = [];
+    server = createMockServer({
+      routes: {
+        '/v2/video_generation': async (req) => {
+          requestBodies.push(await req.json() as { resolution?: string });
+          return jsonResponse({ task_id: 'h3-768' });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    await sdk.video.generate({
+      model: 'MiniMax-H3',
+      content: [{ type: 'text', text: 'Ocean waves' }],
+      resolution: '768P',
+      async: true,
+    });
+    await sdk.video.generate({
+      model: 'MiniMax-H3',
+      prompt: 'Ocean waves',
+      resolution: '768P',
+      async: true,
+    });
+
+    expect(requestBodies.map(body => body.resolution)).toEqual(['768P', '768P']);
+  });
+
+  it('should reject unsupported H3 resolutions without sending a request', async () => {
+    let requestCount = 0;
+    server = createMockServer({
+      routes: {
+        '/v2/video_generation': () => {
+          requestCount += 1;
+          return jsonResponse({ task_id: 'h3-invalid' });
+        },
+      },
+    });
+
+    const sdk = new MiniMaxSDK({
+      apiKey: 'test-key',
+      baseUrl: server.url,
+    });
+
+    await expect(
+      sdk.video.generate({
+        model: 'MiniMax-H3',
+        prompt: 'Ocean waves',
+        resolution: '1080P',
+        async: true,
+      } as never),
+    ).rejects.toThrow('resolution must be one of: 768P, 2K');
+    await expect(
+      sdk.video.generate({
+        model: 'MiniMax-H3',
+        content: [{ type: 'text', text: 'Ocean waves' }],
+        resolution: '1080P',
+        async: true,
+      } as never),
+    ).rejects.toThrow('resolution must be one of: 768P, 2K');
+
+    expect(requestCount).toBe(0);
+  });
+
   it('should get task status', async () => {
     server = createMockServer({
       routes: {
