@@ -24,7 +24,9 @@ const T2A_SAMPLE_RATE: Partial<Record<T2AFormat, number>> = {
 };
 
 export function t2aDefaultSampleRate(format: string, fallback: number): number {
-  return T2A_SAMPLE_RATE[format as T2AFormat] ?? fallback;
+  return Object.hasOwn(T2A_SAMPLE_RATE, format)
+    ? T2A_SAMPLE_RATE[format as T2AFormat] ?? fallback
+    : fallback;
 }
 
 export function validateT2AStreaming(format: string, stream: boolean): void {
