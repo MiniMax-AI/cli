@@ -26,10 +26,13 @@ function stripScheme(url: string): string {
 }
 
 export async function ensureAuth(config: Config): Promise<void> {
-  if (config.apiKey || config.fileApiKey) return;
+  if (config.apiKey && config.apiKeySource !== 'env') return;
+  if (config.fileApiKey) return;
   if (await loadCredentials()) return;
 
-  const envKey = process.env.MINIMAX_API_KEY;
+  const envKey = config.apiKeySource === 'env'
+    ? config.apiKey
+    : process.env.MINIMAX_API_KEY;
   if (envKey) {
     if (!isInteractive({ nonInteractive: config.nonInteractive })) {
       return; // env key is enough; no prompt

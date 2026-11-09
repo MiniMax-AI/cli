@@ -81,6 +81,7 @@ export function parseConfigFile(raw: unknown): ConfigFile {
 
 export interface Config {
   apiKey?: string;
+  apiKeySource?: 'flag' | 'env';
   fileApiKey?: string;
   fileRegion?: Region;
   configPath?: string;
