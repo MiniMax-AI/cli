@@ -16,6 +16,7 @@ import { SDKError } from "../../errors/base";
 import { ExitCode } from "../../errors/codes";
 import { toMerged } from "es-toolkit/object";
 import { ModelPartial } from "../types";
+import { t2aDefaultSampleRate } from '../../utils/audio-formats';
 import {
   sttFormFields,
   submitSttForm,
@@ -263,7 +264,7 @@ export class SpeechSDK extends Client {
       },
       audio_setting: {
         format: "mp3",
-        sample_rate: 32000,
+        sample_rate: t2aDefaultSampleRate(params.audio_setting?.format ?? 'mp3', 32000),
         bitrate: 128000,
         channel: 1,
       },

@@ -113,6 +113,76 @@ describe('SpeechSDK.save', () => {
 describe('SpeechSDK.validateParams', () => {
   const sdk = new SpeechSDK({ apiKey: 'sk-test', region: 'global' });
 
+  it.each([
+    ['mp3', 32000],
+    ['pcm', 32000],
+    ['flac', 32000],
+    ['wav', 32000],
+    ['opus', 24000],
+    ['pcmu_raw', 8000],
+    ['pcmu_wav', 8000],
+  ])('defaults the sample rate for %s to %i Hz', async (format, expected) => {
+    await withStubbedFetch(
+      () => jsonResponse(makeSpeechResponse()),
+      async (sent) => {
+        await sdk.synthesize({ text: 'hello', audio_setting: { format } });
+        expect(JSON.parse(sent.init!.body as string).audio_setting.sample_rate).toBe(expected);
+      },
+    );
+  });
+
+  it('preserves an explicitly provided sample rate', async () => {
+    await withStubbedFetch(
+      () => jsonResponse(makeSpeechResponse()),
+      async (sent) => {
+        const audioSetting = { format: 'opus', sample_rate: 16000, bitrate: 64000, channel: 2 };
+        await sdk.synthesize({ text: 'hello', audio_setting: audioSetting });
+        expect(JSON.parse(sent.init!.body as string).audio_setting).toEqual(audioSetting);
+        expect(audioSetting).toEqual({ format: 'opus', sample_rate: 16000, bitrate: 64000, channel: 2 });
+      },
+    );
+  });
+
+  it('keeps the mp3 defaults when audio settings are omitted', async () => {
+    await withStubbedFetch(
+      () => jsonResponse(makeSpeechResponse()),
+      async (sent) => {
+        await sdk.synthesize({ text: 'hello' });
+        const settings = JSON.parse(sent.init!.body as string).audio_setting;
+        expect(settings.format).toBe('mp3');
+        expect(settings.sample_rate).toBe(32000);
+        expect(settings.bitrate).toBe(128000);
+        expect(settings.channel).toBe(1);
+      },
+    );
+  });
+
+  it.each(['unknown', 'constructor', 'toString', '__proto__'])(
+    'preserves unknown format %s and falls back to a numeric sample rate',
+    async (format) => {
+      await withStubbedFetch(
+        () => jsonResponse(makeSpeechResponse()),
+        async (sent) => {
+          await sdk.synthesize({ text: 'hello', audio_setting: { format } });
+          const settings = JSON.parse(sent.init!.body as string).audio_setting;
+          expect(settings.format).toBe(format);
+          expect(settings.sample_rate).toBe(32000);
+        },
+      );
+    },
+  );
+
+  it('applies the format default to streaming requests too', async () => {
+    await withStubbedFetch(
+      () => sseResponse([{ data: JSON.stringify(makeSpeechResponse()) }]),
+      async (sent) => {
+        const stream = await sdk.synthesize({ text: 'hello', audio_setting: { format: 'pcmu_raw' }, stream: true });
+        for await (const chunk of stream) { void chunk; }
+        expect(JSON.parse(sent.init!.body as string).audio_setting.sample_rate).toBe(8000);
+      },
+    );
+  });
+
   it('throws when text is missing', async () => {
     await expect(sdk.synthesize({} as any)).rejects.toThrow('text is required');
   });
