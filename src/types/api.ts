@@ -258,6 +258,7 @@ export interface VideoTaskResponse {
 }
 
 export type VideoV2ImageRole = 'first_frame' | 'last_frame' | 'reference_image';
+export type VideoV2Resolution = '768P' | '2K';
 export type VideoV2Ratio = 'adaptive' | '21:9' | '16:9' | '4:3' | '1:1' | '3:4' | '9:16';
 export type VideoV2Duration = 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
@@ -293,7 +294,7 @@ export type VideoV2ContentItem =
 export interface VideoV2Request {
   model: 'MiniMax-H3';
   content: VideoV2ContentItem[];
-  resolution: '2K';
+  resolution: VideoV2Resolution;
   duration: VideoV2Duration;
   ratio?: VideoV2Ratio;
   callback_url?: string;

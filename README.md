@@ -107,7 +107,7 @@ mmx video download --file-id 176844028768320 --out video.mp4
 
 For MiniMax-H3, local files and Base64 data URIs are preflight-checked against the documented limits: image 30 MB, reference video 50 MB, reference audio 15 MB, and total JSON request body 64 MB. The API validates dimensions, aspect ratio, duration, frame rate, and codecs for all media.
 
-`--region` is an existing global CLI option, not an H3 parameter. Normal video generation does not need it; the CLI uses the saved or automatically detected region. H3 defaults to 2K, 5 seconds, and 16:9 for text-to-video.
+`--region` is an existing global CLI option, not an H3 parameter. Normal video generation does not need it; the CLI uses the saved or automatically detected region. H3 defaults to 2K, 5 seconds, and 16:9 for text-to-video. Use `--resolution 768P` for 768P output.
 
 ### `mmx speech`
 

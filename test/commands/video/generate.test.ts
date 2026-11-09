@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { default as generateCommand } from '../../../src/commands/video/generate';
+import { ExitCode } from '../../../src/errors/codes';
 import type { Config } from '../../../src/config/schema';
 import type { GlobalFlags } from '../../../src/types/flags';
 import { createMockServer } from '../../helpers/mock-server';
@@ -67,7 +68,7 @@ describe('video generate command', () => {
     expect(optionFlags).toContain('--image <path-or-url>');
     expect(optionFlags).not.toContain('--first-frame <path-or-url>');
     expect(optionFlags).not.toContain('--image-role <role>');
-    expect(optionFlags).not.toContain('--resolution <resolution>');
+    expect(optionFlags).toContain('--resolution <resolution>');
     expect(optionFlags).not.toContain('--region <region>');
     expect(legacyFirstFrame?.hidden).toBe(true);
   });
@@ -274,6 +275,119 @@ describe('video generate command', () => {
     } finally {
       console.log = originalLog;
     }
+  });
+
+  it('should send the requested H3 resolution when --resolution is set', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    const originalLog = console.log;
+    let output = '';
+    console.log = (msg: string) => { output += msg; };
+
+    try {
+      await generateCommand.execute(config, {
+        prompt: 'Ocean waves at sunset',
+        model: 'MiniMax-H3',
+        resolution: '768P',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      });
+
+      expect(JSON.parse(output).request.resolution).toBe('768P');
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('should reject unsupported H3 resolutions as usage errors', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    await expect(
+      generateCommand.execute(config, {
+        prompt: 'Ocean waves at sunset',
+        model: 'MiniMax-H3',
+        resolution: '1080P',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      }),
+    ).rejects.toMatchObject({
+      message: 'MiniMax-H3 resolution must be one of: 768P, 2K.',
+      exitCode: ExitCode.USAGE,
+    });
+  });
+
+  it('should reject --resolution for legacy models', async () => {
+    const config = {
+      apiKey: 'test-key',
+      region: 'global' as const,
+      baseUrl: 'https://api.mmx.io',
+      output: 'json' as const,
+      timeout: 10,
+      verbose: false,
+      quiet: false,
+      noColor: true,
+      yes: false,
+      dryRun: true,
+      nonInteractive: true,
+      async: false,
+    };
+
+    await expect(
+      generateCommand.execute(config, {
+        prompt: 'A cat',
+        model: 'MiniMax-Hailuo-2.3',
+        resolution: '768P',
+        quiet: false,
+        verbose: false,
+        noColor: true,
+        yes: false,
+        dryRun: true,
+        help: false,
+        nonInteractive: true,
+        async: false,
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('require --model MiniMax-H3'),
+      exitCode: ExitCode.USAGE,
+    });
   });
 
   it('maps H3 reference inputs into typed content items', async () => {

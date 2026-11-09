@@ -151,7 +151,7 @@ Do not perform region fallback for validation errors, error `2013`, billing, rat
 
 - Prompt: at most 7000 characters.
 - Output duration: integer from 4 through 15 seconds.
-- Resolution: 2K.
+- Resolution (`--resolution`): `768P` or `2K` (default).
 - Reference images: at most 9.
 - Reference videos: at most 3.
 - Reference audios: at most 3.

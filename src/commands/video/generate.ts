@@ -37,7 +37,7 @@ import {
 
 export default defineCommand({
   name: 'video generate',
-  description: 'Generate a video\n  V2:   MiniMax-H3 (text/image/video/audio content, 2K)\n  T2V:  Hailuo-2.3\n  I2V:  Hailuo-2.3 (default) / Hailuo-2.3-Fast (fast mode, requires --image)\n  SEF:  Hailuo-02 (requires --image and --last-frame)\n  S2V:  S2V-01 (requires --subject-image)',
+  description: 'Generate a video\n  V2:   MiniMax-H3 (text/image/video/audio content, 768P/2K)\n  T2V:  Hailuo-2.3\n  I2V:  Hailuo-2.3 (default) / Hailuo-2.3-Fast (fast mode, requires --image)\n  SEF:  Hailuo-02 (requires --image and --last-frame)\n  S2V:  S2V-01 (requires --subject-image)',
   apiDocs: '/docs/api-reference/video-generation-v2-create',
   usage: 'mmx video generate --prompt <text> [flags]',
   options: [
@@ -51,6 +51,7 @@ export default defineCommand({
     { flag: '--reference-video <path-or-url>', description: 'H3 reference video (repeatable; local MP4/MOV, URL, data URI, or mm_file:// ID).', type: 'array' },
     { flag: '--reference-audio <path-or-url>', description: 'H3 reference audio (repeatable; requires a reference image or video).', type: 'array' },
     { flag: '--duration <seconds>', description: 'Output duration. H3 supports integer values from 4 to 15 (default: 5).', type: 'number' },
+    { flag: '--resolution <resolution>', description: 'H3 output resolution: 768P or 2K (default: 2K).' },
     { flag: '--ratio <ratio>', description: 'H3 aspect ratio: adaptive, 21:9, 16:9, 4:3, 1:1, 3:4, or 9:16.' },
     { flag: '--callback-url <url>', description: 'Webhook URL for completion notification' },
     { flag: '--download <path>', description: 'Save video to file on completion' },
@@ -65,6 +66,7 @@ export default defineCommand({
     'mmx video generate --prompt "A robot painting." --no-wait --quiet',
     '# H3 text-to-video (Video Generation V2)',
     'mmx video generate --model MiniMax-H3 --prompt "Ocean waves at sunset"',
+    'mmx video generate --model MiniMax-H3 --prompt "Ocean waves at sunset" --resolution 768P',
     '# H3 image-to-video',
     'mmx video generate --model MiniMax-H3 --prompt "The subject walks forward" --image start.jpg',
     '# H3 reference-to-video',
@@ -101,6 +103,7 @@ export default defineCommand({
       flags.referenceImage ||
       flags.referenceVideo ||
       flags.referenceAudio ||
+      flags.resolution !== undefined ||
       flags.duration !== undefined ||
       flags.ratio,
     );
@@ -174,6 +177,7 @@ export default defineCommand({
             .map(input => resolveMediaInput(input, 'video')),
           referenceAudios: ((flags.referenceAudio as string[] | undefined) ?? [])
             .map(input => resolveMediaInput(input, 'audio')),
+          resolution: flags.resolution as string | undefined,
           duration: flags.duration as number | undefined,
           ratio: flags.ratio as string | undefined,
           callbackUrl: flags.callbackUrl as string | undefined,
@@ -191,7 +195,7 @@ export default defineCommand({
     } else {
       if (hasV2OnlyInput) {
         throw new CLIError(
-          '--reference-image, --reference-video, --reference-audio, --duration, and --ratio require --model MiniMax-H3.',
+          '--reference-image, --reference-video, --reference-audio, --resolution, --duration, and --ratio require --model MiniMax-H3.',
           ExitCode.USAGE,
         );
       }

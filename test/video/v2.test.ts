@@ -112,8 +112,13 @@ describe('Video Generation V2 request builder', () => {
   });
 
   it('validates resolution, duration, and ratio boundaries', () => {
-    expect(() => buildVideoV2Request({ prompt, resolution: '1080P' }))
-      .toThrow('only supports 2K resolution');
+    for (const resolution of ['1080P', '480P', '768p', '2k', '']) {
+      expect(() => buildVideoV2Request({ prompt, resolution }))
+        .toThrow('resolution must be one of: 768P, 2K');
+    }
+    expect(buildVideoV2Request({ prompt, resolution: '768P' }).resolution).toBe('768P');
+    expect(buildVideoV2Request({ prompt, resolution: '2K' }).resolution).toBe('2K');
+    expect(buildVideoV2Request({ prompt }).resolution).toBe('2K');
 
     for (const duration of [3, 16, 4.5]) {
       expect(() => buildVideoV2Request({ prompt, duration }))
