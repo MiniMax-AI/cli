@@ -56,7 +56,30 @@ const result = await sdk.image.generate({
   height: 1024,
   n: 1,
 });
+
+// MiniMax-H3-Image text-to-image → POST /v1/images/generations
+const h3 = await sdk.image.generate({
+  model: 'MiniMax-H3-Image',
+  prompt: 'An orange cat basking on a windowsill',
+  aspect_ratio: '16:9',
+  area: '2K',
+  n: 2,
+});
+// Partial failures return 200; failed items only carry `error`.
+h3.data.forEach((item, i) => console.log(i, item.url ?? item.error?.message));
+
+// MiniMax-H3-Image image editing → POST /v1/images/edits (1-16 images)
+const edited = await sdk.image.generate({
+  model: 'MiniMax-H3-Image',
+  prompt: 'Replace the cat in Picture 1 with the dog in Picture 2',
+  images: [{ image_url: 'https://example.com/cat.jpg' }, { image_url: 'mm_file://123' }],
+});
+
+// Save successful images; the extension follows output_format.
+const paths = await sdk.image.save(edited, { outDir: './out' });
 ```
+
+H3-Image requests are checked locally against the documented limits (size, aspect ratio, `n`, reference images, `b64_json` total area, 64 MiB request body) before sending. Passing `images` (even an empty list) always targets the edits endpoint. All H3-Image requests use a timeout of at least 600 seconds. The endpoints are not idempotent, so the SDK does not retry them. Streaming (`stream: true`) is not supported by the SDK.
 
 ### Video
 

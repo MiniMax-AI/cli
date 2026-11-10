@@ -214,7 +214,7 @@ ${b('Resources:')}
   ${a('auth')}       ${d('Authentication (login, status, refresh, logout)')}
   ${a('text')}       ${d('Text generation (chat)')}
   ${a('speech')}     ${d('Speech synthesis and transcription (synthesize, voices, transcribe)')}
-  ${a('image')}      ${d('Image generation (generate)')}
+  ${a('image')}      ${d('Image generation and editing (generate)')}
   ${a('video')}      ${d('Video generation (generate, task get, download)')}
   ${a('search')}     ${d('Web search (query)')}
   ${a('vision')}     ${d('Image understanding (describe)')}

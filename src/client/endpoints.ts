@@ -18,6 +18,14 @@ export function imageEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/image_generation`;
 }
 
+export function imageGenerationsEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/images/generations`;
+}
+
+export function imageEditsEndpoint(baseUrl: string): string {
+  return `${baseUrl}/v1/images/edits`;
+}
+
 export function videoGenerateEndpoint(baseUrl: string): string {
   return `${baseUrl}/v1/video_generation`;
 }
