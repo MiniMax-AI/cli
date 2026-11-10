@@ -164,7 +164,7 @@ async function runImageH3(config: Config, flags: GlobalFlags, prompt: string): P
 export default defineCommand({
   name: 'image generate',
   description: 'Generate or edit images (image-01 / MiniMax-H3-Image)',
-  apiDocs: '/docs/api-reference/image-generation-t2i',
+  apiDocs: '/docs/guides/image-generation',
   usage: 'mmx image generate --prompt <text> [flags]',
   options: [
     { flag: '--model <model>', description: 'Model ID: image-01 (default), image-01-live, or MiniMax-H3-Image. Other values are passed to the image-01 endpoint as-is.' },

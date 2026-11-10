@@ -73,7 +73,7 @@ function mapApiErrorBase(status: number, body: ApiErrorBody, url?: string): CLIE
     );
   }
 
-  if (status === 429) {
+  if (status === 429 || (apiCode === 1002 && url?.includes('/v1/images/'))) {
     return new CLIError(
       `Rate limit or quota exceeded. ${apiMsg}`,
       ExitCode.QUOTA,

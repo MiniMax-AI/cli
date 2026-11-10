@@ -43,6 +43,21 @@ describe('mapApiError (OpenAI-style /v1/images/* errors)', () => {
     expect(err.hint).toContain('Image 2 (1000): internal error');
   });
 
+  it('maps 1002 (IPM rate limit) on /v1/images/* to QUOTA, not CONTENT_FILTER', () => {
+    const err = mapApiError(429, {
+      error: { type: 'rate_limit_error', message: 'rate limit exceeded(IPM) (1002)', http_code: '429' },
+    }, url);
+    expect(err.exitCode).toBe(ExitCode.QUOTA);
+    expect(err.message).toContain('Rate limit');
+
+    // Same trailing code with a non-429 status used to hit the content-filter branch.
+    const byCode = mapApiError(400, {
+      error: { type: 'rate_limit_error', message: 'rate limit exceeded(IPM) (1002)' },
+    }, url);
+    expect(byCode.exitCode).toBe(ExitCode.QUOTA);
+    expect(byCode.message).toContain('Rate limit');
+  });
+
   it('keeps 2068 handling scoped to /v1/images/*', () => {
     const err = mapApiError(400, { base_resp: { status_code: 2068, status_msg: 'x' } }, 'https://api.minimax.io/v1/t2a_v2');
     expect(err.exitCode).toBe(ExitCode.GENERAL);
