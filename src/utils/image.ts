@@ -30,7 +30,7 @@ export function localFileToDataUri(filePath: string, maxBytes?: number): string 
 }
 
 export function resolveImageInput(input: string, maxBytes?: number): string {
-  return input.startsWith('http') || input.startsWith('data:') || input.startsWith('mm_file://')
+  return input.startsWith('http://') || input.startsWith('https://') || input.startsWith('data:') || input.startsWith('mm_file://')
     ? input
     : localFileToDataUri(input, maxBytes);
 }

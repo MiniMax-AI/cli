@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'bun:test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { default as generateCommand } from '../../../src/commands/image/generate';
 
 const baseConfig = {
@@ -90,5 +92,41 @@ describe('image generate command', () => {
     expect(parsed.request.n).toBe(2);
     expect(parsed.request.seed).toBe(42);
     expect(parsed.request.model).toBe('image-01');
+  });
+
+  it.each(['http-image-', 'https-image-'])('encodes a local subject reference under %s', async (prefix) => {
+    const dir = mkdtempSync(prefix);
+    const file = join(dir, 'reference.png');
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0qQAAAAASUVORK5CYII=', 'base64');
+    const originalLog = console.log;
+    let output = '';
+    console.log = (message: string) => { output += message; };
+    try {
+      writeFileSync(file, png);
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' },
+        { ...baseFlags, dryRun: true, prompt: 'A cat', subjectRef: `type=character,image=${file}` },
+      );
+      const reference = JSON.parse(output).request.subject_reference[0];
+      expect(reference).toEqual({ type: 'character', image_file: `data:image/png;base64,${png.toString('base64')}` });
+    } finally {
+      console.log = originalLog;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['http://example.com/reference.png', 'https://example.com/reference.png'])('preserves remote subject reference %s', async (url) => {
+    const originalLog = console.log;
+    let output = '';
+    console.log = (message: string) => { output += message; };
+    try {
+      await generateCommand.execute(
+        { ...baseConfig, dryRun: true, output: 'json' },
+        { ...baseFlags, dryRun: true, prompt: 'A cat', subjectRef: `type=character,image=${url}` },
+      );
+      expect(JSON.parse(output).request.subject_reference).toEqual([{ type: 'character', image_url: url }]);
+    } finally {
+      console.log = originalLog;
+    }
   });
 });
