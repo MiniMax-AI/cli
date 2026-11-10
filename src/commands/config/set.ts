@@ -96,7 +96,7 @@ export default defineCommand({
 
     if (resolvedKey === 'timeout') {
       const num = Number(value);
-      if (isNaN(num) || num <= 0) {
+      if (!Number.isFinite(num) || num <= 0) {
         throw new CLIError(
           `Invalid timeout "${value}". Must be a positive number.`,
           ExitCode.USAGE,
