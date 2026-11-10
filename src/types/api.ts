@@ -228,6 +228,68 @@ export interface ImageResponse {
   };
 }
 
+// ---- Image (MiniMax-H3-Image) ----
+
+export type ImageH3Area = '1K' | '2K' | '4K';
+export type ImageH3OutputFormat = 'png' | 'jpeg' | 'jpg' | 'webp';
+export type ImageH3ResponseFormat = 'url' | 'b64_json';
+
+/** Shared body of `POST /v1/images/generations` and `POST /v1/images/edits`. */
+export interface ImageH3BaseRequest {
+  model: 'MiniMax-H3-Image';
+  prompt: string;
+  n?: number;
+  /** `auto` (default) or `WIDTHxHEIGHT`, e.g. `2720x1536`. */
+  size?: string;
+  /** `auto` (default) or `X:Y`. Only valid when size is unset or `auto`. */
+  aspect_ratio?: string;
+  /** Area level. Only valid when size is unset or `auto`. Default: `4K`. */
+  area?: ImageH3Area;
+  output_format?: ImageH3OutputFormat;
+  /** JPEG / WEBP quality, 0-100 (default 95). Ignored for PNG. */
+  output_compression?: number;
+  response_format?: ImageH3ResponseFormat;
+  aigc_watermark?: boolean;
+}
+
+/** Text-to-image: `POST /v1/images/generations`. */
+export interface ImageH3GenerationRequest extends ImageH3BaseRequest {
+  disable_prompt_enhanced?: boolean;
+}
+
+/** Image edit: `POST /v1/images/edits` with 1-16 reference images. */
+export interface ImageH3EditRequest extends ImageH3BaseRequest {
+  images: Array<{ image_url: string }>;
+}
+
+export type ImageH3Request = ImageH3GenerationRequest | ImageH3EditRequest;
+
+export interface ImageH3Item {
+  url?: string;
+  b64_json?: string;
+  size?: string;
+  revised_prompt?: string;
+  error?: { code?: string; message?: string };
+}
+
+export interface ImageH3Usage {
+  generated_images?: number;
+  total_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  input_tokens_details?: { text_tokens?: number; image_tokens?: number };
+  output_tokens_details?: { image_tokens?: number };
+}
+
+export interface ImageH3Response {
+  created?: number;
+  /** Always `n` items in order; failed items carry only `error`. */
+  data: ImageH3Item[];
+  output_format?: 'png' | 'jpeg' | 'webp';
+  usage?: ImageH3Usage;
+  request_id?: string;
+}
+
 // ---- Video ----
 
 export interface VideoRequest {

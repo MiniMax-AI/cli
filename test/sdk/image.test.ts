@@ -151,3 +151,73 @@ describe('ImageSDK.validateParams', () => {
     ).rejects.not.toThrow(/width|height/);
   });
 });
+
+describe('MiniMaxSDK.image (MiniMax-H3-Image)', () => {
+  let server: MockServer;
+
+  afterEach(() => {
+    server?.close();
+  });
+
+  it('routes to /v1/images/generations without images', async () => {
+    let path = '';
+    let body: Record<string, unknown> = {};
+    server = createMockServer({
+      routes: {
+        '/v1/images/': async (req) => {
+          path = new URL(req.url).pathname;
+          body = await req.json() as Record<string, unknown>;
+          return jsonResponse({ output_format: 'jpeg', data: [{ url: 'https://cdn/x.jpg', size: '2048x2048' }], request_id: 'r1' });
+        },
+      },
+    });
+    const sdk = new MiniMaxSDK({ apiKey: 'test-key', baseUrl: server.url });
+    const result = await sdk.image.generate({ model: 'MiniMax-H3-Image', prompt: 'cat', aspect_ratio: '16:9', area: '2K' });
+    expect(path).toBe('/v1/images/generations');
+    expect(body).toEqual({ model: 'MiniMax-H3-Image', prompt: 'cat', aspect_ratio: '16:9', area: '2K' });
+    expect(result.data[0]!.url).toBe('https://cdn/x.jpg');
+    expect(result.request_id).toBe('r1');
+  });
+
+  it('routes to /v1/images/edits with images', async () => {
+    let path = '';
+    server = createMockServer({
+      routes: {
+        '/v1/images/': (req) => {
+          path = new URL(req.url).pathname;
+          return jsonResponse({ data: [{ b64_json: 'AA==' }] });
+        },
+      },
+    });
+    const sdk = new MiniMaxSDK({ apiKey: 'test-key', baseUrl: server.url });
+    await sdk.image.generate({
+      model: 'MiniMax-H3-Image',
+      prompt: 'swap',
+      images: [{ image_url: 'https://a/cat.jpg' }],
+    });
+    expect(path).toBe('/v1/images/edits');
+  });
+
+  it('validates H3 requests before sending', async () => {
+    const sdk = new ImageSDK({ apiKey: 'sk-test', region: 'global' });
+    await expect(sdk.generate({ model: 'MiniMax-H3-Image', prompt: 'x', n: 11 })).rejects.toThrow('1 to 10');
+    await expect(sdk.generate({ model: 'MiniMax-H3-Image', prompt: 'x', size: '2048x2048', area: '2K' }))
+      .rejects.toThrow('cannot be combined');
+    // An empty images list is an edit request with no images, not a silent text-to-image call.
+    await expect(sdk.generate({ model: 'MiniMax-H3-Image', prompt: 'x', images: [] }))
+      .rejects.toThrow('1 to 16');
+  });
+
+  it('saves H3 responses with the returned output format', async () => {
+    const sdk = new ImageSDK({ apiKey: 'sk-test', region: 'global' });
+    const dir = join(tmpdir(), `mmx-sdk-h3-${Date.now()}`);
+    const saved = await sdk.save({
+      output_format: 'png',
+      data: [{ error: { code: '1000' } }, { b64_json: 'AA==' }],
+    }, { outDir: dir });
+    expect(saved).toEqual([join(dir, 'image_002.png')]);
+    expect(existsSync(saved[0]!)).toBe(true);
+    unlinkSync(saved[0]!);
+    rmdirSync(dir);
+  });
+});

@@ -12,6 +12,8 @@ export interface ApiErrorBody {
     code?: number;
     http_code?: string | number;
   };
+  /** Endpoint-specific; on /v1/images/* it holds per-image failure reasons when every image fails. */
+  data?: unknown;
 }
 
 function planHintForUrl(url?: string): string {
@@ -30,13 +32,37 @@ function upgradeUrl(url?: string): string {
   return `${host}/subscribe/token-plan`;
 }
 
+/** Per-image failure reasons from an all-failed /v1/images/* response, one line each. */
+function imageFailureDetails(body: ApiErrorBody): string | undefined {
+  if (!Array.isArray(body.data)) return undefined;
+  const items = body.data as Array<{ error?: { code?: string | number; message?: string } } | null>;
+  const lines = items.flatMap((item, index) => item?.error
+    ? [`Image ${index + 1}${item.error.code !== undefined ? ` (${item.error.code})` : ''}: ${item.error.message ?? 'unknown error'}`]
+    : []);
+  return lines.length > 0 ? lines.join('\n') : undefined;
+}
+
 export function mapApiError(status: number, body: ApiErrorBody, url?: string): CLIError {
+  const error = mapApiErrorBase(status, body, url);
+  const details = url?.includes('/v1/images/') ? imageFailureDetails(body) : undefined;
+  if (!details) return error;
+  return new CLIError(error.message, error.exitCode, error.hint ? `${details}\n${error.hint}` : details);
+}
+
+function mapApiErrorBase(status: number, body: ApiErrorBody, url?: string): CLIError {
   const apiMsg =
     body.base_resp?.status_msg ||
     body.error?.message ||
     `HTTP ${status}`;
 
-  const apiCode = body.base_resp?.status_code || body.error?.code;
+  // /v1/images/* (OpenAI-style) errors put the MiniMax code at the end of the
+  // message: "no image generated: all 2 images failed content safety check (1027)".
+  // Scoped to that endpoint so other APIs keep their existing classification.
+  const trailingCode = url?.includes('/v1/images/')
+    ? body.error?.message?.match(/\((\d{4})\)\s*$/)?.[1]
+    : undefined;
+  const apiCode = body.base_resp?.status_code || body.error?.code
+    || (trailingCode ? Number(trailingCode) : undefined);
   const errorType = body.error?.type;
 
   if (status === 401 || status === 403) {
@@ -47,11 +73,20 @@ export function mapApiError(status: number, body: ApiErrorBody, url?: string): C
     );
   }
 
-  if (status === 429) {
+  if (status === 429 || (apiCode === 1002 && url?.includes('/v1/images/'))) {
     return new CLIError(
       `Rate limit or quota exceeded. ${apiMsg}`,
       ExitCode.QUOTA,
       'Check usage: mmx quota show',
+    );
+  }
+
+  // 2068: the current plan tier does not include this model (returned as HTTP 402).
+  if (apiCode === 2068 && url?.includes('/v1/images/')) {
+    return new CLIError(
+      `This model is not available on your current plan. ${apiMsg}`,
+      ExitCode.QUOTA,
+      `Check usage: mmx quota show\nUpgrade plan: ${upgradeUrl(url)}`,
     );
   }
 

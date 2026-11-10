@@ -81,7 +81,18 @@ cat messages.json | mmx text chat --messages-file - --output json
 mmx image "一只穿宇航服的猫"
 mmx image generate --prompt "科技感 Logo" --n 3 --aspect-ratio 16:9
 mmx image generate --prompt "山水画" --out-dir ./output/
+
+# MiniMax-H3-Image 文生图
+mmx image generate --model MiniMax-H3-Image --prompt "一只橘猫趴在窗台上晒太阳，午后暖光，胶片质感" --aspect-ratio 16:9 --area 2K
+mmx image generate --model MiniMax-H3-Image --prompt "极简海报" --size 2720x1536 --output-format png --n 2
+
+# MiniMax-H3-Image 图像编辑（1~16 张参考图，按顺序对应图1、图2…）
+mmx image generate --model MiniMax-H3-Image --prompt "把图1里的猫换成图2里的柴犬，保持背景不变" --image cat.jpg --image https://example.com/dog.png
 ```
+
+MiniMax-H3-Image 不传 `--image` 时调用 `/v1/images/generations`（文生图），传 `--image` 时调用 `/v1/images/edits`（图像编辑）。输出尺寸二选一：`--size 宽x高`（面积 655,360~20,000,000 像素、宽高比 1:3~3:1），或 `--aspect-ratio` + `--area 1K|2K|4K`（默认 4K）。`--no-prompt-enhance` 可关闭文生图的 Prompt 增强，此时须指定 `--size` 或具体的 `--aspect-ratio`。单张失败（如未通过内容安全检查）不会中断其它图片，文件按原始张序命名，失败原因输出到 stderr（`--quiet` 时也会输出）。使用 `--response-format base64` 时，总输出面积（`n` × 宽 × 高）上限为 png 20,000,000 像素、jpg/webp 80,000,000 像素；`size` 为 auto 时每张按 `--area` 计（4K 按 4096 × 4096），超出会在本地直接报错。
+
+H3-Image 接口不支持幂等，超时重试会重复生成并计费，因此 CLI 不会自动重试，并把该请求的超时下限设为 600 秒（与服务端一致）。`--seed`、`--prompt-optimizer`、`--subject-ref` 仅适用于 image-01。
 
 ### `mmx video`
 

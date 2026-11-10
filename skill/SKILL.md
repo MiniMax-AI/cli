@@ -84,7 +84,7 @@ cat conversation.json | mmx text chat --messages-file - --output json
 
 ### image generate
 
-Generate images. Model: `image-01`.
+Generate images. Default model: `image-01`. Use `--model MiniMax-H3-Image` for higher-resolution text-to-image (up to 20 MP) or for image editing with `--image`.
 
 ```bash
 mmx image generate --prompt <text> [flags]
@@ -104,6 +104,27 @@ mmx image generate --prompt <text> [flags]
 | `--response-format <format>` | string | `url` (default) or `base64`. Base64 bypasses CDN download |
 | `--out-dir <dir>` | string | Download images to directory |
 | `--out-prefix <prefix>` | string | Filename prefix (default: `image`) |
+| `--model <model>` | string | `image-01` (default), `image-01-live`, or `MiniMax-H3-Image`; other values go to the image-01 endpoint unchanged |
+
+**MiniMax-H3-Image only** (`--seed`, `--prompt-optimizer`, `--subject-ref` are rejected; `--width/--height` become `--size`):
+
+| Flag | Type | Description |
+|---|---|---|
+| `--image <path-or-url>` | string, repeatable | 1–16 reference images → image editing (`/v1/images/edits`). Order = Picture 1, 2, … |
+| `--size <WxH>` | string | `auto` or e.g. `2720x1536`; area 655,360–20,000,000 px, ratio 1:3–3:1. Not with `--aspect-ratio`/`--area` |
+| `--aspect-ratio <X:Y>` | string | `auto` (default) or X:Y (integers 1–300) between 1:3 and 3:1 |
+| `--area <level>` | string | `1K`, `2K`, `4K` (default) |
+| `--n <count>` | number | 1–10 |
+| `--output-format <fmt>` | string | `jpg` (default), `png`, `webp` |
+| `--output-compression <q>` | number | 0–100 (default 95), jpg/webp only |
+| `--no-prompt-enhance` | boolean | Text-to-image only; needs `--size` or a concrete `--aspect-ratio` |
+
+H3-Image is synchronous and **not idempotent** — do not re-run a command just because it was slow; each run is billed. Partial failures exit 0 with `failed_count`/`failures` in JSON output (failures are also printed to stderr, even with `--quiet`). With `--response-format base64`, the total area `n` × W × H is limited to 20 MP for png and 80 MP for jpg/webp (`size auto` counts the `--area` level, e.g. 4K = 4096×4096).
+
+```bash
+mmx image generate --model MiniMax-H3-Image --prompt "A cat on a windowsill" --aspect-ratio 16:9 --area 2K --output json --quiet
+mmx image generate --model MiniMax-H3-Image --prompt "Put the hat from Picture 2 on the person in Picture 1" --image person.jpg --image hat.png --out result.jpg --quiet
+```
 
 ```bash
 mmx image generate --prompt "A cat in a spacesuit" --output json --quiet
