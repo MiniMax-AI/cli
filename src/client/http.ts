@@ -130,7 +130,14 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
     maybeShowStatusBar(config, credential.token, model);
   }
 
-  const timeoutMs = (opts.timeout ?? config.timeout) * 1000;
+  let timeoutMs = (opts.timeout ?? config.timeout) * 1000;
+  if (timeoutMs > 0) {
+    const nearestMs = Math.round(timeoutMs);
+    // Remove floating-point noise around whole milliseconds before rounding
+    // genuine sub-millisecond budgets down, never extending them to a full ms.
+    timeoutMs = Math.abs(timeoutMs - nearestMs) <= Number.EPSILON * timeoutMs
+      ? nearestMs : Math.floor(timeoutMs);
+  }
 
   const streamAbortController = opts.stream ? new AbortController() : undefined;
   const headerTimeout = streamAbortController
@@ -165,7 +172,14 @@ export async function request(config: Config, opts: RequestOpts): Promise<Respon
 
   if (!res.ok) {
     let body: ApiErrorBody = {};
-    try { body = (await res.json()) as ApiErrorBody; } catch { /* non-JSON */ }
+    try {
+      body = (await res.json()) as ApiErrorBody;
+    } catch (error) {
+      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+        throw error;
+      }
+      // Preserve HTTP error mapping when the response body is not JSON.
+    }
     throw mapApiError(res.status, body, opts.url);
   }
 
@@ -177,7 +191,10 @@ export async function requestJson<T>(config: Config, opts: RequestOpts): Promise
   let data: T & { base_resp?: { status_code?: number; status_msg?: string } };
   try {
     data = (await res.json()) as T & { base_resp?: { status_code?: number; status_msg?: string } };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      throw error;
+    }
     const contentType = res.headers.get('content-type') || '';
     throw new CLIError(
       `API returned non-JSON response (${contentType || 'unknown type'}). Server may be experiencing issues.`,
