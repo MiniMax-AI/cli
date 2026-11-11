@@ -111,7 +111,12 @@ function isUnavailablePlan(model: QuotaModelRemain): boolean {
 }
 
 function clampPct(value: number): number {
-  return Math.max(0, Math.min(MAX_DISPLAY_PCT, Math.round(value)));
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  return Math.max(0, Math.min(MAX_DISPLAY_PCT, rounded));
+}
+
+function formatPct(value: number): string {
+  return `${clampPct(value).toFixed(2)}%`;
 }
 
 function boostFactor(boostPermille: number | undefined | null): number {
@@ -137,7 +142,7 @@ function renderBar(remainingPct: number, color: boolean, barWidth: number = BAR_
   const ratio = Math.min(1, pct / 100);
   const filled = Math.round(barWidth * ratio);
   const empty = barWidth - filled;
-  const pctStr = `${pct}%`.padStart(4);
+  const pctStr = formatPct(pct).padStart(4);
   if (!color) {
     const bar = `[${'█'.repeat(filled)}${'.'.repeat(empty)}]`;
     return showPct ? `${bar} ${pctStr}` : bar;
