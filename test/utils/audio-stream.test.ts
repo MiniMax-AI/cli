@@ -53,4 +53,18 @@ describe('decodeAudioStream', () => {
       'API stream ended without audio data',
     );
   });
+
+  it('rejects a stream that closes after audio chunks but without a terminator', async () => {
+    // A dropped connection: chunks arrive, then the body ends with no
+    // `status: 2` chunk and no `data: [DONE]` terminator.
+    const response = new Response(
+      'data: {"data":{"audio":"414243","status":1}}\n\n'
+      + 'data: {"data":{"audio":"444546","status":1}}\n\n',
+      { headers: { 'Content-Type': 'text/event-stream' } },
+    );
+
+    await expect(collectAudio(response)).rejects.toThrow(
+      'Stream disconnected before audio completed.',
+    );
+  });
 });
