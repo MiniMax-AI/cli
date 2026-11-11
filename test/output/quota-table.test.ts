@@ -211,15 +211,67 @@ describe('renderQuotaTable', () => {
 
     const output = lines.join('\n');
 
+    expect(lines.find(line => line.includes('Week:'))).toContain('1w Reset 6d 0h');
+    expect(output).not.toContain('\x1b[');
     // general: 2-hour rolling window; video: daily window.
     expect(output).toContain('| 2h Reset 2h 0m |');
     expect(output).toContain('| 1d Reset 6h 0m |');
     // Every data row carries the column divider before the reset cell.
-    const dataRows = lines.filter(l => l.includes('Reset'));
+    const dataRows = lines.filter(l => l.includes('Reset') && !l.includes('Week:'));
     expect(dataRows.length).toBe(2);
     for (const row of dataRows) {
       expect(row.split('|').length).toBe(4);
     }
+  });
+
+  it('uses the first model with a weekly quota for the header countdown', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      const [general, video] = createCodingPlanModels();
+      renderQuotaTable(
+        [
+          {
+            ...video,
+            current_interval_status: 3,
+            current_weekly_status: 3,
+            current_interval_total_count: 0,
+            current_weekly_total_count: 0,
+          },
+          general,
+        ],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(lines.find(line => line.includes('Week:'))).toContain('1w Reset 6d 0h');
+  });
+
+  it('uses compact hours for weekly countdowns shorter than one day', () => {
+    const lines: string[] = [];
+    const originalLog = console.log;
+    console.log = (message?: unknown) => {
+      lines.push(String(message ?? ''));
+    };
+
+    try {
+      renderQuotaTable(
+        [{ ...createModel(), weekly_remains_time: 23 * 60 * 60 * 1000 }],
+        { ...createConfig(), noColor: true },
+      );
+    } finally {
+      console.log = originalLog;
+    }
+
+    const header = lines.find(line => line.includes('Week:')) ?? '';
+    expect(header).toContain('1w Reset 23h');
+    expect(header).not.toContain('23h 0m');
   });
 
   it('renders seconds only for positive durations below one minute', () => {
