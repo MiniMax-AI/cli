@@ -62,7 +62,8 @@ export async function* decodeAudioStream(
 
   let receivedAudio = false;
   for await (const event of parseSSE(response)) {
-    if (!event.data || event.data === '[DONE]') break;
+    if (event.data === '[DONE]') break;
+    if (!event.data) continue;
 
     let parsed: AudioPayload;
     try {
