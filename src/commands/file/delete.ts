@@ -1,6 +1,9 @@
 import { defineCommand } from '../../command';
 import { requestJson } from '../../client/http';
 import { fileDeleteEndpoint } from '../../client/endpoints';
+import { CLIError } from '../../errors/base';
+import { ExitCode } from '../../errors/codes';
+import { normalizeFileId } from '../../files/file-id';
 import { formatOutput, detectOutputFormat } from '../../output/formatter';
 import { isInteractive } from '../../utils/env';
 import { promptText, failIfMissing } from '../../utils/prompt';
@@ -33,10 +36,18 @@ export default defineCommand({
       }
     }
 
+    const normalizedFileId = normalizeFileId(fileId);
+    if (!normalizedFileId) {
+      throw new CLIError(
+        '--file-id must be a positive decimal integer within the int64 range.',
+        ExitCode.USAGE,
+      );
+    }
+
     const format = detectOutputFormat(config.output);
 
     if (config.dryRun) {
-      process.stdout.write(formatOutput({ request: { delete_file: fileId } }, format) + '\n');
+      process.stdout.write(formatOutput({ request: { delete_file: normalizedFileId } }, format) + '\n');
       return;
     }
 
@@ -44,7 +55,7 @@ export default defineCommand({
     const response = await requestJson<FileDeleteResponse>(config, {
       url,
       method: 'POST',
-      body: { file_id: Number(fileId) },
+      body: { file_id: normalizedFileId },
     });
 
     if (config.quiet) {
