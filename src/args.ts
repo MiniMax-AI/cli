@@ -62,7 +62,8 @@ export function findOptionError(argv: string[], options: OptionDef[]): string | 
       }
       if (eqIdx === -1 && !schema.booleans.has(key)) {
         const value = argv[i + 1];
-        if (value === undefined || value.startsWith('-')) {
+        if (value === undefined || (value.startsWith('-')
+          && !(schema.numbers.has(key) && Number.isFinite(Number(value))))) {
           return `Option --${rawKey} requires a value.`;
         }
         i += 2;
