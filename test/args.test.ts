@@ -86,4 +86,24 @@ describe('scanCommandPath', () => {
         .toContain('requires a value');
     }
   });
+
+  it.each(['-2', '-0.5', '-1e2'])('accepts a separate negative numeric value: %s', (value) => {
+    const options: OptionDef[] = [
+      { flag: '--pitch <n>', description: 'Pitch adjustment', type: 'number' },
+    ];
+    const argv = ['speech', 'synthesize', '--pitch', value];
+
+    expect(findOptionError(argv, options)).toBeUndefined();
+    expect(parseFlags(argv, options).pitch).toBe(Number(value));
+  });
+
+  it('still rejects an option in place of a numeric value', () => {
+    expect(findOptionError(['--timeout', '--verbose'], OPTIONS))
+      .toBe('Option --timeout requires a value.');
+  });
+
+  it('still rejects a leading dash in a separate string value', () => {
+    expect(findOptionError(['--message', '-text'], OPTIONS))
+      .toBe('Option --message requires a value.');
+  });
 });
