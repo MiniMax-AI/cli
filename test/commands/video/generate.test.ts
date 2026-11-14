@@ -664,11 +664,12 @@ describe('video generate command', () => {
     ).rejects.toThrow('require --model MiniMax-H3');
   });
 
-  it('rejects explicit MiniMax-Hailuo-2.3-Fast without --image', async () => {
+  it.each(['flag', 'config'])('rejects MiniMax-Hailuo-2.3-Fast without --image via %s', async (source) => {
     const config = {
       apiKey: 'test-key',
       region: 'global' as const,
       baseUrl: 'https://api.mmx.io',
+      defaultVideoModel: source === 'config' ? 'MiniMax-Hailuo-2.3-Fast' : undefined,
       output: 'json' as const,
       timeout: 10,
       verbose: false,
@@ -683,7 +684,7 @@ describe('video generate command', () => {
     await expect(
       generateCommand.execute(config, {
         prompt: 'A cat',
-        model: 'MiniMax-Hailuo-2.3-Fast',
+        model: source === 'flag' ? 'MiniMax-Hailuo-2.3-Fast' : undefined,
         quiet: false,
         verbose: false,
         noColor: true,
